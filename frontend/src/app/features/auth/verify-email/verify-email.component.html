@@ -1,0 +1,45 @@
+<section class="auth-card">
+  <header>
+    <p class="eyebrow">FashionStore SaaS</p>
+    <h1>Verificar correo</h1>
+    <p class="muted">Confirme el token enviado a su correo para activar el acceso.</p>
+  </header>
+
+  @if (!network.online()) {
+    <p class="warning" role="status">Sin conexion. La verificacion necesita red.</p>
+  }
+
+  @if (error()) {
+    <p class="alert" role="alert">{{ error() }}</p>
+  }
+
+  @if (success()) {
+    <div class="success">
+      <p>{{ success() }}</p>
+      <a routerLink="/login">Ir a iniciar sesion</a>
+    </div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <label>
+        Empresa
+        <input formControlName="empresa_slug" autocomplete="organization" placeholder="demo" />
+      </label>
+
+      <label>
+        Token de verificacion
+        <input formControlName="token" placeholder="Token recibido por correo" />
+        @if (form.controls.token.touched && form.controls.token.invalid) {
+          <small>Ingrese el token completo.</small>
+        }
+      </label>
+
+      <button type="submit" [disabled]="loading() || !network.online()">
+        {{ loading() ? 'Verificando...' : 'Verificar' }}
+      </button>
+    </form>
+  }
+
+  <p class="footer-link">
+    <a routerLink="/register">Volver al registro</a>
+  </p>
+</section>

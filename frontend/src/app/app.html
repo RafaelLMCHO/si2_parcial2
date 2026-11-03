@@ -1,0 +1,53 @@
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" routerLink="/">
+      <span class="brand-mark">FS</span>
+      <span>FashionStore <small>SaaS</small></span>
+    </a>
+
+    <nav>
+      @if (auth.user(); as user) {
+        @if (user.rol === 'superadmin' && !user.empresa_id) {
+          <a routerLink="/saas">Panel SaaS</a>
+        }
+        @if (user.rol === 'administrador' && user.empresa_id) {
+          <a routerLink="/mi-suscripcion">Suscripcion</a>
+        }
+        <a routerLink="/profile">Mi perfil</a>
+        <button type="button" class="nav-button" (click)="requestLogout()">Salir</button>
+      } @else {
+        <a routerLink="/login">Ingresar</a>
+        <a class="nav-cta" routerLink="/register">Registrarse</a>
+      }
+    </nav>
+  </header>
+
+  @if (!network.online()) {
+    <div class="system-banner offline" role="status">
+      Sin conexion. Puede consultar los datos guardados; las escrituras estan deshabilitadas.
+    </div>
+  }
+
+  @if (updateReady()) {
+    <div class="system-banner update" role="status">
+      Hay una nueva version disponible.
+      <button type="button" (click)="reload()">Actualizar</button>
+    </div>
+  }
+
+  <main>
+    <router-outlet />
+  </main>
+
+  <footer>
+    <span>FashionStore SaaS - Segundo parcial</span>
+    <span>Sistemas de Informacion II - Grupo 33</span>
+  </footer>
+</div>
+
+<app-logout-dialog
+  [open]="showLogout()"
+  [pending]="auth.pendingOffline()"
+  (confirmed)="confirmLogout()"
+  (cancelled)="showLogout.set(false)"
+/>

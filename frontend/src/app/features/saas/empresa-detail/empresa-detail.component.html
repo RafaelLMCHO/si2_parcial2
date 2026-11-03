@@ -1,0 +1,195 @@
+<section class="page">
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Gestion de tenant</p>
+      <h1>{{ empresa()?.nombre ?? 'Empresa' }}</h1>
+      <p class="muted">
+        @if (empresa(); as e) {
+          {{ e.nit }} · {{ e.slug }} · {{ e.correo }}
+        } @else {
+          Cargando informacion de la empresa.
+        }
+      </p>
+    </div>
+    <a class="ghost-link" routerLink="/saas">Volver al panel</a>
+  </header>
+
+  @if (!network.online()) {
+    <p class="warning" role="status">Sin conexion. La gestion SaaS requiere red.</p>
+  }
+
+  @if (error()) {
+    <p class="alert" role="alert">{{ error() }}</p>
+  }
+  @if (message()) {
+    <p class="success" role="status">{{ message() }}</p>
+  }
+
+  @if (loading()) {
+    <p class="muted" role="status">Cargando empresa...</p>
+  }
+
+  @if (empresa(); as e) {
+    @if (e.estado === 'suspendida') {
+      <p class="warning">
+        El servicio esta suspendido y las sesiones de la empresa fueron revocadas.
+      </p>
+    }
+    @if (e.estado === 'pendiente_plan') {
+      <p class="warning">
+        La empresa aun no tiene un plan. Sus usuarios no podran iniciar sesion hasta que asigne
+        una suscripcion.
+      </p>
+    }
+
+    <div class="grid">
+      <article class="card">
+        <div class="card-head">
+          <h2>Informacion general</h2>
+          <span class="pill" [class]="'pill ' + e.estado">{{ e.estado }}</span>
+        </div>
+        <dl>
+          <div><dt>Razon social</dt><dd>{{ e.nombre }}</dd></div>
+          <div><dt>NIT</dt><dd>{{ e.nit }}</dd></div>
+          <div><dt>Slug</dt><dd>{{ e.slug }}</dd></div>
+          <div><dt>Correo</dt><dd>{{ e.correo }}</dd></div>
+          <div><dt>Telefono</dt><dd>{{ e.telefono || '-' }}</dd></div>
+          <div><dt>Direccion</dt><dd>{{ e.direccion || '-' }}</dd></div>
+          <div><dt>Sucursales activas</dt><dd>{{ e.sucursales_activas }}</dd></div>
+          <div><dt>Alta</dt><dd>{{ e.created_at | date: 'dd/MM/yyyy HH:mm' }}</dd></div>
+        </dl>
+      </article>
+
+      <article class="card">
+        <h2>Suscripcion actual</h2>
+        @if (e.suscripcion; as s) {
+          <dl>
+            <div><dt>Plan</dt><dd>{{ s.plan.nombre }}</dd></div>
+            <div><dt>Estado</dt><dd>{{ s.estado }}</dd></div>
+            <div><dt>Precio</dt><dd>{{ s.plan.precio_mensual | number: '1.2-2' }} {{ s.plan.moneda }}</dd></div>
+            <div><dt>Inicio</dt><dd>{{ s.fecha_inicio | date: 'dd/MM/yyyy' }}</dd></div>
+            <div>
+              <dt>Vencimiento</dt>
+              <dd>{{ s.fecha_fin ? (s.fecha_fin | date: 'dd/MM/yyyy') : 'Sin fecha' }}</dd>
+            </div>
+            <div>
+              <dt>Dias restantes</dt>
+              <dd>{{ s.dias_restantes ?? 'Ilimitado' }}</dd>
+            </div>
+            <div><dt>Renovacion automatica</dt><dd>{{ s.renovacion_auto ? 'Si' : 'No' }}</dd></div>
+            <div><dt>IA habilitada</dt><dd>{{ s.ia_habilitada ? 'Si' : 'No' }}</dd></div>
+          </dl>
+          @if (s.por_vencer) {
+            <p class="warning">La suscripcion vence en los proximos 7 dias.</p>
+          }
+
+          <h3>Limites del plan</h3>
+          <dl class="limits">
+            @for (limite of s.plan.limites | keyvalue; track limite.key) {
+              <div>
+                <dt>{{ limiteLabel(limite.key) }}</dt>
+                <dd>{{ limite.value === null ? 'Ilimitado' : limite.value }}</dd>
+              </div>
+            }
+          </dl>
+        } @else {
+          <p class="muted">Sin suscripcion registrada.</p>
+        }
+      </article>
+    </div>
+
+    <article class="card">
+      <h2>Asignar o cambiar plan</h2>
+      <form [formGroup]="planForm" (ngSubmit)="assignPlan()">
+        <div class="grid form-grid">
+          <label>
+            Plan
+            <select formControlName="plan_codigo">
+              @for (plan of planes(); track plan.codigo) {
+                <option [value]="plan.codigo">
+                  {{ plan.nombre }} - {{ plan.precio_mensual | number: '1.2-2' }} {{ plan.moneda }}
+                </option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Estado de suscripcion
+            <select formControlName="estado">
+              <option value="prueba">Prueba</option>
+              <option value="activa">Activa</option>
+              <option value="mora">En mora</option>
+              <option value="suspendida">Suspendida</option>
+            </select>
+          </label>
+
+          <label>
+            Fecha de inicio
+            <input type="date" formControlName="fecha_inicio" />
+          </label>
+
+          <label>
+            Fecha de vencimiento
+            <input type="date" formControlName="fecha_fin" />
+          </label>
+        </div>
+
+        <label class="checkbox">
+          <input type="checkbox" formControlName="renovacion_auto" />
+          Renovacion automatica
+        </label>
+
+        <p class="hint">
+          Al cambiar de plan se conserva el historial: la suscripcion anterior se marca como
+          cancelada y se registra una nueva.
+        </p>
+
+        <button
+          type="submit"
+          [disabled]="saving() || !network.online() || e.estado === 'cancelada'"
+        >
+          {{ saving() ? 'Guardando...' : 'Guardar suscripcion' }}
+        </button>
+      </form>
+    </article>
+
+    <article class="card">
+      <h2>Control de servicio</h2>
+      <p class="muted">
+        Suspender revoca todas las sesiones activas de la empresa. Reactivar rehabilita el acceso
+        si la suscripcion no esta vencida.
+      </p>
+      <label>
+        Motivo (opcional)
+        <input [formControl]="accionForm.controls.motivo" placeholder="Motivo de la accion" />
+      </label>
+
+      <div class="actions">
+        @if (e.estado === 'suspendida') {
+          <button type="button" [disabled]="saving() || !network.online()" (click)="reactivar()">
+            Reactivar servicio
+          </button>
+        } @else if (!confirmingSuspend()) {
+          <button
+            type="button"
+            class="danger"
+            [disabled]="saving() || !network.online() || e.estado === 'cancelada'"
+            (click)="confirmingSuspend.set(true)"
+          >
+            Suspender servicio
+          </button>
+        } @else {
+          <p class="warning">
+            Confirme la suspension. Se revocaran las sesiones activas de la empresa.
+          </p>
+          <button type="button" class="danger" [disabled]="saving()" (click)="suspender()">
+            Confirmar suspension
+          </button>
+          <button type="button" class="ghost" (click)="confirmingSuspend.set(false)">
+            Cancelar
+          </button>
+        }
+      </div>
+    </article>
+  }
+</section>

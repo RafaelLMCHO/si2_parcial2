@@ -1,0 +1,22 @@
+\set ON_ERROR_STOP on
+\ir 00_extensions.sql
+\ir 01_core_saas.sql
+\ir 02_geografia.sql
+\ir 03_rbac_seguridad.sql
+\ir 04_auditoria.sql
+\ir 05_catalogo.sql
+\ir 06_inventario.sql
+\ir 07_reservas_carrito.sql
+\ir 08_ecommerce_base.sql
+\ir 09_ventas_pagos.sql
+\ir 10_offline.sql
+\ir 11_ecommerce_derivados.sql
+\ir 12_ml_ia.sql
+\ir 17_ar.sql
+\ir 13_funciones_triggers.sql
+\ir 14_rls.sql
+\ir 15_indices.sql
+\ir 16_seeds.sql
+\ir 18_ajustes_cu01_05.sql
+\ir 20_ajustes_cu06_cu09.sql
+\ir 99_verificacion.sql

@@ -1,0 +1,70 @@
+<section class="auth-card">
+  <header>
+    <p class="eyebrow">FashionStore SaaS</p>
+    <h1>Iniciar sesion</h1>
+    <p class="muted">Acceda con su empresa, correo y contrasena.</p>
+  </header>
+
+  @if (!network.online()) {
+    <p class="warning" role="status">
+      Sin conexion. El inicio de sesion necesita red; si ya inicio sesion antes, puede volver a
+      entrar desde el acceso directo.
+    </p>
+  }
+
+  @if (error()) {
+    <p class="alert" role="alert">{{ error() }}</p>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <label>
+      Empresa
+      <input
+        formControlName="empresa_slug"
+        autocomplete="organization"
+        inputmode="text"
+        placeholder="demo"
+      />
+      <small class="hint">Deje vacio solo para ingresar como superadmin.</small>
+    </label>
+
+    <label>
+      Correo
+      <input
+        formControlName="correo"
+        type="email"
+        autocomplete="email"
+        inputmode="email"
+        placeholder="admin@demo.test"
+      />
+      @if (form.controls.correo.touched && form.controls.correo.invalid) {
+        <small>Ingrese un correo valido.</small>
+      }
+    </label>
+
+    <label>
+      Contrasena
+      <span class="password-field">
+        <input
+          formControlName="password"
+          [type]="showPassword() ? 'text' : 'password'"
+          autocomplete="current-password"
+        />
+        <button type="button" class="reveal" (click)="showPassword.set(!showPassword())">
+          {{ showPassword() ? 'Ocultar' : 'Mostrar' }}
+        </button>
+      </span>
+      @if (form.controls.password.touched && form.controls.password.invalid) {
+        <small>Minimo 8 caracteres.</small>
+      }
+    </label>
+
+    <button type="submit" [disabled]="loading() || !network.online()">
+      {{ loading() ? 'Ingresando...' : 'Ingresar' }}
+    </button>
+  </form>
+
+  <p class="footer-link">
+    No tiene cuenta? <a routerLink="/register">Registrarse</a>
+  </p>
+</section>

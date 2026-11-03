@@ -1,0 +1,101 @@
+<section class="page">
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Plan contratado</p>
+      <h1>Mi suscripcion</h1>
+      <p class="muted">
+        @if (data(); as d) {
+          {{ d.empresa_nombre }}
+        } @else {
+          Consulte el plan, vencimiento y limites de su empresa.
+        }
+      </p>
+    </div>
+    <a class="ghost-link" routerLink="/profile">Volver al perfil</a>
+  </header>
+
+  @if (!network.online()) {
+    <p class="warning" role="status">Sin conexion. No se puede consultar la suscripcion.</p>
+  }
+
+  @if (error()) {
+    <p class="alert" role="alert">{{ error() }}</p>
+  }
+
+  @if (loading()) {
+    <p class="muted" role="status">Cargando suscripcion...</p>
+  }
+
+  @if (data(); as d) {
+    @if (d.suscripcion.por_vencer) {
+      <p class="warning">
+        Su suscripcion vence en {{ d.suscripcion.dias_restantes }} dia(s). Contacte al
+        administrador SaaS para renovarla.
+      </p>
+    }
+
+    <div class="grid">
+      <article class="card">
+        <h2>Resumen</h2>
+        <dl>
+          <div><dt>Plan</dt><dd>{{ d.suscripcion.plan.nombre }}</dd></div>
+          <div><dt>Estado</dt><dd>{{ d.suscripcion.estado }}</dd></div>
+          <div>
+            <dt>Precio mensual</dt>
+            <dd>
+              {{ d.suscripcion.plan.precio_mensual | number: '1.2-2' }}
+              {{ d.suscripcion.plan.moneda }}
+            </dd>
+          </div>
+          <div><dt>Inicio</dt><dd>{{ d.suscripcion.fecha_inicio | date: 'dd/MM/yyyy' }}</dd></div>
+          <div>
+            <dt>Vencimiento</dt>
+            <dd>
+              {{
+                d.suscripcion.fecha_fin
+                  ? (d.suscripcion.fecha_fin | date: 'dd/MM/yyyy')
+                  : 'Sin fecha'
+              }}
+            </dd>
+          </div>
+          <div>
+            <dt>Dias restantes</dt>
+            <dd>{{ d.suscripcion.dias_restantes ?? 'Ilimitado' }}</dd>
+          </div>
+          <div>
+            <dt>Renovacion automatica</dt>
+            <dd>{{ d.suscripcion.renovacion_auto ? 'Si' : 'No' }}</dd>
+          </div>
+          <div>
+            <dt>Asistente IA</dt>
+            <dd>{{ d.suscripcion.ia_habilitada ? 'Habilitado' : 'No incluido' }}</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="card">
+        <h2>Limites y uso</h2>
+        <dl>
+          @for (limite of d.suscripcion.limites | keyvalue; track limite.key) {
+            <div>
+              <dt>{{ limiteLabel(limite.key) }}</dt>
+              <dd>
+                {{ limite.value === null ? 'Ilimitado' : limite.value }}
+                @if (limite.key === 'sucursales') {
+                  <small class="block">
+                    Uso actual: {{ d.suscripcion.uso['sucursales'] }}
+                  </small>
+                }
+              </dd>
+            </div>
+          }
+        </dl>
+        @if (d.suscripcion.ia_habilitada) {
+          <p class="hint">Su plan incluye el asistente de inteligencia artificial.</p>
+        } @else {
+          <p class="hint">Solicite una mejora de plan para habilitar el asistente IA.</p>
+        }
+      </article>
+    </div>
+  }
+</section>

@@ -1,0 +1,156 @@
+<section class="panel">
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Superadministrador SaaS</p>
+      <h1>Panel de empresas</h1>
+      <p class="muted">Supervise tenants, suscripciones y volumen transaccional del mes.</p>
+    </div>
+    <a class="cta" routerLink="/saas/empresas/nueva">Registrar empresa</a>
+  </header>
+
+  @if (!network.online()) {
+    <p class="warning" role="status">
+      Sin conexion. El panel SaaS requiere red para consultar informacion actualizada.
+    </p>
+  }
+
+  @if (error()) {
+    <p class="alert" role="alert">{{ error() }}</p>
+  }
+
+  @if (metricas(); as m) {
+    <div class="metrics">
+      <article class="metric-card">
+        <span class="metric-label">Tenants registrados</span>
+        <strong>{{ m.total_tenants }}</strong>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">Empresas activas</span>
+        <strong>{{ m.empresas_activas }}</strong>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">Por vencer (7 dias)</span>
+        <strong>{{ m.suscripciones_por_vencer }}</strong>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">Ventas completadas del mes</span>
+        <strong>{{ m.volumen_transaccional | number: '1.2-2' }} {{ m.moneda }}</strong>
+        <small>{{ m.periodo_inicio | date: 'dd/MM/yyyy' }} - {{ m.periodo_fin | date: 'dd/MM/yyyy' }}</small>
+      </article>
+    </div>
+  }
+
+  <article class="card">
+    <form class="filters" [formGroup]="filters" (ngSubmit)="applyFilters()">
+      <label>
+        Buscar
+        <input formControlName="search" placeholder="Nombre, NIT o slug" />
+      </label>
+      <label>
+        Estado
+        <select formControlName="estado">
+          <option value="">Todos</option>
+          <option value="activa">Activa</option>
+          <option value="pendiente_plan">Pendiente de plan</option>
+          <option value="suspendida">Suspendida</option>
+          <option value="cancelada">Cancelada</option>
+        </select>
+      </label>
+      <label>
+        Plan
+        <select formControlName="plan">
+          <option value="">Todos</option>
+          @for (plan of planes(); track plan.codigo) {
+            <option [value]="plan.codigo">{{ plan.nombre }}</option>
+          }
+        </select>
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" formControlName="por_vencer" />
+        Solo por vencer
+      </label>
+      <div class="filter-actions">
+        <button type="submit" [disabled]="loading() || !network.online()">Filtrar</button>
+        <button type="button" class="ghost" (click)="clearFilters()">Limpiar</button>
+      </div>
+    </form>
+  </article>
+
+  <article class="card">
+    <div class="table-header">
+      <h2>Empresas</h2>
+      <span class="muted">{{ total() }} resultado(s)</span>
+    </div>
+
+    @if (loading()) {
+      <p class="muted" role="status">Cargando empresas...</p>
+    } @else if (!empresas().length) {
+      <p class="muted">No hay empresas que coincidan con los filtros.</p>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Empresa</th>
+              <th>Estado</th>
+              <th>Plan</th>
+              <th>Sucursales</th>
+              <th>Vencimiento</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (empresa of empresas(); track empresa.id) {
+              <tr>
+                <td>
+                  <strong>{{ empresa.nombre }}</strong>
+                  <small class="block">NIT {{ empresa.nit }} · {{ empresa.slug }}</small>
+                </td>
+                <td>
+                  <span class="pill" [class]="'pill ' + empresa.estado">{{ empresa.estado }}</span>
+                </td>
+                <td>
+                  @if (empresa.suscripcion; as suscripcion) {
+                    <span>{{ suscripcion.plan.nombre }}</span>
+                    <small class="block">{{ suscripcion.estado }}</small>
+                  } @else {
+                    <span class="muted">Sin plan</span>
+                  }
+                </td>
+                <td>{{ empresa.sucursales_activas }}</td>
+                <td>
+                  @if (empresa.suscripcion?.fecha_fin; as fechaFin) {
+                    <span>{{ fechaFin | date: 'dd/MM/yyyy' }}</span>
+                    @if (empresa.suscripcion?.por_vencer) {
+                      <small class="block danger">Vence pronto</small>
+                    }
+                  } @else {
+                    <span class="muted">-</span>
+                  }
+                </td>
+                <td class="actions">
+                  <a [routerLink]="['/saas/empresas', empresa.id]">Gestionar</a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        <button type="button" class="ghost" [disabled]="page() <= 1" (click)="previousPage()">
+          Anterior
+        </button>
+        <span>Pagina {{ page() }} de {{ totalPages() }}</span>
+        <button
+          type="button"
+          class="ghost"
+          [disabled]="page() * pageSize >= total()"
+          (click)="nextPage()"
+        >
+          Siguiente
+        </button>
+      </div>
+    }
+  </article>
+</section>

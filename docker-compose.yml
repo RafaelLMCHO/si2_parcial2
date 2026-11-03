@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: fashionstore-segundo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fashionstore
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - fashionstore_pgdata:/var/lib/postgresql/data
+      - ./db:/workspace/db:ro
+      - ./tests:/workspace/tests:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fashionstore"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  fashionstore_pgdata:

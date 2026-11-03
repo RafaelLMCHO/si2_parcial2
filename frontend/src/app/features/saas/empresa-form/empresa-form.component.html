@@ -1,0 +1,111 @@
+<section class="page">
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Alta de tenant</p>
+      <h1>Registrar empresa</h1>
+      <p class="muted">
+        Cree la empresa, su administrador inicial y deje el tenant pendiente de asignacion de plan.
+      </p>
+    </div>
+    <a class="ghost-link" routerLink="/saas">Volver al panel</a>
+  </header>
+
+  @if (!network.online()) {
+    <p class="warning" role="status">Sin conexion. El alta de empresas requiere red.</p>
+  }
+
+  @if (error()) {
+    <p class="alert" role="alert">{{ error() }}</p>
+  }
+
+  @if (result(); as created) {
+    <article class="card success-card">
+      <h2>{{ created.mensaje }}</h2>
+      <dl>
+        <div>
+          <dt>Empresa</dt>
+          <dd>{{ created.nombre }} ({{ created.slug }})</dd>
+        </div>
+        <div>
+          <dt>NIT</dt>
+          <dd>{{ created.nit }}</dd>
+        </div>
+        <div>
+          <dt>Administrador</dt>
+          <dd>{{ created.admin_correo }}</dd>
+        </div>
+        <div>
+          <dt>Contrasena temporal</dt>
+          <dd><code>{{ created.password_temporal }}</code></dd>
+        </div>
+      </dl>
+      <p class="warning">
+        Esta contrasena se muestra una sola vez. Entreguela al administrador por un canal seguro.
+      </p>
+      <div class="actions">
+        <button type="button" (click)="copyPassword()">
+          {{ copied() ? 'Copiada' : 'Copiar contrasena' }}
+        </button>
+        <a class="cta" [routerLink]="['/saas/empresas', created.empresa_id]">Asignar plan</a>
+        <button type="button" class="ghost" (click)="registerAnother()">Registrar otra</button>
+      </div>
+    </article>
+  } @else {
+    <article class="card">
+      <h2>Datos de la empresa</h2>
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <div class="grid">
+          <label>
+            Razon social
+            <input formControlName="nombre" autocomplete="organization" />
+            @if (form.controls.nombre.touched && form.controls.nombre.invalid) {
+              <small>Ingrese la razon social.</small>
+            }
+          </label>
+
+          <label>
+            NIT
+            <input formControlName="nit" inputmode="text" placeholder="123456789" />
+            @if (form.controls.nit.touched && form.controls.nit.invalid) {
+              <small>Ingrese un NIT valido.</small>
+            }
+          </label>
+
+          <label>
+            Telefono
+            <input formControlName="telefono" inputmode="tel" autocomplete="tel" />
+          </label>
+
+          <label>
+            Correo de la empresa
+            <input formControlName="correo_admin" type="email" autocomplete="email" />
+            <small class="hint">Tambien sera el correo del administrador inicial.</small>
+            @if (form.controls.correo_admin.touched && form.controls.correo_admin.invalid) {
+              <small>Ingrese un correo valido.</small>
+            }
+          </label>
+        </div>
+
+        <label>
+          Direccion
+          <input formControlName="direccion" autocomplete="street-address" />
+          @if (form.controls.direccion.touched && form.controls.direccion.invalid) {
+            <small>Ingrese la direccion de la empresa.</small>
+          }
+        </label>
+
+        <label>
+          Nombre del administrador
+          <input formControlName="nombre_admin" autocomplete="name" />
+          @if (form.controls.nombre_admin.touched && form.controls.nombre_admin.invalid) {
+            <small>Ingrese el nombre del administrador.</small>
+          }
+        </label>
+
+        <button type="submit" [disabled]="loading() || !network.online()">
+          {{ loading() ? 'Registrando...' : 'Registrar empresa' }}
+        </button>
+      </form>
+    </article>
+  }
+</section>

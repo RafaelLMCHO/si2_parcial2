@@ -1,0 +1,82 @@
+<section class="auth-card">
+  <header>
+    <p class="eyebrow">FashionStore SaaS</p>
+    <h1>Crear cuenta</h1>
+    <p class="muted">El registro queda asociado a la empresa indicada.</p>
+  </header>
+
+  @if (!network.online()) {
+    <p class="warning" role="status">Sin conexion. El registro necesita red.</p>
+  }
+
+  @if (error()) {
+    <p class="alert" role="alert">{{ error() }}</p>
+  }
+
+  @if (registered(); as result) {
+    <div class="success">
+      <p>{{ result.mensaje }}</p>
+      @if (result.verification_token) {
+        <p class="token-label">Token de verificacion (modo demo):</p>
+        <code>{{ result.verification_token }}</code>
+      }
+      <button type="button" (click)="goToVerification()">Verificar correo</button>
+    </div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <label>
+        Empresa
+        <input formControlName="empresa_slug" autocomplete="organization" placeholder="demo" />
+        @if (form.controls.empresa_slug.touched && form.controls.empresa_slug.invalid) {
+          <small>Indique el identificador de la empresa.</small>
+        }
+      </label>
+
+      <label>
+        Nombre completo
+        <input formControlName="nombre" autocomplete="name" />
+        @if (form.controls.nombre.touched && form.controls.nombre.invalid) {
+          <small>Ingrese su nombre.</small>
+        }
+      </label>
+
+      <label>
+        Correo
+        <input formControlName="correo" type="email" autocomplete="email" inputmode="email" />
+        @if (form.controls.correo.touched && form.controls.correo.invalid) {
+          <small>Ingrese un correo valido.</small>
+        }
+      </label>
+
+      <label>
+        Telefono (opcional)
+        <input formControlName="telefono" autocomplete="tel" inputmode="tel" />
+      </label>
+
+      <label>
+        Contrasena
+        <span class="password-field">
+          <input
+            formControlName="password"
+            [type]="showPassword() ? 'text' : 'password'"
+            autocomplete="new-password"
+          />
+          <button type="button" class="reveal" (click)="showPassword.set(!showPassword())">
+            {{ showPassword() ? 'Ocultar' : 'Mostrar' }}
+          </button>
+        </span>
+        @if (form.controls.password.touched && form.controls.password.invalid) {
+          <small>Minimo 8 caracteres.</small>
+        }
+      </label>
+
+      <button type="submit" [disabled]="loading() || !network.online()">
+        {{ loading() ? 'Registrando...' : 'Registrarme' }}
+      </button>
+    </form>
+  }
+
+  <p class="footer-link">
+    Ya tiene cuenta? <a routerLink="/login">Iniciar sesion</a>
+  </p>
+</section>

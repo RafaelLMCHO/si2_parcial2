@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagramas de Secuencia y Robustez - CU-01 al CU-05 (ICONIX)</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --subtext: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --accent-seq: #4ade80;
+      --accent-seq-hover: #22c55e;
+    }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2rem 1rem;
+    }
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 2rem;
+    }
+    h1 {
+      font-size: 2.2rem;
+      margin: 0 0 0.5rem 0;
+      color: #e2e8f0;
+    }
+    p.lead {
+      color: var(--subtext);
+      font-size: 1.1rem;
+      margin: 0 0 1.5rem 0;
+    }
+    .nav-links {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .nav-btn {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .nav-btn-seq {
+      background: #14532d;
+      color: #86efac;
+      border: 1px solid #22c55e;
+    }
+    .nav-btn-rob {
+      background: #0c4a6e;
+      color: #7dd3fc;
+      border: 1px solid #0284c7;
+    }
+    .section-title {
+      font-size: 1.8rem;
+      color: #f1f5f9;
+      border-left: 4px solid var(--accent-seq);
+      padding-left: 0.8rem;
+      margin: 3rem 0 1.5rem 0;
+    }
+    .section-title.rob {
+      border-left-color: var(--accent);
+    }
+    .grid {
+      display: flex;
+      flex-direction: column;
+      gap: 2.5rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .card-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--accent-seq);
+      margin: 0;
+    }
+    .card.rob .card-title {
+      color: var(--accent);
+    }
+    .card-desc {
+      font-size: 0.95rem;
+      color: var(--subtext);
+      margin-top: 0.25rem;
+    }
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .btn-green {
+      background: var(--accent-seq);
+      color: #0f172a;
+    }
+    .btn-green:hover {
+      background: var(--accent-seq-hover);
+      color: #ffffff;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #0f172a;
+    }
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      color: #ffffff;
+    }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--subtext);
+    }
+    .img-wrapper {
+      background: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      padding: 1rem;
+      display: flex;
+      justify-content: center;
+    }
+    .img-wrapper img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>FashionStore SaaS - Diagramas ICONIX (CU-01 al CU-05)</h1>
+      <p class="lead">Diagramas de Secuencia y Robustez generados en Alta Resolución (PNG 300 DPI y Vectorial SVG)</p>
+      <div class="nav-links">
+        <a href="#secuencia" class="nav-btn nav-btn-seq">Ir a Diagramas de Secuencia</a>
+        <a href="#robustez" class="nav-btn nav-btn-rob">Ir a Diagramas de Robustez</a>
+      </div>
+    </header>
+
+    <!-- SECCIÓN: DIAGRAMAS DE SECUENCIA -->
+    <h2 id="secuencia" class="section-title">Diagramas de Secuencia (CU-01 al CU-05) con alt, opt, loop</h2>
+    <div class="grid">
+
+      <!-- SECUENCIA CU-01 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-01: Iniciar Sesión (Login)</h3>
+            <div class="card-desc">Fragmentos: opt [Superadmin], alt [Credenciales válidas / inválidas] | CRUD: GET, PATCH, POST</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu01_iniciar_sesion.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu01_iniciar_sesion.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu01_iniciar_sesion.png" alt="Secuencia CU-01 Iniciar Sesión">
+        </div>
+      </div>
+
+      <!-- SECUENCIA CU-02 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-02: Registrarse y Verificar Correo</h3>
+            <div class="card-desc">Fragmentos: alt [Correo disponible / duplicado 409], opt [Modo demo], alt [Token válido / inválido 400] | CRUD: GET, POST, PATCH, DELETE</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu02_registrarse.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu02_registrarse.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu02_registrarse.png" alt="Secuencia CU-02 Registrarse">
+        </div>
+      </div>
+
+      <!-- SECUENCIA CU-03 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-03: Gestionar Perfil y Cambio de Contraseña</h3>
+            <div class="card-desc">Fragmentos: opt [Modificación datos], alt [Clave válida / errónea 400], loop [Revocar demás sesiones] | CRUD: GET, PUT/PATCH, DELETE, POST</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu03_gestionar_perfil.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu03_gestionar_perfil.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu03_gestionar_perfil.png" alt="Secuencia CU-03 Gestionar Perfil">
+        </div>
+      </div>
+
+      <!-- SECUENCIA CU-04 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-04: Cerrar Sesión y Refresco de Tokens</h3>
+            <div class="card-desc">Fragmentos: opt [Preservar cola offline], alt [Refresh token válido / revocado 401] | CRUD: DELETE, GET, PUT/PATCH, POST</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu04_cerrar_sesion.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu04_cerrar_sesion.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu04_cerrar_sesion.png" alt="Secuencia CU-04 Cerrar Sesión">
+        </div>
+      </div>
+
+      <!-- SECUENCIA CU-05 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-05: Registrar Auditoría del Sistema</h3>
+            <div class="card-desc">Fragmentos: alt [Ruta excluida / auditable], opt [JWT Presente], loop [Enmascarar claves sensibles ***] | CRUD: GET, POST (audita GET, POST, PUT, DELETE)</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu05_registrar_auditoria.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu05_registrar_auditoria.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu05_registrar_auditoria.png" alt="Secuencia CU-05 Registrar Auditoría">
+        </div>
+      </div>
+
+    </div>
+
+    <!-- SECCIÓN: DIAGRAMAS DE ROBUSTEZ -->
+    <h2 id="robustez" class="section-title rob">Diagramas de Robustez (CU-01 al CU-05)</h2>
+    <div class="grid">
+
+      <!-- CONSOLIDADO ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Diagrama Integrado de Robustez: CU-01 al CU-05</h3>
+            <div class="card-desc">Visión global de todos los actores, boundaries, controladores y entidades del sistema.</div>
+          </div>
+          <div class="actions">
+            <a href="cu01_cu05_consolidado.png" download class="btn btn-primary">Descargar PNG Consolidado</a>
+            <a href="cu01_cu05_consolidado.svg" download class="btn btn-outline">Descargar SVG Consolidado</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu01_cu05_consolidado.png" alt="Consolidado Robustez">
+        </div>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>

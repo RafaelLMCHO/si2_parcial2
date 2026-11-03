@@ -1,0 +1,143 @@
+<section class="profile">
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Mi cuenta</p>
+      <h1>{{ user()?.nombre ?? 'Perfil' }}</h1>
+      <p class="muted">
+        {{ user()?.correo }} · Rol {{ user()?.rol }} · Empresa {{ auth.tenantSlug() }}
+      </p>
+    </div>
+    <div class="hero-actions">
+      @if (install.canInstall()) {
+        <button type="button" class="ghost" (click)="installApp()">Instalar app</button>
+      }
+      <button type="button" class="ghost" (click)="requestLogout()">Cerrar sesion</button>
+    </div>
+  </header>
+
+  @if (!network.online()) {
+    <p class="warning" role="status">
+      Sin conexion. Los datos mostrados son los ultimos guardados en este dispositivo.
+    </p>
+  }
+
+  @if (auth.isSessionExpired()) {
+    <p class="warning" role="status">
+      La sesion local expiro. Reconectese para renovarla; mientras tanto no puede guardar cambios.
+    </p>
+  }
+
+  @if (auth.pendingOffline()) {
+    <p class="warning">
+      Hay operaciones pendientes en la cola offline. Cerrar sesion no las elimina.
+    </p>
+  }
+
+  @if (offlineNotice()) {
+    <p class="warning" role="status">{{ offlineNotice() }}</p>
+  }
+
+  @if (message()) {
+    <p class="success" role="status">{{ message() }}</p>
+  }
+  @if (error()) {
+    <p class="alert" role="alert">{{ error() }}</p>
+  }
+
+  <div class="grid">
+    <article class="card">
+      <h2>Datos personales</h2>
+      <form [formGroup]="profileForm" (ngSubmit)="saveProfile()">
+        <label>
+          Nombre
+          <input
+            formControlName="nombre"
+            autocomplete="name"
+            [disabled]="!canWrite() || loading()"
+          />
+          @if (profileForm.controls.nombre.touched && profileForm.controls.nombre.invalid) {
+            <small>Ingrese su nombre.</small>
+          }
+        </label>
+
+        <label>
+          Telefono
+          <input
+            formControlName="telefono"
+            autocomplete="tel"
+            inputmode="tel"
+            [disabled]="!canWrite() || loading()"
+          />
+        </label>
+
+        <button type="submit" [disabled]="!canWrite() || loading()">
+          {{ loading() ? 'Guardando...' : 'Guardar cambios' }}
+        </button>
+      </form>
+    </article>
+
+    <article class="card">
+      <h2>Seguridad</h2>
+      <form [formGroup]="passwordForm" (ngSubmit)="changePassword()">
+        <label>
+          Contrasena actual
+          <input
+            formControlName="password_actual"
+            type="password"
+            autocomplete="current-password"
+            [disabled]="!canWrite() || loading()"
+          />
+        </label>
+
+        <label>
+          Nueva contrasena
+          <input
+            formControlName="password_nueva"
+            type="password"
+            autocomplete="new-password"
+            [disabled]="!canWrite() || loading()"
+          />
+          @if (
+            passwordForm.controls.password_nueva.touched &&
+            passwordForm.controls.password_nueva.invalid
+          ) {
+            <small>Minimo 8 caracteres.</small>
+          }
+        </label>
+
+        <button type="submit" [disabled]="!canWrite() || loading()">Cambiar contrasena</button>
+      </form>
+    </article>
+
+    <article class="card">
+      <h2>Estado de la cuenta</h2>
+      <dl>
+        <div>
+          <dt>Correo verificado</dt>
+          <dd>{{ user()?.email_verificado ? 'Si' : 'No' }}</dd>
+        </div>
+        <div>
+          <dt>Estado</dt>
+          <dd>{{ user()?.estado }}</dd>
+        </div>
+        <div>
+          <dt>Ultimo acceso</dt>
+          <dd>
+            {{ user()?.ultimo_acceso ? (user()?.ultimo_acceso | date: 'short') : 'Sin registro' }}
+          </dd>
+        </div>
+        <div>
+          <dt>Alta</dt>
+          <dd>{{ user()?.created_at ? (user()?.created_at | date: 'short') : '-' }}</dd>
+        </div>
+      </dl>
+    </article>
+  </div>
+</section>
+
+<app-logout-dialog
+  [open]="showLogout()"
+  [pending]="auth.pendingOffline()"
+  (confirmed)="confirmLogout()"
+  (cancelled)="showLogout.set(false)"
+/>

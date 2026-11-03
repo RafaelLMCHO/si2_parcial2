@@ -1,0 +1,62 @@
+:root {
+  color-scheme: light;
+  --fs-primary: #be185d;
+  --fs-primary-soft: #fdf2f8;
+  --fs-text: #111827;
+  --fs-muted: #6b7280;
+  --fs-border: #e5e7eb;
+  --fs-surface: #ffffff;
+  --fs-background: #f8fafc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(251, 207, 232, 0.45), transparent 35%),
+    radial-gradient(circle at 90% 10%, rgba(196, 181, 253, 0.25), transparent 30%),
+    var(--fs-background);
+  color: var(--fs-text);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+
+a {
+  color: var(--fs-primary);
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
