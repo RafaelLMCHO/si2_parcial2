@@ -3,10 +3,15 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/verify_email_screen.dart';
+import '../../features/catalogo/presentation/catalogo_controller.dart';
+import '../../features/catalogo/presentation/catalogo_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../session/session_controller.dart';
 
-GoRouter createRouter(SessionController session) {
+GoRouter createRouter(
+  SessionController session,
+  CatalogoController catalogoController,
+) {
   return GoRouter(
     initialLocation: session.isAuthenticated ? '/profile' : '/login',
     refreshListenable: session,
@@ -46,6 +51,11 @@ GoRouter createRouter(SessionController session) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => ProfileScreen(session: session),
+      ),
+      GoRoute(
+        path: '/catalogo',
+        builder: (context, state) =>
+            CatalogoScreen(session: session, controller: catalogoController),
       ),
     ],
   );

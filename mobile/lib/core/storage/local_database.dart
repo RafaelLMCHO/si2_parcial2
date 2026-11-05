@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import '../../features/auth/data/auth_models.dart';
+import '../../features/catalogo/data/catalogo_models.dart';
 
 class LocalDatabase {
   Database? _db;
@@ -23,49 +26,83 @@ class LocalDatabase {
         path ?? p.join(await getDatabasesPath(), 'fashionstore.db');
     _db = await openDatabase(
       databasePath,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE usuario_cache (
-            id TEXT PRIMARY KEY,
-            empresa_id TEXT,
-            nombre TEXT NOT NULL,
-            correo TEXT NOT NULL,
-            telefono TEXT,
-            email_verificado INTEGER NOT NULL,
-            estado TEXT NOT NULL,
-            rol TEXT NOT NULL,
-            sucursal_id TEXT,
-            ultimo_acceso TEXT,
-            created_at TEXT,
-            cached_at TEXT NOT NULL
-          )
-        ''');
-        await db.execute('''
-          CREATE TABLE tenant_cache (
-            slug TEXT PRIMARY KEY,
-            cached_at TEXT NOT NULL
-          )
-        ''');
-        await db.execute('''
-          CREATE TABLE sync_meta (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-          )
-        ''');
-        await db.execute('''
-          CREATE TABLE operacion_pendiente (
-            id TEXT PRIMARY KEY,
-            tipo TEXT NOT NULL,
-            payload TEXT NOT NULL,
-            estado TEXT NOT NULL,
-            creada_en TEXT NOT NULL,
-            intentos INTEGER NOT NULL DEFAULT 0
-          )
-        ''');
+        await _createSessionTables(db);
+        await _createCatalogoTables(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await _createCatalogoTables(db);
+        }
       },
     );
     return _db!;
+  }
+
+  Future<void> _createSessionTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE usuario_cache (
+        id TEXT PRIMARY KEY,
+        empresa_id TEXT,
+        nombre TEXT NOT NULL,
+        correo TEXT NOT NULL,
+        telefono TEXT,
+        email_verificado INTEGER NOT NULL,
+        estado TEXT NOT NULL,
+        rol TEXT NOT NULL,
+        sucursal_id TEXT,
+        ultimo_acceso TEXT,
+        created_at TEXT,
+        cached_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE tenant_cache (
+        slug TEXT PRIMARY KEY,
+        cached_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE sync_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE operacion_pendiente (
+        id TEXT PRIMARY KEY,
+        tipo TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        estado TEXT NOT NULL,
+        creada_en TEXT NOT NULL,
+        intentos INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+  }
+
+  Future<void> _createCatalogoTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE catalogo_cache (
+        empresa_slug TEXT NOT NULL,
+        prenda_id TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (empresa_slug, prenda_id)
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX idx_catalogo_cache_empresa
+      ON catalogo_cache (empresa_slug)
+    ''');
+    await db.execute('''
+      CREATE TABLE catalogo_auxiliares_cache (
+        empresa_slug TEXT PRIMARY KEY,
+        payload TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
   }
 
   Future<void> saveUser(AppUser user) async {
@@ -134,6 +171,131 @@ class LocalDatabase {
       'SELECT COUNT(*) AS total FROM operacion_pendiente',
     );
     return (rows.first['total'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> saveCatalogoSnapshot({
+    required String empresaSlug,
+    required int version,
+    required List<Prenda> items,
+  }) async {
+    final db = await database;
+    final updatedAt = DateTime.now().toIso8601String();
+    await db.transaction((txn) async {
+      await txn.delete(
+        'catalogo_cache',
+        where: 'empresa_slug = ?',
+        whereArgs: [empresaSlug],
+      );
+      final batch = txn.batch();
+      for (final item in items) {
+        batch.insert('catalogo_cache', {
+          'empresa_slug': empresaSlug,
+          'prenda_id': item.id,
+          'payload': jsonEncode(item.toJson()),
+          'version': version,
+          'updated_at': updatedAt,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
+  Future<CatalogoSnapshot?> readCatalogoSnapshot(String empresaSlug) async {
+    final db = await database;
+    final rows = await db.query(
+      'catalogo_cache',
+      where: 'empresa_slug = ?',
+      whereArgs: [empresaSlug],
+      orderBy: 'prenda_id ASC',
+    );
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    final items = <Prenda>[];
+    var version = 0;
+    DateTime? updatedAt;
+    for (final row in rows) {
+      final payload = row['payload']?.toString();
+      if (payload == null || payload.isEmpty) {
+        continue;
+      }
+      try {
+        final decoded = jsonDecode(payload);
+        if (decoded is Map) {
+          items.add(Prenda.fromJson(Map<String, dynamic>.from(decoded)));
+        }
+      } catch (_) {
+        continue;
+      }
+      final rowVersion = int.tryParse(row['version']?.toString() ?? '');
+      if (rowVersion != null && rowVersion > version) {
+        version = rowVersion;
+      }
+      updatedAt ??= DateTime.tryParse(row['updated_at']?.toString() ?? '');
+    }
+
+    if (items.isEmpty) {
+      return null;
+    }
+
+    return CatalogoSnapshot(
+      version: version,
+      updatedAt: updatedAt ?? DateTime.now(),
+      items: items,
+    );
+  }
+
+  Future<void> saveCatalogoAuxiliares({
+    required String empresaSlug,
+    required AuxiliaresCatalogo auxiliares,
+  }) async {
+    final db = await database;
+    await db.insert('catalogo_auxiliares_cache', {
+      'empresa_slug': empresaSlug,
+      'payload': jsonEncode(auxiliares.toJson()),
+      'updated_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<AuxiliaresCatalogo?> readCatalogoAuxiliares(String empresaSlug) async {
+    final db = await database;
+    final rows = await db.query(
+      'catalogo_auxiliares_cache',
+      where: 'empresa_slug = ?',
+      whereArgs: [empresaSlug],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return null;
+    }
+    final payload = rows.first['payload']?.toString();
+    if (payload == null || payload.isEmpty) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map) {
+        return AuxiliaresCatalogo.fromJson(Map<String, dynamic>.from(decoded));
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
+  Future<void> clearCatalogoCache(String empresaSlug) async {
+    final db = await database;
+    await db.delete(
+      'catalogo_cache',
+      where: 'empresa_slug = ?',
+      whereArgs: [empresaSlug],
+    );
+    await db.delete(
+      'catalogo_auxiliares_cache',
+      where: 'empresa_slug = ?',
+      whereArgs: [empresaSlug],
+    );
   }
 
   Future<void> clearUserCache() async {

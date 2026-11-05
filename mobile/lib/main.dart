@@ -8,6 +8,8 @@ import 'core/storage/local_database.dart';
 import 'core/storage/secure_session_store.dart';
 import 'core/utils/network_status.dart';
 import 'features/auth/data/auth_repository.dart';
+import 'features/catalogo/data/catalogo_repository.dart';
+import 'features/catalogo/presentation/catalogo_controller.dart';
 import 'features/profile/data/profile_repository.dart';
 
 Future<void> main() async {
@@ -33,8 +35,14 @@ Future<void> main() async {
     apiClient.sessionExpiredHandler = session.handleSessionExpired;
     apiClient.networkLostHandler = session.handleNetworkLost;
 
+    final catalogoController = CatalogoController(
+      CatalogoRepository(apiClient.dio),
+      database,
+      networkStatus,
+    );
+
     await session.bootstrap();
-    final router = createRouter(session);
+    final router = createRouter(session, catalogoController);
 
     runApp(FashionStoreApp(session: session, router: router));
   } catch (error) {
