@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../features/auth/data/auth_models.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/profile/data/profile_repository.dart';
+import '../network/api_client.dart';
 import '../network/api_exception.dart';
 import '../storage/local_database.dart';
 import '../storage/secure_session_store.dart';
@@ -16,11 +17,13 @@ class SessionController extends ChangeNotifier {
     required SecureSessionStore secureStore,
     required LocalDatabase database,
     required NetworkStatus networkStatus,
+    ApiClient? apiClient,
   }) : _authRepository = authRepository,
        _profileRepository = profileRepository,
        _secureStore = secureStore,
        _database = database,
        _networkStatus = networkStatus,
+       _apiClient = apiClient,
        _online = networkStatus.value {
     _networkStatus.addListener(_onNetworkChanged);
   }
@@ -30,6 +33,10 @@ class SessionController extends ChangeNotifier {
   final SecureSessionStore _secureStore;
   final LocalDatabase _database;
   final NetworkStatus _networkStatus;
+  ApiClient? _apiClient;
+
+  ApiClient get apiClient => _apiClient ??= ApiClient();
+  LocalDatabase get database => _database;
 
   String? _accessToken;
   String? _refreshToken;

@@ -26,18 +26,52 @@ class LocalDatabase {
         path ?? p.join(await getDatabasesPath(), 'fashionstore.db');
     _db = await openDatabase(
       databasePath,
-      version: 2,
+      version: 4,
       onCreate: (db, version) async {
         await _createSessionTables(db);
         await _createCatalogoTables(db);
+        await _createInventarioTables(db);
+        await _createOfflineTables(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await _createCatalogoTables(db);
         }
+        if (oldVersion < 3) {
+          await _createInventarioTables(db);
+        }
+        if (oldVersion < 4) {
+          await _createOfflineTables(db);
+        }
       },
     );
     return _db!;
+  }
+
+  Future<void> _createOfflineTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS soft_locks (
+        id TEXT PRIMARY KEY,
+        variante_id TEXT NOT NULL,
+        sucursal_id TEXT NOT NULL,
+        cantidad INTEGER NOT NULL,
+        expira_en TEXT NOT NULL,
+        creado_en TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _createInventarioTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS existencias_local (
+        empresa_id TEXT NOT NULL,
+        sucursal_id TEXT NOT NULL,
+        variante_id TEXT NOT NULL,
+        stock_disponible INTEGER NOT NULL DEFAULT 0,
+        actualizado_en TEXT NOT NULL,
+        PRIMARY KEY (empresa_id, sucursal_id, variante_id)
+      )
+    ''');
   }
 
   Future<void> _createSessionTables(Database db) async {
@@ -309,6 +343,65 @@ class LocalDatabase {
     await db.delete('usuario_cache');
     await db.delete('tenant_cache');
     await db.delete('sync_meta');
+  }
+
+  Future<void> registrarOperacionOffline({
+    required String id,
+    required String tipo,
+    required Map<String, dynamic> payload,
+    String estado = 'pendiente',
+  }) async {
+    final db = await database;
+    await db.insert('operacion_pendiente', {
+      'id': id,
+      'tipo': tipo,
+      'payload': jsonEncode(payload),
+      'estado': estado,
+      'creada_en': DateTime.now().toIso8601String(),
+      'intentos': 0,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Map<String, dynamic>>> listarOperacionesOffline() async {
+    final db = await database;
+    final rows = await db.query('operacion_pendiente', orderBy: 'creada_en DESC');
+    return rows.map((r) {
+      final map = Map<String, dynamic>.from(r);
+      try {
+        map['payload'] = jsonDecode(r['payload'] as String);
+      } catch (_) {}
+      return map;
+    }).toList();
+  }
+
+  Future<void> actualizarEstadoOperacion(String id, String nuevoEstado) async {
+    final db = await database;
+    await db.update(
+      'operacion_pendiente',
+      {'estado': nuevoEstado},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<bool> crearSoftLockLocal({
+    required String id,
+    required String varianteId,
+    required String sucursalId,
+    required int cantidad,
+    int ttlMinutos = 45,
+  }) async {
+    final db = await database;
+    final expiraEn = DateTime.now().add(Duration(minutes: ttlMinutos)).toIso8601String();
+    await db.insert('soft_locks', {
+      'id': id,
+      'variante_id': varianteId,
+      'sucursal_id': sucursalId,
+      'cantidad': cantidad,
+      'expira_en': expiraEn,
+      'creado_en': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    return true;
   }
 
   Future<void> close() async {

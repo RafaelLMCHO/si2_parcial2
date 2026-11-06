@@ -28,6 +28,7 @@ Future<void> main() async {
       secureStore: SecureSessionStore(),
       database: database,
       networkStatus: networkStatus,
+      apiClient: apiClient,
     );
 
     apiClient.tokenProvider = () => session.accessToken;

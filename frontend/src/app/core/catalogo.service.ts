@@ -102,6 +102,10 @@ export class CatalogoService {
     );
   }
 
+  obtenerPrendaPorId(id: string): Observable<Prenda> {
+    return this.http.get<Prenda>(`/api/v1/catalogo/prendas/${id}`);
+  }
+
   private guardarSnapshotLocal(version: number, items: Prenda[]): void {
     if (typeof localStorage === 'undefined') return;
     try {

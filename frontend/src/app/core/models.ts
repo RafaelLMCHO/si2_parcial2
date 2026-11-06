@@ -339,3 +339,121 @@ export interface AuxiliaresCatalogoResponse {
   temporadas: ItemSimple[];
   colecciones: ItemSimple[];
 }
+
+
+// ---------------------------------------------------------------------------
+// CU-17 a CU-24 Modelos TypeScript
+// ---------------------------------------------------------------------------
+
+export interface InventarioVariante {
+  inventario_id: string;
+  sucursal_id: string;
+  sucursal_nombre: string;
+  stock_fisico: number;
+  stock_reservado: number;
+  stock_disponible: number;
+  stock_minimo: number;
+  ubicacion?: string | null;
+  bajo_minimo: boolean;
+  actualizado_en: string;
+}
+
+export interface InventarioPrenda {
+  variante_id: string;
+  sku: string;
+  codigo_barras?: string | null;
+  prenda_id: string;
+  prenda_nombre: string;
+  talla: string;
+  color: string;
+  precio_venta: number;
+  existencias: InventarioVariante[];
+}
+
+export interface InventarioListResponse {
+  total: number;
+  page: number;
+  page_size: number;
+  items: InventarioPrenda[];
+}
+
+export interface DisponibilidadVariante {
+  variante_id: string;
+  sku: string;
+  talla: string;
+  color: string;
+  stock_disponible: number;
+}
+
+export interface DisponibilidadSucursal {
+  sucursal_id: string;
+  nombre: string;
+  direccion: string;
+  ciudad: string;
+  variantes: DisponibilidadVariante[];
+}
+
+export interface DisponibilidadPrendaResponse {
+  prenda_id: string;
+  agotado_en_todas: boolean;
+  actualizado_en: string;
+  sucursales: DisponibilidadSucursal[];
+  es_local?: boolean;
+}
+
+export interface ReservaItem {
+  variante_id: string;
+  sku: string;
+  prenda_nombre: string;
+  talla: string;
+  color: string;
+  cantidad: number;
+  ubicacion?: string | null;
+}
+
+export interface Reserva {
+  id: string;
+  empresa_id: string;
+  usuario_id: string;
+  sucursal_id: string;
+  sucursal_nombre?: string | null;
+  codigo: string;
+  estado: string;
+  fecha_visita: string;
+  expira_en: string;
+  probador?: string | null;
+  items: ReservaItem[];
+  created_at: string;
+}
+
+export interface CarritoItem {
+  id: string;
+  variante_id: string;
+  sku: string;
+  prenda_nombre: string;
+  talla: string;
+  color: string;
+  imagen_url?: string | null;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+}
+
+export interface Carrito {
+  id: string;
+  items: CarritoItem[];
+  total: number;
+}
+
+export interface PosVentaResponse {
+  venta_id: string;
+  numero: string;
+  total: number;
+  cambio?: number;
+  metodo_pago: string;
+  estado: string;
+  comprobante_url: string;
+}
+
+export type VariantePrenda = Variante;
+
