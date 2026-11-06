@@ -24,8 +24,8 @@ class CarritoItemOut(BaseModel):
     color: str
     imagen_url: Optional[str]
     cantidad: int
-    precio_unitario: Decimal
-    subtotal: Decimal
+    precio_unitario: float
+    subtotal: float
 
 
 class CarritoOut(BaseModel):
@@ -34,7 +34,7 @@ class CarritoOut(BaseModel):
     usuario_id: Optional[UUID]
     estado: str
     items: List[CarritoItemOut]
-    total: Decimal
+    total: float
     created_at: datetime
     updated_at: datetime
 

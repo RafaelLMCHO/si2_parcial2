@@ -1,6 +1,8 @@
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
+from asyncpg import Connection
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -116,3 +118,67 @@ async def get_current_user(
         jti=payload.get("jti"),
     )
     return request.state.current_user
+
+
+_PERMISSION_ALIASES = {
+    "reportes:leer": "reportes.ver",
+    "reportes:exportar": "reportes.ver",
+    "catalogo:leer": "catalogo.ver",
+}
+
+
+def _normalize_permission(codigo: str) -> str:
+    clave = codigo.strip()
+    return _PERMISSION_ALIASES.get(clave, clave.replace(":", "."))
+
+
+async def get_conn(
+    current: CurrentUser = Depends(get_current_user),
+) -> AsyncIterator[Connection]:
+    if current.empresa_id:
+        async with tenant_connection(current.empresa_id, current.user_id) as conn:
+            yield conn
+    else:
+        async with admin_connection() as conn:
+            yield conn
+
+
+def require_permission(codigo: str):
+    permiso = _normalize_permission(codigo)
+
+    async def dependency(
+        current: CurrentUser = Depends(get_current_user),
+    ) -> CurrentUser:
+        if current.rol == "superadmin":
+            return current
+        if current.empresa_id is None:
+            raise api_error(
+                403,
+                "PERMISO_DENEGADO",
+                "No tiene permisos para esta operacion",
+            )
+        async with tenant_connection(current.empresa_id, current.user_id) as conn:
+            allowed = await conn.fetchval(
+                """
+                SELECT 1
+                  FROM usuario u
+                  JOIN rol_permiso rp ON rp.rol_id = u.rol_id
+                  JOIN permiso p ON p.id = rp.permiso_id
+                 WHERE u.id = $1
+                   AND u.empresa_id = $2
+                   AND p.codigo = $3
+                 LIMIT 1
+                """,
+                current.user_id,
+                current.empresa_id,
+                permiso,
+            )
+        if not allowed:
+            raise api_error(
+                403,
+                "PERMISO_DENEGADO",
+                "No tiene permisos para esta operacion",
+            )
+        return current
+
+    return dependency

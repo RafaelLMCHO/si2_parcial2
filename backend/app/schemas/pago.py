@@ -21,7 +21,7 @@ class PagoIntencionOut(BaseModel):
 class PagoOut(BaseModel):
     id: UUID
     venta_id: UUID
-    monto: Decimal
+    monto: float
     metodo: str
     estado: str
     pasarela_id: Optional[str]

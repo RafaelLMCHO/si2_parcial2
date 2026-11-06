@@ -20,11 +20,11 @@ class LineaFaltante(BaseModel):
 
 
 class CheckoutValidarOut(BaseModel):
-    subtotal: Decimal
-    descuento: Decimal
-    impuesto: Decimal
-    costo_envio: Decimal
-    total_a_pagar: Decimal
+    subtotal: float
+    descuento: float
+    impuesto: float
+    costo_envio: float
+    total_a_pagar: float
     sucursal_despacho_id: Optional[UUID]
     sucursal_despacho_nombre: Optional[str]
     cupon_id: Optional[UUID]
@@ -41,7 +41,7 @@ class CrearOrdenRequest(BaseModel):
 class OrdenCreadaOut(BaseModel):
     venta_id: UUID
     numero: str
-    total_a_pagar: Decimal
+    total_a_pagar: float
     estado: str
 
 
@@ -53,10 +53,10 @@ class VentaDetalleOut(BaseModel):
     talla: str
     color: str
     cantidad: int
-    precio_lista: Decimal
-    precio_unitario: Decimal
-    descuento_linea: Decimal
-    subtotal: Decimal
+    precio_lista: float
+    precio_unitario: float
+    descuento_linea: float
+    subtotal: float
 
 
 class VentaOut(BaseModel):
@@ -65,10 +65,10 @@ class VentaOut(BaseModel):
     numero: str
     canal: str
     estado: str
-    subtotal: Decimal
-    descuento: Decimal
-    impuesto: Decimal
-    total: Decimal
+    subtotal: float
+    descuento: float
+    impuesto: float
+    total: float
     cliente_nombre: Optional[str]
     cliente_documento: Optional[str]
     fecha_hora: datetime
@@ -104,8 +104,8 @@ class PosVentaRequest(BaseModel):
 class PosVentaOut(BaseModel):
     venta_id: UUID
     numero: str
-    total: Decimal
-    cambio: Optional[Decimal]
+    total: float
+    cambio: Optional[float]
     metodo_pago: str
     estado: str
     comprobante_url: str

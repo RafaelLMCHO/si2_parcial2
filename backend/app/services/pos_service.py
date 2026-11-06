@@ -492,7 +492,7 @@ async def crear_venta_pos(
 
         # Generar firma criptográfica para QR
         qr_nonce = secrets.token_hex(8)
-        ahora_iso = conn.fetchval("SELECT now()::text")
+        ahora_iso = await conn.fetchval("SELECT now()::text")
         firma_qr = _generar_firma_pos(empresa_id, numero_venta, total_a_pagar, str(ahora_iso), qr_nonce)
 
         # Insertar venta en 'completada'

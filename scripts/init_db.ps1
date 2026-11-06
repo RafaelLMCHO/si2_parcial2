@@ -18,6 +18,9 @@ if (-not $ready) {
 }
 
 docker compose exec -T db psql -U postgres -d fashionstore -v ON_ERROR_STOP=1 -f /workspace/tests/00_reset.sql
+if ($LASTEXITCODE -ne 0) { throw 'Fallo el reset del esquema.' }
+
 docker compose exec -T db psql -U postgres -d fashionstore -v ON_ERROR_STOP=1 -f /workspace/db/run_all.sql
+if ($LASTEXITCODE -ne 0) { throw 'Fallo la ejecucion de db/run_all.sql.' }
 
 Write-Host 'Base de datos FashionStore lista en localhost:5434.'

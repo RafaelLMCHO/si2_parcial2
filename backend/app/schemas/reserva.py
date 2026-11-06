@@ -51,12 +51,12 @@ class ReservaOut(BaseModel):
     empresa_id: UUID
     usuario_id: UUID
     sucursal_id: UUID
-    sucursal_nombre: Optional[str]
+    sucursal_nombre: Optional[str] = None
     codigo: str
     estado: str
     fecha_visita: datetime
     expira_en: datetime
-    probador: Optional[str]
+    probador: Optional[str] = None
     items: List[ReservaItemOut]
     historial: Optional[List[ReservaEstadoHistorialOut]] = None
     created_at: datetime

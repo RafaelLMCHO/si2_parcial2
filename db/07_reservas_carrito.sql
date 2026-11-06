@@ -72,6 +72,8 @@ CREATE TABLE carrito_detalle (
     variante_id uuid NOT NULL,
     cantidad integer NOT NULL CHECK (cantidad > 0),
     precio_unitario numeric(12,2) NOT NULL CHECK (precio_unitario >= 0),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (empresa_id, carrito_id, variante_id),
     UNIQUE (empresa_id, id),
     FOREIGN KEY (empresa_id, carrito_id)

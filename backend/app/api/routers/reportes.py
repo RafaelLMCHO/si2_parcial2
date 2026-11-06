@@ -89,7 +89,7 @@ async def solicitar_reporte_ia(
 ):
     """CU-34: Procesa consulta en lenguaje natural (texto/voz) bajo whitelist segura (BR-08) y Plan Pro (BR-03)."""
     return await ia_reporte_service.procesar_reporte_ia(
-        conn, user.empresa_id, user.id, payload
+        conn, user.empresa_id, user.user_id, payload
     )
 
 
@@ -101,6 +101,6 @@ async def exportar_reporte_dinamico(
 ):
     """CU-34: Ensambla y descarga binario dinámico en formato Excel (.xlsx) o PDF (.pdf)."""
     return await ia_reporte_service.exportar_reporte(
-        conn, user.empresa_id, user.id, payload
+        conn, user.empresa_id, user.user_id, payload
     )
 

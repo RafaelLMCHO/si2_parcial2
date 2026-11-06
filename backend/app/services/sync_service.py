@@ -19,6 +19,13 @@ from app.schemas.sync import (
 
 SECRET_KEY_QR = "fashionstore_offline_secret_key_2026"
 
+
+def _op_get(op, name: str, default=None):
+    """Accede a operaciones que pueden ser Pydantic, dict o asyncpg.Record."""
+    if isinstance(op, dict):
+        return op.get(name, default)
+    return getattr(op, name, default)
+
 class SyncService:
     def __init__(self, pool: Pool):
         self.pool = pool
@@ -35,7 +42,7 @@ class SyncService:
                 """
                 SELECT id, codigo, nombre, descripcion, precio_base, categoria_id, imagen_url
                 FROM prenda
-                WHERE empresa_id = $1 AND activo = true
+                WHERE empresa_id = $1 AND estado = 'activa' AND deleted_at IS NULL
                 ORDER BY nombre ASC
                 """,
                 empresa_id
@@ -46,11 +53,11 @@ class SyncService:
             variantes_rows = await conn.fetch(
                 """
                 SELECT v.id, v.prenda_id, v.sku, v.precio_venta, v.codigo_barras,
-                       t.nombre as talla, c.nombre as color, c.codigo_hex as color_hex
-                FROM variante_prenda v
+                       t.nombre as talla, c.nombre as color, c.hex as color_hex
+                FROM variante v
                 LEFT JOIN talla t ON t.id = v.talla_id
                 LEFT JOIN color c ON c.id = v.color_id
-                WHERE v.empresa_id = $1 AND v.activo = true
+                WHERE v.empresa_id = $1 AND v.estado = 'activa' AND v.deleted_at IS NULL
                 """,
                 empresa_id
             )
@@ -91,8 +98,10 @@ class SyncService:
                     p["precio_base"] = float(p["precio_base"])
 
             for v in variantes:
-                v["id"] = str(v["id"])
-                v["prenda_id"] = str(v["prenda_id"])
+                if v.get("id"):
+                    v["id"] = str(v["id"])
+                if v.get("prenda_id"):
+                    v["prenda_id"] = str(v["prenda_id"])
                 if v.get("precio_venta"):
                     v["precio_venta"] = float(v["precio_venta"])
 
@@ -349,7 +358,11 @@ class SyncService:
         )
 
     async def _procesar_venta_offline_sync(self, conn, empresa_id: str, usuario_id: str, op):
-        p = op.payload
+        op_id = _op_get(op, "id")
+        sucursal_id = _op_get(op, "sucursal_id")
+        p = _op_get(op, "payload") or {}
+        if isinstance(p, str):
+            p = json.loads(p)
         lineas = p.get("lineas", [])
         if not lineas:
             raise Exception("Venta offline sin líneas de productos")
@@ -365,7 +378,7 @@ class SyncService:
                 WHERE empresa_id = $1 AND sucursal_id = $2 AND variante_id = $3
                 FOR UPDATE
                 """,
-                empresa_id, op.sucursal_id, var_id
+                empresa_id, sucursal_id, var_id
             )
             if not stock or stock["stock_disponible"] < cant:
                 raise Exception(f"Stock insuficiente en servidor para variante {var_id}")
@@ -374,25 +387,26 @@ class SyncService:
             await conn.execute(
                 """
                 UPDATE inventario
-                SET stock_fisico = stock_fisico - $1
+                SET stock_fisico = stock_fisico - $1, actualizado_en = now()
                 WHERE empresa_id = $2 AND sucursal_id = $3 AND variante_id = $4
                 """,
-                cant, empresa_id, op.sucursal_id, var_id
+                cant, empresa_id, sucursal_id, var_id
             )
 
         # Insertar venta oficial
         total = float(p.get("total", 0.0))
-        numero_ticket = f"OFF-{op.id[:8].upper()}"
+        numero_ticket = f"OFF-{str(op_id)[:8].upper()}"
         venta_id = await conn.fetchval(
             """
             INSERT INTO venta (
                 id, empresa_id, sucursal_id, usuario_id, numero,
-                subtotal, total, estado, origen, cliente_nombre, cliente_documento
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'completada', 'pos', $8, $9)
+                subtotal, descuento, impuesto, total, estado, canal,
+                idempotency_key, cliente_nombre, cliente_documento
+            ) VALUES ($1, $2, $3, $4, $5, $6, 0, 0, $6, 'completada', 'OFFLINE', $7, $8, $9)
             RETURNING id
             """,
-            op.id, empresa_id, op.sucursal_id, usuario_id, numero_ticket,
-            total / 1.13, total, p.get("cliente_nombre", "Consumidor Final"),
+            op_id, empresa_id, sucursal_id, usuario_id, numero_ticket,
+            total, f"offline_{op_id}", p.get("cliente_nombre", "Consumidor Final"),
             p.get("cliente_documento", "0")
         )
 
@@ -401,14 +415,21 @@ class SyncService:
             pu = float(l["precio_unitario"])
             await conn.execute(
                 """
-                INSERT INTO detalle_venta (empresa_id, venta_id, variante_id, cantidad, precio_unitario, subtotal)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO venta_detalle (
+                    empresa_id, venta_id, variante_id, cantidad,
+                    precio_lista, precio_unitario, descuento_linea, subtotal
+                )
+                VALUES ($1, $2, $3, $4, $5, $5, 0, $6)
                 """,
                 empresa_id, venta_id, l["variante_id"], cant, pu, cant * pu
             )
 
     async def _procesar_reserva_offline_sync(self, conn, empresa_id: str, usuario_id: str, op):
-        p = op.payload
+        op_id = _op_get(op, "id")
+        sucursal_id = _op_get(op, "sucursal_id")
+        p = _op_get(op, "payload") or {}
+        if isinstance(p, str):
+            p = json.loads(p)
         items = p.get("items", [])
         fecha_visita = p.get("fecha_visita") or datetime.now(timezone.utc).isoformat()
         probador = p.get("probador", True)
@@ -416,30 +437,34 @@ class SyncService:
         reserva_id = await conn.fetchval(
             """
             INSERT INTO reserva (
-                id, empresa_id, sucursal_id, estado, fecha_visita, probador, codigo
-            ) VALUES ($1, $2, $3, 'pendiente_preparacion', $4, $5, $6)
+                id, empresa_id, usuario_id, sucursal_id, estado,
+                fecha_visita, expira_en, probador, codigo
+            ) VALUES ($1, $2, $3, $4, 'pendiente_preparacion', $5, $6, $7, $8)
             RETURNING id
             """,
-            op.id, empresa_id, op.sucursal_id,
+            op_id, empresa_id, usuario_id, sucursal_id,
             datetime.fromisoformat(fecha_visita.replace("Z", "+00:00")),
+            datetime.fromisoformat(fecha_visita.replace("Z", "+00:00")) + timedelta(hours=2),
             "Cabina 1" if probador else None,
-            f"RES-OFF-{op.id[:6].upper()}"
+            f"RES-OFF-{str(op_id)[:6].upper()}"
         )
 
         for it in items:
             await conn.execute(
                 """
-                INSERT INTO detalle_reserva (empresa_id, reserva_id, variante_id, cantidad)
+                INSERT INTO reserva_detalle (empresa_id, reserva_id, variante_id, cantidad)
                 VALUES ($1, $2, $3, $4)
                 """,
                 empresa_id, reserva_id, it["variante_id"], int(it.get("cantidad", 1))
             )
 
     async def _procesar_cambio_offline_sync(self, conn, empresa_id: str, usuario_id: str, op):
-        p = op.payload
+        p = _op_get(op, "payload") or {}
+        if isinstance(p, str):
+            p = json.loads(p)
         await self.procesar_nota_cambio(
             empresa_id, usuario_id, NotaCambioCreate(
-                sucursal_id=op.sucursal_id,
+                sucursal_id=_op_get(op, "sucursal_id"),
                 venta_origen_id=p.get("venta_origen_id"),
                 variante_devuelta_id=p["variante_devuelta_id"],
                 variante_nueva_id=p["variante_nueva_id"],

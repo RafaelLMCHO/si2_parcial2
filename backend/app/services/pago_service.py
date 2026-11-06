@@ -182,7 +182,7 @@ async def crear_intencion_pago(
                 )
                 VALUES ($1, $2, $3, $4, 'tarjeta', $5, 'pendiente')
                 ON CONFLICT (empresa_id, idempotency_key)
-                DO UPDATE SET updated_at = now()
+                DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
                 RETURNING id
                 """,
                 UUID(empresa_id),
@@ -362,7 +362,7 @@ async def procesar_webhook_stripe(payload_bytes: bytes, signature: Optional[str]
                 empresa_id=str(empresa_id),
                 venta_id=str(venta_id),
                 pago_id=pago_id_str,
-                ip="stripe_webhook",
+                ip=None,
             )
         except Exception as e:
             logger.error("Error al finalizar venta tras webhook exitoso: %s", str(e))

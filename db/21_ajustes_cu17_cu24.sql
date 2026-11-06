@@ -1,5 +1,16 @@
 -- Migración cu17_cu24_ajustes
 -- a) Ampliar CHECK de reserva.estado
+DROP TRIGGER IF EXISTS trg_reserva_liberar_stock ON reserva;
+DROP TRIGGER IF EXISTS trg_reserva_historial_estado ON reserva;
+ALTER TABLE reserva ALTER COLUMN estado TYPE varchar(30);
+ALTER TABLE reserva_estado_historial ALTER COLUMN estado_anterior TYPE varchar(30);
+ALTER TABLE reserva_estado_historial ALTER COLUMN estado_nuevo TYPE varchar(30);
+CREATE TRIGGER trg_reserva_liberar_stock
+    BEFORE UPDATE OF estado ON reserva
+    FOR EACH ROW EXECUTE FUNCTION fn_liberar_stock_reserva();
+CREATE TRIGGER trg_reserva_historial_estado
+    AFTER UPDATE OF estado ON reserva
+    FOR EACH ROW EXECUTE FUNCTION fn_registrar_historial_reserva();
 ALTER TABLE reserva DROP CONSTRAINT IF EXISTS reserva_estado_check;
 ALTER TABLE reserva ALTER COLUMN estado SET DEFAULT 'pendiente_preparacion';
 ALTER TABLE reserva ADD CONSTRAINT reserva_estado_check
@@ -30,6 +41,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_reserva_empresa_cliente_uuid ON reserva (em
 
 -- c) Agregar ubicacion a inventario
 ALTER TABLE inventario ADD COLUMN IF NOT EXISTS ubicacion varchar(60);
+ALTER TABLE carrito_detalle ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE carrito_detalle ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
 -- d) Ampliar CHECK de venta.estado  
 ALTER TABLE venta DROP CONSTRAINT IF EXISTS venta_estado_check;

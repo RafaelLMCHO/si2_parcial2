@@ -48,7 +48,7 @@ async def get_mi_avatar(
 ):
     """CU-36: Avatar del cliente y sus medidas anatómicas corporales."""
     return await vestidor_ar_service.obtener_o_crear_avatar(
-        conn, user.empresa_id, user.id
+        conn, user.empresa_id, user.user_id
     )
 
 
@@ -60,7 +60,7 @@ async def iniciar_sesion_vestidor(
 ):
     """CU-36: Registra el inicio de una sesión interactiva de vestidor virtual."""
     return await vestidor_ar_service.iniciar_sesion_prueba(
-        conn, user.empresa_id, user.id, payload
+        conn, user.empresa_id, user.user_id, payload
     )
 
 

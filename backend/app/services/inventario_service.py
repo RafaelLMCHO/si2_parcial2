@@ -11,6 +11,7 @@ Convenciones del proyecto:
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
 from app.core.errors import api_error
@@ -26,6 +27,18 @@ logger = logging.getLogger(__name__)
 def _uuid(val: str | UUID) -> UUID:
     """Convierte str → UUID de forma segura."""
     return UUID(str(val)) if not isinstance(val, UUID) else val
+
+
+def _maybe_uuid(val: str | UUID | None) -> UUID | None:
+    """Convierte a UUID solo si el valor es válido; las referencias libres se ignoran."""
+    if val is None:
+        return None
+    if isinstance(val, UUID):
+        return val
+    try:
+        return UUID(str(val))
+    except (TypeError, ValueError):
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -67,7 +80,7 @@ async def registrar_movimiento(
         stock_anterior,
         stock_nuevo,
         referencia_tipo,
-        _uuid(referencia_id) if referencia_id else None,
+        _maybe_uuid(referencia_id),
         motivo,
         _uuid(usuario_id) if usuario_id else None,
     )
@@ -331,13 +344,40 @@ async def listar_inventario(
             *params,
         )
 
-        items = [dict(r) for r in rows]
+        agrupados: dict[str, dict] = {}
+        for r in rows:
+            vid = str(r["variante_id"])
+            if vid not in agrupados:
+                agrupados[vid] = {
+                    "variante_id": r["variante_id"],
+                    "sku": r["sku"],
+                    "codigo_barras": r["codigo_barras"],
+                    "prenda_id": r["prenda_id"],
+                    "prenda_nombre": r["prenda_nombre"],
+                    "talla": r["talla_nombre"],
+                    "color": r["color_nombre"],
+                    "precio_venta": r["precio_venta"],
+                    "existencias": [],
+                }
+            agrupados[vid]["existencias"].append({
+                "inventario_id": r["id"],
+                "sucursal_id": r["sucursal_id"],
+                "sucursal_nombre": r["sucursal_nombre"],
+                "stock_fisico": r["stock_fisico"],
+                "stock_reservado": r["stock_reservado"],
+                "stock_disponible": r["stock_disponible"],
+                "stock_minimo": r["stock_minimo"],
+                "ubicacion": r["ubicacion"],
+                "bajo_minimo": int(r["stock_disponible"]) <= int(r["stock_minimo"]),
+                "actualizado_en": r["actualizado_en"],
+            })
+
         return {
             "total": total,
             "page": page,
             "page_size": page_size,
             "pages": max(1, -(-total // page_size)),
-            "items": items,
+            "items": list(agrupados.values()),
         }
 
 
@@ -438,9 +478,11 @@ async def registrar_ingreso(
     )
 
     return {
+        "ok": True,
         "mensaje": "Ingreso registrado correctamente",
         "sucursal_id": sucursal_id,
         "items": resultados,
+        "ingresados": len(resultados),
     }
 
 
@@ -558,7 +600,7 @@ async def registrar_ajuste(
                 _uuid(sucursal_id),
             )
 
-        tipo_movimiento = "ajuste_positivo" if cantidad > 0 else "ajuste_negativo"
+        tipo_movimiento = "ajuste"
         await registrar_movimiento(
             conn,
             empresa_id=empresa_id,
@@ -1042,7 +1084,8 @@ async def get_disponibilidad_prenda(
                    v.sku,
                    t.nombre      AS talla,
                    c.nombre      AS color,
-                   i.stock_disponible
+                   i.stock_disponible,
+                   i.actualizado_en
               FROM inventario i
               JOIN variante v  ON v.id = i.variante_id AND v.empresa_id = i.empresa_id
               JOIN prenda p    ON p.id = v.prenda_id
@@ -1060,12 +1103,36 @@ async def get_disponibilidad_prenda(
             _uuid(prenda_id),
         )
 
+        sucursales: dict[str, dict] = {}
+        for r in rows:
+            sid = str(r["sucursal_id"])
+            if sid not in sucursales:
+                sucursales[sid] = {
+                    "sucursal_id": r["sucursal_id"],
+                    "nombre": r["nombre"],
+                    "direccion": r["direccion"] or "",
+                    "ciudad": r["ciudad"] or "",
+                    "variantes": [],
+                }
+            sucursales[sid]["variantes"].append({
+                "variante_id": r["variante_id"],
+                "sku": r["sku"],
+                "talla": r["talla"],
+                "color": r["color"],
+                "stock_disponible": r["stock_disponible"],
+            })
+
+        actualizado_en = (
+            max(r["actualizado_en"] for r in rows)
+            if rows
+            else datetime.now(timezone.utc)
+        )
+
         return {
-            "prenda_id": str(prenda["id"]),
-            "prenda_codigo": prenda["codigo"],
-            "prenda_nombre": prenda["nombre"],
-            "total_registros": len(rows),
-            "disponibilidad": [dict(r) for r in rows],
+            "prenda_id": prenda["id"],
+            "agotado_en_todas": all(int(r["stock_disponible"]) <= 0 for r in rows),
+            "actualizado_en": actualizado_en,
+            "sucursales": list(sucursales.values()),
         }
 
 

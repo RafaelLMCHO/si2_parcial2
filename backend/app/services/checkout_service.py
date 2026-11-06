@@ -82,7 +82,7 @@ async def _buscar_sucursal_despacho(conn, empresa_id: str, items: list[dict]) ->
         for variante_id, cantidad in cantidades.items():
             stock = await conn.fetchval(
                 """
-                SELECT COALESCE(stock_fisico, 0) FROM inventario_sucursal
+                SELECT COALESCE(stock_disponible, 0) FROM inventario
                  WHERE empresa_id=$1 AND sucursal_id=$2 AND variante_id=$3
                 """,
                 UUID(empresa_id), sucursal_id, UUID(variante_id),
@@ -98,10 +98,10 @@ async def _buscar_sucursal_despacho(conn, empresa_id: str, items: list[dict]) ->
     sucursales = await conn.fetch(
         """
         SELECT s.id, s.nombre,
-               COALESCE(SUM(inv.stock_fisico), 0) AS stock_total
+               COALESCE(SUM(inv.stock_disponible), 0) AS stock_total
           FROM sucursal s
-          LEFT JOIN inventario_sucursal inv
-                 ON inv.sucursal_id = s.id
+          LEFT JOIN inventario inv
+                  ON inv.sucursal_id = s.id
                 AND inv.empresa_id = s.empresa_id
                 AND inv.variante_id = ANY($2::uuid[])
          WHERE s.empresa_id = $1 AND s.estado = 'activa' AND s.deleted_at IS NULL
@@ -127,7 +127,7 @@ async def _verificar_stock(conn, empresa_id: str, sucursal_id: str, items: list[
     for item in items:
         stock = await conn.fetchval(
             """
-            SELECT COALESCE(stock_fisico, 0) FROM inventario_sucursal
+            SELECT COALESCE(stock_disponible, 0) FROM inventario
              WHERE empresa_id=$1 AND sucursal_id=$2 AND variante_id=$3
             """,
             UUID(empresa_id), UUID(sucursal_id), UUID(str(item["variante_id"])),
@@ -372,9 +372,9 @@ async def crear_orden(
                 subtotal, descuento, impuesto, total,
                 estado, idempotency_key,
                 firma_qr, qr_nonce, firma_algoritmo,
-                cupon_id, sucursal_id
+                cupon_id, sucursal_id, direccion_id
             )
-            VALUES ($1,$2,$3,'WEB',$4,$5,$6,$7,'pendiente_pago',$8,$9,$10,'HMAC-SHA256',$11,$12)
+            VALUES ($1,$2,$3,'WEB',$4,$5,$6,$7,'pendiente_pago',$8,$9,$10,'HMAC-SHA256',$11,$12,$13)
             RETURNING id
             """,
             UUID(empresa_id), numero, UUID(user_id),
@@ -382,13 +382,15 @@ async def crear_orden(
             idempotency_key, firma_qr, nonce,
             UUID(cupon_id) if cupon_id else None,
             UUID(despacho_id) if despacho_id else None,
+            UUID(direccion_id) if direccion_id else None,
         )
 
         # Insertar historial de estado
         await conn.execute(
             """
-            INSERT INTO venta_estado_historial (empresa_id, venta_id, estado, creado_por)
-            VALUES ($1,$2,'pendiente_pago',$3)
+            INSERT INTO venta_estado_historial
+                (empresa_id, venta_id, estado_anterior, estado_nuevo, motivo, usuario_id)
+            VALUES ($1,$2,NULL,'pendiente_pago','Creación de orden',$3)
             """,
             UUID(empresa_id), venta_id, UUID(user_id),
         )
@@ -413,24 +415,17 @@ async def crear_orden(
                 cantidad, precio_lista, precio_unitario, descuento_linea, subtotal_linea,
             )
 
-        # Crear registro de envío si tipo_entrega='envio'
+        # Crear registro de envío solo para entregas a domicilio.
+        # El recojo no genera fila en envio porque direccion_id es obligatorio.
         if tipo_entrega == "envio":
             await conn.execute(
                 """
-                INSERT INTO envio (empresa_id, venta_id, direccion_id, tipo, costo, estado)
-                VALUES ($1,$2,$3,'envio',$4,'pendiente')
+                INSERT INTO envio (empresa_id, venta_id, direccion_id, costo, estado)
+                VALUES ($1,$2,$3,$4,'pendiente')
                 """,
                 UUID(empresa_id), venta_id,
                 UUID(direccion_id) if direccion_id else None,
                 costo_envio,
-            )
-        elif tipo_entrega == "recojo" and despacho_id:
-            await conn.execute(
-                """
-                INSERT INTO envio (empresa_id, venta_id, tipo, costo, estado, sucursal_recojo_id)
-                VALUES ($1,$2,'recojo',0,'pendiente',$3)
-                """,
-                UUID(empresa_id), venta_id, UUID(despacho_id),
             )
 
         result = {
@@ -515,41 +510,36 @@ async def finalizar_venta_pagada(
         # Bloquear inventario para evitar condición de carrera
         if sucursal_id:
             variante_ids = [r["variante_id"] for r in lineas]
-            await conn.fetch(
+            inv_rows = await conn.fetch(
                 """
-                SELECT id FROM inventario_sucursal
+                SELECT variante_id, stock_fisico
+                  FROM inventario
                  WHERE empresa_id=$1 AND sucursal_id=$2 AND variante_id=ANY($3::uuid[])
                  ORDER BY variante_id
                  FOR UPDATE
                 """,
                 UUID(empresa_id), sucursal_id, variante_ids,
             )
+            inv_map = {str(r["variante_id"]): int(r["stock_fisico"]) for r in inv_rows}
 
             # Re-verificar stock
-            sin_stock = []
-            for linea in lineas:
-                stock = await conn.fetchval(
-                    """
-                    SELECT COALESCE(stock_fisico, 0) FROM inventario_sucursal
-                     WHERE empresa_id=$1 AND sucursal_id=$2 AND variante_id=$3
-                    """,
-                    UUID(empresa_id), sucursal_id, linea["variante_id"],
-                )
-                if int(stock or 0) < linea["cantidad"]:
-                    sin_stock.append(linea["variante_id"])
+            sin_stock = [
+                linea["variante_id"]
+                for linea in lineas
+                if inv_map.get(str(linea["variante_id"]), 0) < linea["cantidad"]
+            ]
 
             if sin_stock:
-                # Anular venta por stock insuficiente
-                await conn.execute(
-                    "UPDATE venta SET estado='anulada', updated_at=now() WHERE id=$1",
-                    UUID(venta_id),
-                )
+                # El trigger de venta registra automáticamente el historial de estado.
                 await conn.execute(
                     """
-                    INSERT INTO venta_estado_historial (empresa_id, venta_id, estado, notas)
-                    VALUES ($1,$2,'anulada','Stock insuficiente al confirmar pago')
+                    UPDATE venta
+                       SET estado='anulada',
+                           notas=COALESCE(notas, '') || ' | Stock insuficiente al confirmar pago',
+                           updated_at=now()
+                     WHERE id=$1
                     """,
-                    UUID(empresa_id), UUID(venta_id),
+                    UUID(venta_id),
                 )
                 logger.warning(
                     "Venta %s anulada por stock insuficiente. Variantes sin stock: %s. "
@@ -560,57 +550,47 @@ async def finalizar_venta_pagada(
 
             # Descontar stock y registrar movimientos
             for linea in lineas:
+                variante_id = linea["variante_id"]
+                cantidad = int(linea["cantidad"])
+                stock_anterior = inv_map[str(variante_id)]
+                stock_nuevo = stock_anterior - cantidad
+
                 await conn.execute(
                     """
-                    UPDATE inventario_sucursal
+                    UPDATE inventario
                        SET stock_fisico = stock_fisico - $1,
-                           updated_at = now()
+                           actualizado_en = now()
                      WHERE empresa_id=$2 AND sucursal_id=$3 AND variante_id=$4
                     """,
-                    linea["cantidad"], UUID(empresa_id), sucursal_id, linea["variante_id"],
+                    cantidad, UUID(empresa_id), sucursal_id, variante_id,
                 )
                 await conn.execute(
                     """
                     INSERT INTO movimiento_inventario (
                         empresa_id, sucursal_id, variante_id,
-                        tipo, cantidad, referencia_id, referencia_tipo
+                        tipo, cantidad, stock_anterior, stock_nuevo,
+                        referencia_id, referencia_tipo, usuario_id
                     )
-                    VALUES ($1,$2,$3,'venta',$4,$5,'venta')
+                    VALUES ($1,$2,$3,'venta',$4,$5,$6,$7,'venta',$8)
                     """,
-                    UUID(empresa_id), sucursal_id, linea["variante_id"],
-                    linea["cantidad"], UUID(venta_id),
+                    UUID(empresa_id), sucursal_id, variante_id,
+                    -cantidad, stock_anterior, stock_nuevo,
+                    UUID(venta_id), venta["usuario_id"],
                 )
 
-        # Actualizar estado venta: pendiente_pago → pagada → completada
+        # Actualizar estado venta: pendiente_pago → pagada → completada.
+        # fn_registrar_historial_venta inserta el historial automáticamente.
         await conn.execute(
             "UPDATE venta SET estado='pagada', updated_at=now() WHERE id=$1",
             UUID(venta_id),
         )
         await conn.execute(
-            """
-            INSERT INTO venta_estado_historial (empresa_id, venta_id, estado)
-            VALUES ($1,$2,'pagada')
-            """,
-            UUID(empresa_id), UUID(venta_id),
-        )
-        await conn.execute(
             "UPDATE venta SET estado='completada', updated_at=now() WHERE id=$1",
             UUID(venta_id),
-        )
-        await conn.execute(
-            """
-            INSERT INTO venta_estado_historial (empresa_id, venta_id, estado)
-            VALUES ($1,$2,'completada')
-            """,
-            UUID(empresa_id), UUID(venta_id),
         )
 
         # Registrar uso de cupón
         if venta["cupon_id"]:
-            descuento_aplicado = await conn.fetchval(
-                "SELECT descuento FROM venta WHERE id=$1",
-                UUID(venta_id),
-            )
             existing_uso = await conn.fetchval(
                 "SELECT id FROM cupon_uso WHERE empresa_id=$1 AND cupon_id=$2 AND venta_id=$3",
                 UUID(empresa_id), venta["cupon_id"], UUID(venta_id),
@@ -618,11 +598,11 @@ async def finalizar_venta_pagada(
             if existing_uso is None:
                 await conn.execute(
                     """
-                    INSERT INTO cupon_uso (empresa_id, cupon_id, usuario_id, venta_id, descuento_aplicado)
-                    VALUES ($1,$2,$3,$4,$5)
+                    INSERT INTO cupon_uso (empresa_id, cupon_id, usuario_id, venta_id)
+                    VALUES ($1,$2,$3,$4)
                     """,
                     UUID(empresa_id), venta["cupon_id"], venta["usuario_id"],
-                    UUID(venta_id), descuento_aplicado,
+                    UUID(venta_id),
                 )
 
         # Marcar carrito como convertido
@@ -678,13 +658,6 @@ async def reintentar_pago(
         await conn.execute(
             "UPDATE venta SET estado='pendiente_pago', updated_at=now() WHERE id=$1",
             UUID(venta_id),
-        )
-        await conn.execute(
-            """
-            INSERT INTO venta_estado_historial (empresa_id, venta_id, estado, notas)
-            VALUES ($1,$2,'pendiente_pago','Reintento de pago solicitado por usuario')
-            """,
-            UUID(empresa_id), UUID(venta_id),
         )
         return {
             "venta_id": venta["id"],
@@ -749,7 +722,7 @@ async def get_comprobante_data(empresa_id: str, user_id: str, venta_id: str) -> 
             "canal": venta["canal"],
             "estado": venta["estado"],
             "empresa_nombre": venta["empresa_nombre"],
-            "empresa_nit": venta.get("empresa_nit"),
+            "empresa_nit": venta["empresa_nit"],
             "subtotal": venta["subtotal"],
             "descuento": venta["descuento"],
             "impuesto": venta["impuesto"],

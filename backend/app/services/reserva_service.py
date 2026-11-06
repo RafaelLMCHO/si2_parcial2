@@ -130,7 +130,7 @@ async def crear_reserva(
     empresa_id: str,
     user_id: str,
     sucursal_id: str,
-    fecha_visita_str: str | datetime,
+    fecha_visita: str | datetime,
     items: list[dict],
     cliente_uuid: str | None = None,
     ip: str | None = None,
@@ -143,13 +143,11 @@ async def crear_reserva(
     ahora = datetime.now(timezone.utc)
 
     # Parsear fecha
-    if isinstance(fecha_visita_str, str):
+    if isinstance(fecha_visita, str):
         try:
-            fecha_visita = datetime.fromisoformat(fecha_visita_str)
+            fecha_visita = datetime.fromisoformat(fecha_visita)
         except ValueError:
             raise api_error(422, "FECHA_INVALIDA", "Formato de fecha_visita inválido")
-    else:
-        fecha_visita = fecha_visita_str
 
     if fecha_visita.tzinfo is None:
         fecha_visita = fecha_visita.replace(tzinfo=timezone.utc)
@@ -183,8 +181,7 @@ async def crear_reserva(
 
     # Idempotencia por cliente_uuid
     if cliente_uuid:
-        pool = get_pool()
-        async with pool.acquire() as conn_check:
+        async with tenant_connection(empresa_id, user_id) as conn_check:
             existing = await conn_check.fetchrow(
                 """
                 SELECT id FROM reserva
@@ -218,8 +215,8 @@ async def crear_reserva(
              WHERE empresa_id = $1
                AND sucursal_id = $2
                AND variante_id = ANY($3)
-             FOR UPDATE
              ORDER BY variante_id
+             FOR UPDATE
             """,
             UUID(empresa_id),
             UUID(sucursal_id),
@@ -246,7 +243,7 @@ async def crear_reserva(
                 """
                 UPDATE inventario
                    SET stock_reservado = stock_reservado + $1,
-                       updated_at      = now()
+                       actualizado_en  = now()
                  WHERE empresa_id  = $2
                    AND sucursal_id = $3
                    AND variante_id = $4
@@ -527,7 +524,8 @@ async def cancelar_reserva(
             """
             SELECT id FROM inventario
              WHERE empresa_id = $1 AND sucursal_id = $2 AND variante_id = ANY($3)
-             FOR UPDATE ORDER BY variante_id
+             ORDER BY variante_id
+             FOR UPDATE
             """,
             UUID(empresa_id),
             r["sucursal_id"],
@@ -540,7 +538,7 @@ async def cancelar_reserva(
                 """
                 UPDATE inventario
                    SET stock_reservado = GREATEST(0, stock_reservado - $1),
-                       updated_at      = now()
+                       actualizado_en  = now()
                  WHERE empresa_id  = $2
                    AND sucursal_id = $3
                    AND variante_id = $4
@@ -655,7 +653,7 @@ async def expirar_reservas_vencidas(empresa_id: str | None = None) -> int:
                             """
                             UPDATE inventario
                                SET stock_reservado = GREATEST(0, stock_reservado - $1),
-                                   updated_at      = now()
+                                   actualizado_en  = now()
                              WHERE empresa_id  = $2
                                AND sucursal_id = $3
                                AND variante_id = $4
@@ -705,7 +703,7 @@ async def expirar_reservas_vencidas(empresa_id: str | None = None) -> int:
 async def listar_por_preparar(
     empresa_id: str,
     user_id: str,
-    sucursal_id_encargado: str,
+    sucursal_id_encargado: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> dict:
@@ -713,33 +711,37 @@ async def listar_por_preparar(
     offset = (page - 1) * page_size
 
     async with tenant_connection(empresa_id, user_id) as conn:
+        if not sucursal_id_encargado:
+            sucursal_id_encargado = await conn.fetchval(
+                "SELECT sucursal_id FROM usuario WHERE id = $1 AND empresa_id = $2",
+                UUID(user_id),
+                UUID(empresa_id),
+            )
+
+        conditions = ["r.empresa_id = $1", "r.estado = 'pendiente_preparacion'"]
+        params: list = [UUID(empresa_id)]
+        if sucursal_id_encargado:
+            params.append(UUID(str(sucursal_id_encargado)))
+            conditions.append(f"r.sucursal_id = ${len(params)}")
+        where = " AND ".join(conditions)
+
         total = await conn.fetchval(
-            """
-            SELECT count(*)::int FROM reserva
-             WHERE empresa_id  = $1
-               AND sucursal_id = $2
-               AND estado      = 'pendiente_preparacion'
-            """,
-            UUID(empresa_id),
-            UUID(sucursal_id_encargado),
+            f"SELECT count(*)::int FROM reserva r WHERE {where}",
+            *params,
         )
 
+        params.extend([page_size, offset])
         rows = await conn.fetch(
-            """
+            f"""
             SELECT r.*,
                    s.nombre AS sucursal_nombre
               FROM reserva r
               LEFT JOIN sucursal s ON s.id = r.sucursal_id
-             WHERE r.empresa_id  = $1
-               AND r.sucursal_id = $2
-               AND r.estado      = 'pendiente_preparacion'
+             WHERE {where}
              ORDER BY r.fecha_visita ASC
-             LIMIT $3 OFFSET $4
+             LIMIT ${len(params) - 1} OFFSET ${len(params)}
             """,
-            UUID(empresa_id),
-            UUID(sucursal_id_encargado),
-            page_size,
-            offset,
+            *params,
         )
 
         items = []
@@ -775,7 +777,7 @@ async def preparar_reserva(
     async with tenant_connection(empresa_id, user_id) as conn:
         # Obtener datos del encargado (sucursal)
         encargado = await conn.fetchrow(
-            "SELECT sucursal_id FROM empleado WHERE usuario_id = $1 AND empresa_id = $2",
+            "SELECT sucursal_id FROM usuario WHERE id = $1 AND empresa_id = $2",
             UUID(user_id),
             UUID(empresa_id),
         )
@@ -879,7 +881,7 @@ async def reportar_incidencia(
     async with tenant_connection(empresa_id, user_id) as conn:
         # Obtener sucursal del encargado
         encargado = await conn.fetchrow(
-            "SELECT sucursal_id FROM empleado WHERE usuario_id = $1 AND empresa_id = $2",
+            "SELECT sucursal_id FROM usuario WHERE id = $1 AND empresa_id = $2",
             UUID(user_id),
             UUID(empresa_id),
         )
@@ -954,7 +956,7 @@ async def reportar_incidencia(
                     UPDATE inventario
                        SET stock_fisico    = GREATEST(0, stock_fisico    - $1),
                            stock_reservado = GREATEST(0, stock_reservado - $1),
-                           updated_at      = now()
+                           actualizado_en  = now()
                      WHERE empresa_id  = $2
                        AND sucursal_id = $3
                        AND variante_id = $4

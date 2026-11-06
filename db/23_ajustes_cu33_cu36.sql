@@ -69,13 +69,13 @@ LIMIT 3;
 
 -- 2. Índices de optimización para consultas analíticas de reportes (CU-33 y CU-34)
 CREATE INDEX IF NOT EXISTS idx_venta_reportes_empresa_fecha 
-    ON venta (empresa_id, emitido_en DESC);
+    ON venta (empresa_id, fecha_hora DESC);
 
 CREATE INDEX IF NOT EXISTS idx_venta_detalle_reportes_variante 
     ON venta_detalle (empresa_id, variante_id);
 
 CREATE INDEX IF NOT EXISTS idx_mov_inventario_reportes 
-    ON movimiento_inventario (empresa_id, creado_en DESC);
+    ON movimiento_inventario (empresa_id, ocurrido_en DESC);
 
 CREATE INDEX IF NOT EXISTS idx_reporte_exportado_empresa_usuario 
     ON reporte_exportado (empresa_id, usuario_id, generado_en DESC);
