@@ -1,6 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import {
   CU33ReportesConvencionalesController,
   DashboardConvencionalResponse,
@@ -12,9 +13,15 @@ import {
 @Component({
   selector: 'app-reportes-convencionales',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   template: `
     <div class="p-6 max-w-7xl mx-auto space-y-6">
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; background: #fff; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid #e5e7eb;">
+        <a routerLink="/reportes/convencionales" style="padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 700; background: #eef2ff; color: #4f46e5; text-decoration: none;">CU-33: Reportes Convencionales</a>
+        <a routerLink="/reportes/ia" style="padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 600; color: #4b5563; text-decoration: none;">CU-34: Reporte Predictivo con IA</a>
+        <a routerLink="/analytics-ml" style="padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 600; color: #4b5563; text-decoration: none;">CU-35: Dashboard Analítico ML</a>
+      </div>
+
       <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-gray-200 gap-4">
         <div>
           <h1 class="text-2xl font-bold text-gray-900">CU-33: Reportes y Dashboards Convencionales</h1>

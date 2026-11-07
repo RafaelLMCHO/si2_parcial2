@@ -10,6 +10,12 @@ import { ReservaService } from '../../../core/reserva.service';
   imports: [CommonModule, FormsModule, RouterModule],
   template: `
     <div class="container mx-auto px-4 py-8 max-w-2xl font-sans">
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; background: #fff; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid #e5e7eb;">
+        <a routerLink="/reservas/nueva" style="padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 700; background: #fdf2f8; color: #be185d; text-decoration: none;">CU-19: Crear Reserva (Probador)</a>
+        <a routerLink="/reservas/mis-reservas" style="padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 600; color: #4b5563; text-decoration: none;">CU-20: Mis Reservas / Consulta</a>
+        <a routerLink="/reservas/staff" style="padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 600; color: #4b5563; text-decoration: none;">CU-21: Preparación Staff Tienda</a>
+      </div>
+
       <div class="mb-6 border-b pb-4">
         <h1 class="text-2xl font-bold text-gray-900">CU-19: Reserva de Prendas y Probador</h1>
         <p class="text-sm text-gray-500">Agenda tu visita para probarte prendas en tienda sin compromiso de compra</p>

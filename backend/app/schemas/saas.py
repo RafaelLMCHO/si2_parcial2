@@ -147,3 +147,7 @@ class MetricasSaaSOut(BaseModel):
     moneda: str = "BOB"
     periodo_inicio: date
     periodo_fin: date
+    tenants_activos: int | None = None
+    usuarios_totales: int | None = None
+    sucursales: int | None = None
+    mrr: Decimal | None = None

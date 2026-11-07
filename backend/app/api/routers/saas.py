@@ -37,6 +37,13 @@ async def list_planes(
     return await saas_service.list_planes()
 
 
+@router.get("/facturas")
+async def list_facturas(
+    _: CurrentUser = Depends(require_superadmin),
+):
+    return await saas_service.list_facturas()
+
+
 @router.get("/empresas", response_model=EmpresaListResponse)
 async def list_empresas(
     search: str | None = Query(default=None, max_length=120),

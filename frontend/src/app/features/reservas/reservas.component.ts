@@ -13,9 +13,9 @@ import { ReservaService } from '../../core/reserva.service';
       <div class="header">
         <h2>Gestión y Consulta de Reservas</h2>
         <div class="tab-buttons">
-          <button class="btn" [class.btn-primary]="tab === 'mis'" (click)="setTab('mis')">Mis Reservas</button>
-          <button class="btn" [class.btn-primary]="tab === 'preparar'" (click)="setTab('preparar')">Por Preparar (Tienda)</button>
-          <button class="btn btn-outline" (click)="abrirModalNueva()">+ Nueva Reserva</button>
+          <button class="btn" [class.btn-primary]="tab === 'mis'" (click)="setTab('mis')">CU-20: Mis Reservas</button>
+          <button class="btn" [class.btn-primary]="tab === 'preparar'" (click)="setTab('preparar')">CU-21: Por Preparar (Staff)</button>
+          <button class="btn btn-outline" (click)="abrirModalNueva()">+ CU-19: Nueva Reserva</button>
         </div>
       </div>
 

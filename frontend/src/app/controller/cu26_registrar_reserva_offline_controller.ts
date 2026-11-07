@@ -34,7 +34,7 @@ export class CU26RegistrarReservaOfflineController {
       cola.push(operacion);
       localStorage.setItem('cola_operaciones_offline', JSON.stringify(cola));
 
-      this.reservaUuid.set(uuid);
+      this.reservaUuid.set(uuid); //controlador1
       this.cargando.set(false);
       return uuid;
     } catch (e: any) {

@@ -45,10 +45,14 @@ class SequenceDiagram:
         self.y_lifeline_top = 0.885
         self.y_lifeline_bottom = 0.05
 
-    def add_participant(self, key, label, ptype, x, sub=""):
+    def add_participant(self, key, label, ptype, x, sub="", w=None, h=None, font_size=None, sub_size=None):
         """ptype: 'actor', 'boundary', 'control', 'entity'"""
         self.participants[key] = x
-        w, h = 0.088, 0.048
+        w = w if w is not None else 0.088
+        h = h if h is not None else 0.048
+        f_size = font_size if font_size is not None else 8.5
+        s_size = sub_size if sub_size is not None else 7.0
+        t_size = max(6.2, f_size - 1.0)
         y = 0.910
         
         if ptype == 'actor':
@@ -66,10 +70,10 @@ class SequenceDiagram:
             facecolor=fill, edgecolor=edge, linewidth=1.6, zorder=4
         )
         self.ax.add_patch(rect)
-        self.ax.text(x, y + 0.012, tag, fontsize=7.5, fontweight='bold', ha='center', va='center', color=edge, zorder=5)
-        self.ax.text(x, y - 0.002, label, fontsize=8.5, fontweight='bold', ha='center', va='center', color=COLORS['text'], zorder=5)
+        self.ax.text(x, y + 0.012, tag, fontsize=t_size, fontweight='bold', ha='center', va='center', color=edge, zorder=5)
+        self.ax.text(x, y - 0.002, label, fontsize=f_size, fontweight='bold', ha='center', va='center', color=COLORS['text'], zorder=5)
         if sub:
-            self.ax.text(x, y - 0.015, sub, fontsize=7.0, ha='center', va='center', color=COLORS['subtext'], zorder=5)
+            self.ax.text(x, y - 0.015, sub, fontsize=s_size, ha='center', va='center', color=COLORS['subtext'], zorder=5)
             
         # Draw vertical lifeline
         self.ax.plot(
@@ -77,9 +81,10 @@ class SequenceDiagram:
             linestyle='--', color=COLORS['lifeline'], linewidth=1.2, zorder=2
         )
 
-    def add_message(self, src_key, dst_key, y, label, is_return=False, self_call=False):
+    def add_message(self, src_key, dst_key, y, label, is_return=False, self_call=False, font_size=None):
         x1 = self.participants[src_key]
         x2 = self.participants[dst_key]
+        f_size = font_size if font_size is not None else 7.8
         
         if self_call:
             # Curved self call
@@ -94,7 +99,7 @@ class SequenceDiagram:
                 zorder=3
             )
             self.ax.text(
-                x1 + 0.012, y - 0.009, label, fontsize=7.8, ha='left', va='center',
+                x1 + 0.012, y - 0.009, label, fontsize=f_size, ha='left', va='center',
                 color=COLORS['msg_call'], fontweight='bold', zorder=5,
                 bbox=dict(boxstyle="round,pad=0.18", fc="#FFFFFF", ec="#CBD5E1", lw=0.8, alpha=0.92)
             )
@@ -114,7 +119,7 @@ class SequenceDiagram:
             )
             mx = (x1 + x2) / 2
             self.ax.text(
-                mx, y + 0.009, label, fontsize=7.5, ha='center', va='bottom',
+                mx, y + 0.009, label, fontsize=max(6.8, f_size - 0.3), ha='center', va='bottom',
                 color=COLORS['msg_return'], style='italic', zorder=5,
                 bbox=dict(boxstyle="round,pad=0.15", fc="#FFFFFF", ec="none", alpha=0.85)
             )
@@ -135,7 +140,7 @@ class SequenceDiagram:
             color = COLORS['crud_badge'] if is_crud else COLORS['msg_call']
             
             self.ax.text(
-                mx, y + 0.009, label, fontsize=7.8, ha='center', va='bottom',
+                mx, y + 0.009, label, fontsize=f_size, ha='center', va='bottom',
                 color=color, fontweight='bold', zorder=5,
                 bbox=dict(boxstyle="round,pad=0.18", fc="#FFFFFF", ec="#E2E8F0", lw=0.8, alpha=0.92)
             )
@@ -499,6 +504,831 @@ def generate_seq_cu05(output_dir):
     d.save(png_path, svg_path)
 
 
+# ----------------------------------------------------------------------------------------
+# CU-17: Gestión de Inventario, Kárdex y Ajustes
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu17(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-17: GESTIÓN DE INVENTARIO, KÁRDEX Y AJUSTES",
+        "Consulta de Stock, Ajustes Manuales (+/-), Kárdex Inmutable y Auditoría | Metodología ICONIX"
+    )
+    d.add_participant('actor', 'Encargado', 'actor', 0.06, 'Staff / Admin')
+    d.add_participant('ui', 'MatrizInventario', 'boundary', 0.18, 'inventario.html')
+    d.add_participant('modal', 'ModalAjuste', 'boundary', 0.31, 'ajuste-modal.html')
+    d.add_participant('ctrl', 'inventario_ctrl', 'control', 0.46, 'inventario_service.py')
+    d.add_participant('inv', 'Inventario', 'entity', 0.60, 'db / inventario')
+    d.add_participant('var', 'PrendaVariante', 'entity', 0.73, 'db / variante')
+    d.add_participant('mov', 'Kardex', 'entity', 0.85, 'db / mov_inventario')
+    d.add_participant('aud', 'Auditoria', 'entity', 0.95, 'db / bitacora')
+
+    d.add_message('actor', 'ui', 0.84, "1. Solicitar existencias de inventario")
+    d.add_message('ui', 'ctrl', 0.80, "2. GET /api/v1/inventario (sucursal_id, solo_bajo_minimo)")
+    d.add_message('ctrl', 'inv', 0.76, "3. GET: consultar stock_fisico y stock_minimo")
+    d.add_message('ctrl', 'var', 0.72, "4. GET: recuperar SKU, talla, color y datos de prenda")
+    d.add_message('ctrl', 'ui', 0.68, "5. Response 200 (existencias, alertas stock crítico)", is_return=True)
+    d.add_message('ui', 'actor', 0.64, "6. Renderizar matriz con semáforo de existencias")
+    d.add_message('actor', 'modal', 0.60, "7. Abrir modal e ingresar ajuste manual (+/- cant, motivo)")
+    d.add_message('modal', 'ctrl', 0.56, "8. POST /api/v1/inventario/movimientos/ajuste")
+    d.add_message('ctrl', 'inv', 0.52, "9. GET: verificar variante y stock FOR UPDATE")
+
+    d.add_frame(
+        "alt", "[stock_fisico + cantidad >= 0 (Ajuste Válido)]",
+        0.03, 0.97, 0.50, 0.15,
+        divider_y=0.27,
+        else_guard="[else: stock resultante < 0 (Error Stock Insuficiente)]"
+    )
+    d.add_message('ctrl', 'inv', 0.46, "10. PATCH / UPDATE: actualizar stock_fisico (+/-)")
+    d.add_message('ctrl', 'mov', 0.41, "11. POST: asentar movimiento en kárdex (tipo='ajuste')")
+    d.add_message('ctrl', 'aud', 0.36, "12. POST: auditar evento stock.ajustar")
+    d.add_message('ctrl', 'modal', 0.32, "13. Response 200 OK (ajuste registrado)", is_return=True)
+    d.add_message('modal', 'actor', 0.29, "14. Confirmación visual y actualización en tiempo real")
+
+    d.add_message('ctrl', 'modal', 0.23, "15. Error 409 Conflict: 'Stock resultante no puede ser menor a cero'", is_return=True)
+    d.add_message('modal', 'actor', 0.18, "16. Mostrar alerta Toast de restricción")
+
+    png_path = os.path.join(output_dir, "secuencia_cu17_gestion_inventario.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu17_gestion_inventario.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-18: Disponibilidad en Tiendas / Búsqueda Omnicanal
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu18(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-18: DISPONIBILIDAD EN TIENDAS / BÚSQUEDA OMNICANAL",
+        "Consulta de Stock Multi-Sucursal en Tiempo Real y Cálculo de Disponibilidad | Metodología ICONIX"
+    )
+    d.add_participant('actor', 'Cliente', 'actor', 0.06, 'Visitante / Comprador')
+    d.add_participant('cat_ui', 'CatalogoComponent', 'boundary', 0.19, 'catalogo.html')
+    d.add_participant('map_ui', 'MapaDisponibilidad', 'boundary', 0.33, 'tiendas-modal.html')
+    d.add_participant('ctrl', 'inventario_ctrl', 'control', 0.48, 'inventario_service.py')
+    d.add_participant('empresa', 'Empresa', 'entity', 0.62, 'db / empresa')
+    d.add_participant('sucursal', 'Sucursal', 'entity', 0.74, 'db / sucursal')
+    d.add_participant('inv', 'Inventario', 'entity', 0.86, 'db / inventario')
+    d.add_participant('var', 'PrendaVariante', 'entity', 0.95, 'db / variante')
+
+    d.add_message('actor', 'cat_ui', 0.84, "1. Seleccionar prenda y talla en catálogo web/móvil")
+    d.add_message('actor', 'map_ui', 0.80, "2. Clic en 'Ver disponibilidad en tiendas físicas'")
+    d.add_message('map_ui', 'ctrl', 0.76, "3. GET /api/v1/prendas/{id}/disponibilidad (variante_id, ciudad)")
+    d.add_message('ctrl', 'empresa', 0.71, "4. GET: verificar tenant activo y políticas de stock")
+    d.add_message('ctrl', 'var', 0.67, "5. GET: validar variante_id y SKU activo")
+    d.add_message('ctrl', 'sucursal', 0.63, "6. GET: listar sucursales físicas operativas")
+
+    d.add_frame("loop", "[Para cada sucursal física de la empresa]", 0.44, 0.98, 0.60, 0.38)
+    d.add_message('ctrl', 'inv', 0.55, "7. GET: consultar stock_fisico y stock_reservado")
+    d.add_message('ctrl', 'ctrl', 0.50, "calcular_disponible = stock_fisico - stock_reservado", self_call=True)
+    d.add_message('ctrl', 'map_ui', 0.44, "8. Agregar sucursal con unidades disponibles y distancia", is_return=True)
+
+    d.add_frame(
+        "alt", "[disponible > 0 en sucursales]",
+        0.03, 0.97, 0.35, 0.12,
+        divider_y=0.23,
+        else_guard="[else: stock agotado en todas las tiendas]"
+    )
+    d.add_message('map_ui', 'actor', 0.29, "9. Mostrar mapa interactivo con stock verde y botón 'Reservar'")
+    d.add_message('map_ui', 'actor', 0.17, "10. Notificar 'Sin stock cercano', sugerir envío a domicilio")
+
+    png_path = os.path.join(output_dir, "secuencia_cu18_disponibilidad_tiendas.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu18_disponibilidad_tiendas.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-19: Creación de Reservas y Probador
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu19(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-19: CREACIÓN DE RESERVAS Y PROBADOR",
+        "Validación de Stock Omnicanal, Apartado Temporal (TTL 48h) y Emisión de Voucher | Metodología ICONIX"
+    )
+    d.add_participant('actor', 'Cliente', 'actor', 0.06, 'Usuario autenticado')
+    d.add_participant('ui', 'ReservaProbadorUI', 'boundary', 0.19, 'reserva-probador.html')
+    d.add_participant('ctrl', 'reserva_ctrl', 'control', 0.34, 'reserva_service.py')
+    d.add_participant('inv', 'Inventario', 'entity', 0.49, 'db / inventario')
+    d.add_participant('res', 'Reserva', 'entity', 0.63, 'db / reserva')
+    d.add_participant('item', 'ReservaItem', 'entity', 0.76, 'db / reserva_item')
+    d.add_participant('hist', 'ReservaHistorial', 'entity', 0.87, 'db / historial')
+    d.add_participant('aud', 'Auditoria', 'entity', 0.96, 'db / bitacora')
+
+    d.add_message('actor', 'ui', 0.84, "1. Seleccionar sucursal, fecha/hora y prendas a reservar")
+    d.add_message('ui', 'ctrl', 0.80, "2. POST /api/v1/reservas/validar (sucursal_id, fecha, items)")
+    d.add_message('ctrl', 'inv', 0.76, "3. GET: verificar disponible (stock_fisico - stock_reservado >= cant)")
+    d.add_message('ctrl', 'ui', 0.72, "4. Validación exitosa: prendas disponibles", is_return=True)
+    d.add_message('actor', 'ui', 0.68, "5. Confirmar reserva (Idempotency-Key en Header)")
+    d.add_message('ui', 'ctrl', 0.64, "6. POST /api/v1/reservas (datos_reserva, items)")
+
+    d.add_frame(
+        "alt", "[Stock suficiente para todas las prendas]",
+        0.03, 0.98, 0.61, 0.14,
+        divider_y=0.25,
+        else_guard="[else: Conflicto de stock por concurrencia]"
+    )
+    d.add_message('ctrl', 'inv', 0.57, "7. PATCH / UPDATE: stock_reservado = stock_reservado + cant")
+    d.add_message('ctrl', 'res', 0.52, "8. POST: insertar reserva ('pendiente', expira_en = now + 48h, voucher)")
+    d.add_message('ctrl', 'item', 0.47, "9. POST: insertar reserva_item (variante_id, cantidad)")
+    d.add_message('ctrl', 'hist', 0.42, "10. POST: historial estado inicial 'pendiente'")
+    d.add_message('ctrl', 'aud', 0.37, "11. POST: auditar creación de reserva")
+    d.add_message('ctrl', 'ui', 0.32, "12. Response 201 Created (codigo_reserva, voucher_url)", is_return=True)
+    d.add_message('ui', 'actor', 0.28, "13. Exhibir voucher con código QR para probador")
+
+    d.add_message('ctrl', 'ui', 0.21, "14. Response 409 Conflict: 'Prenda no disponible'", is_return=True)
+    d.add_message('ui', 'actor', 0.17, "15. Notificar stock insuficiente y solicitar cambio de talla")
+
+    png_path = os.path.join(output_dir, "secuencia_cu19_creacion_reservas.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu19_creacion_reservas.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-20: Consulta y Seguimiento de Reservas del Cliente
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu20(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-20: CONSULTA Y GESTIÓN DE RESERVAS DEL CLIENTE",
+        "Historial de Reservas, Transiciones de Estado y Cancelación con Devolución de Stock | Metodología ICONIX"
+    )
+    d.add_participant('actor', 'Cliente', 'actor', 0.06, 'Usuario autenticado')
+    d.add_participant('ui', 'MisReservasUI', 'boundary', 0.20, 'mis-reservas.html')
+    d.add_participant('modal', 'ModalCancelar', 'boundary', 0.35, 'cancelar-modal.html')
+    d.add_participant('ctrl', 'reserva_ctrl', 'control', 0.50, 'reserva_service.py')
+    d.add_participant('res', 'Reserva', 'entity', 0.64, 'db / reserva')
+    d.add_participant('hist', 'ReservaHistorial', 'entity', 0.76, 'db / historial')
+    d.add_participant('inv', 'Inventario', 'entity', 0.88, 'db / inventario')
+    d.add_participant('aud', 'Auditoria', 'entity', 0.96, 'db / bitacora')
+
+    d.add_message('actor', 'ui', 0.84, "1. Acceder a sección 'Mis Reservas'")
+    d.add_message('ui', 'ctrl', 0.80, "2. GET /api/v1/reservas (filtrar usuario_id autenticado)")
+    d.add_message('ctrl', 'res', 0.76, "3. GET: consultar reservas activas e históricas del cliente")
+    d.add_message('ctrl', 'hist', 0.71, "4. GET: recuperar traza de estados, fechas y probador asignado")
+    d.add_message('ctrl', 'ui', 0.66, "5. Response 200 (listado con estado: Pendiente, Preparada, Expirada)", is_return=True)
+    d.add_message('ui', 'actor', 0.61, "6. Renderizar tarjetas de reservas y código QR")
+    d.add_message('actor', 'modal', 0.57, "7. Clic en 'Cancelar Reserva' e ingresar motivo")
+    d.add_message('modal', 'ctrl', 0.52, "8. POST /api/v1/reservas/{id}/cancelar (motivo)")
+
+    d.add_frame(
+        "alt", "[Reserva en estado 'pendiente' o 'preparada']",
+        0.03, 0.98, 0.49, 0.14,
+        divider_y=0.25,
+        else_guard="[else: Reserva ya completada o expirada]"
+    )
+    d.add_message('ctrl', 'res', 0.45, "9. PATCH / UPDATE: estado = 'cancelada', cancelada_en = now()")
+    d.add_message('ctrl', 'hist', 0.40, "10. POST: registrar transición a 'cancelada'")
+    d.add_message('ctrl', 'inv', 0.35, "11. PATCH / UPDATE: stock_reservado = stock_reservado - cant")
+    d.add_message('ctrl', 'aud', 0.30, "12. POST: auditar evento reserva.cancelada")
+    d.add_message('ctrl', 'modal', 0.27, "13. Response 200 OK (reserva cancelada y stock liberado)", is_return=True)
+
+    d.add_message('ctrl', 'modal', 0.21, "14. Error 400 Bad Request: 'La reserva ya no puede ser cancelada'", is_return=True)
+    d.add_message('modal', 'actor', 0.17, "15. Mostrar mensaje de restricción en pantalla")
+
+    png_path = os.path.join(output_dir, "secuencia_cu20_consulta_reservas.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu20_consulta_reservas.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-21: Preparación y Validación de Reservas (Staff de Tienda)
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu21(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-21: PREPARACIÓN Y VALIDACIÓN DE RESERVAS (STAFF)",
+        "Pick & Pack en Sucursal, Asignación de Probador y Reporte de Incidencias | Metodología ICONIX",
+        width=19, height=14
+    )
+    d.y_lifeline_bottom = 0.04
+    
+    # 11 Participantes idénticos al Diagrama de Robustez de CU-21
+    d.add_participant('actor', 'Encargado', 'actor', 0.048, 'Staff de Sucursal', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('bandeja_ui', 'BandejaReservas', 'boundary', 0.138, 'reservas-por-preparar', w=0.074, font_size=7.0, sub_size=5.8)
+    d.add_participant('modal_prep', 'ModalPreparacion', 'boundary', 0.228, 'preparar-reserva.html', w=0.074, font_size=7.0, sub_size=5.8)
+    d.add_participant('modal_inc', 'ModalIncidencia', 'boundary', 0.318, 'incidencia-stock.html', w=0.074, font_size=7.0, sub_size=5.8)
+    
+    d.add_participant('listar_ctrl', 'listar_reservas', 'control', 0.410, 'reserva_service.py', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('prep_ctrl', 'preparar_reserva', 'control', 0.502, 'reserva_service.py', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('inc_ctrl', 'registrar_incid', 'control', 0.595, 'reserva_service.py', w=0.072, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('reserva', 'Reserva', 'entity', 0.690, 'db / reserva', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('historial', 'ReservaHistorial', 'entity', 0.785, 'db / historial_reserva', w=0.074, font_size=7.0, sub_size=5.8)
+    d.add_participant('inventario', 'Inventario', 'entity', 0.880, 'db / inventario', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('auditoria', 'BitacoraAuditoria', 'entity', 0.965, 'db / bitacora', w=0.060, font_size=6.8, sub_size=5.6)
+    
+    # 1. Consulta de reservas por preparar en sucursal
+    d.add_message('actor', 'bandeja_ui', 0.85, "1. Acceder a bandeja de reservas por preparar en tienda")
+    d.add_message('bandeja_ui', 'listar_ctrl', 0.81, "2. GET /api/v1/reservas/por-preparar")
+    d.add_message('listar_ctrl', 'reserva', 0.77, "3. GET: filtrar por sucursal y 'pendiente'")
+    d.add_message('listar_ctrl', 'bandeja_ui', 0.73, "4. Response 200 OK (reservas pendientes para Pick & Pack)", is_return=True)
+    d.add_message('bandeja_ui', 'actor', 0.68, "5. Visualizar listado de prendas y probadores asignables", is_return=True)
+    
+    # 2. alt frame: Preparación exitosa vs Incidencia física
+    d.add_frame(
+        "alt", "[Prendas en perchero y probador físico disponible]",
+        0.02, 0.99, 0.64, 0.06,
+        divider_y=0.34,
+        else_guard="[else: Prenda dañada / extraviada en tienda (Reporte de Incidencia)]"
+    )
+    
+    # Camino Exitoso: Preparar reserva y asignar probador
+    d.add_message('actor', 'modal_prep', 0.60, "6. Seleccionar reserva, abrir modal y asignar probador 'P1'")
+    d.add_message('modal_prep', 'prep_ctrl', 0.55, "7. POST /api/v1/reservas/{id}/preparar (probador asignado)")
+    d.add_message('prep_ctrl', 'reserva', 0.50, "8. PATCH: estado='preparada', probador='P1'")
+    d.add_message('prep_ctrl', 'historial', 0.46, "9. POST: historial: pendiente -> preparada")
+    d.add_message('prep_ctrl', 'auditoria', 0.42, "10. POST: auditar preparacion física")
+    d.add_message('prep_ctrl', 'modal_prep', 0.38, "11. Response 200 OK (probador asignado y prendas listas)", is_return=True)
+    
+    # Camino Alternativo: Reportar Incidencia de Stock
+    d.add_message('actor', 'modal_inc', 0.29, "12. Detectar anomalía física y abrir modal de incidencia")
+    d.add_message('modal_inc', 'inc_ctrl', 0.25, "13. POST /api/v1/reservas/{id}/incidencia (prenda dañada/extraviada)")
+    d.add_message('inc_ctrl', 'reserva', 0.21, "14. PATCH: estado='incidencia_stock'")
+    d.add_message('inc_ctrl', 'historial', 0.17, "15. POST: historial: incidencia")
+    d.add_message('inc_ctrl', 'inventario', 0.13, "16. PATCH / UPDATE: liberar reserva del ítem dañado")
+    d.add_message('inc_ctrl', 'auditoria', 0.09, "17. POST: auditar incidencia de prenda")
+    
+    png_path = os.path.join(output_dir, "secuencia_cu21_preparacion_reservas.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu21_preparacion_reservas.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-22: Carrito de Compras y Checkout Omnicanal
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu22(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-22: CARRITO DE COMPRAS Y CHECKOUT OMNICANAL",
+        "Validación de Stock, Cupones de Descuento, Opciones de Entrega y Creación de Orden | Metodología ICONIX"
+    )
+    d.add_participant('actor', 'Cliente', 'actor', 0.06, 'Comprador online')
+    d.add_participant('cart_ui', 'CarritoComponent', 'boundary', 0.18, 'carrito.html')
+    d.add_participant('check_ui', 'CheckoutComponent', 'boundary', 0.31, 'checkout.html')
+    d.add_participant('ctrl', 'checkout_ctrl', 'control', 0.46, 'checkout_service.py')
+    d.add_participant('cupon', 'Cupon', 'entity', 0.59, 'db / cupon')
+    d.add_participant('inv', 'Inventario', 'entity', 0.72, 'db / inventario')
+    d.add_participant('venta', 'Venta', 'entity', 0.84, 'db / venta')
+    d.add_participant('envio', 'Envio', 'entity', 0.92, 'db / envio')
+    d.add_participant('aud', 'Auditoria', 'entity', 0.97, 'db / bitacora')
+
+    d.add_message('actor', 'cart_ui', 0.84, "1. Modificar carrito e ingresar código de cupón")
+    d.add_message('cart_ui', 'ctrl', 0.80, "2. POST /api/v1/checkout/validar (cupon_codigo, tipo_entrega)")
+    d.add_message('ctrl', 'cupon', 0.76, "3. GET: validar vigencia, usos y porcentaje descuento")
+    d.add_message('ctrl', 'inv', 0.71, "4. GET: verificar disponibilidad de stock por variante")
+    d.add_message('ctrl', 'cart_ui', 0.67, "5. Response 200 (descuento aplicado y totales)", is_return=True)
+    d.add_message('actor', 'check_ui', 0.63, "6. Seleccionar entrega (domicilio / recojo en tienda) y confirmar orden")
+    d.add_message('check_ui', 'ctrl', 0.58, "7. POST /api/v1/checkout/orden (Idempotency-Key en Header)")
+
+    d.add_frame(
+        "alt", "[Stock verificado e Idempotencia garantizada]",
+        0.03, 0.98, 0.55, 0.14,
+        divider_y=0.25,
+        else_guard="[else: Stock insuficiente por compra concurrente]"
+    )
+    d.add_message('ctrl', 'venta', 0.51, "8. POST: crear venta y detalle (estado='pendiente_pago')")
+    d.add_message('ctrl', 'envio', 0.46, "9. POST: registrar orden de envío o recojo en tienda")
+    d.add_message('ctrl', 'cupon', 0.41, "10. PATCH: registrar uso del cupón de descuento")
+    d.add_message('ctrl', 'aud', 0.36, "11. POST: auditar creación de orden omnicanal")
+    d.add_message('ctrl', 'check_ui', 0.31, "12. Response 201 Created (orden_id, paso: 'pagar')", is_return=True)
+    d.add_message('check_ui', 'actor', 0.27, "13. Redirigir a pasarela de pagos (CU-24)")
+
+    d.add_message('ctrl', 'check_ui', 0.21, "14. Error 409 Conflict: 'Variante sin stock'", is_return=True)
+    d.add_message('check_ui', 'actor', 0.17, "15. Notificar al cliente para ajustar carrito")
+
+    png_path = os.path.join(output_dir, "secuencia_cu22_checkout_carrito.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu22_checkout_carrito.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-23: Punto de Venta (POS) - Caja y Facturación
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu23(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-23: PUNTO DE VENTA (POS) - CAJA Y FACTURACIÓN",
+        "Escaneo Barcode, Descuento Atómico de Stock, Kárdex, Venta Pagada y Emisión de Ticket | Metodología ICONIX",
+        width=20, height=14
+    )
+    # 13 Participantes idénticos al Diagrama de Robustez de CU-23
+    d.add_participant('cajero', 'Cajero', 'actor', 0.045, 'Mostrador POS', w=0.065, font_size=7.6, sub_size=6.2)
+    d.add_participant('pos_ui', 'PantallaPOS', 'boundary', 0.120, 'pos-mostrador.html', w=0.068, font_size=7.2, sub_size=6.0)
+    d.add_participant('cobro_ui', 'ModalCobroPOS', 'boundary', 0.198, 'pos-cobro.html', w=0.068, font_size=7.2, sub_size=6.0)
+    d.add_participant('ticket_ui', 'TicketImpresion', 'boundary', 0.276, 'pos-ticket.html', w=0.068, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('buscar_ctrl', 'buscar_por_barcode', 'control', 0.355, 'pos_service.py', w=0.070, font_size=7.2, sub_size=6.0)
+    d.add_participant('venta_ctrl', 'procesar_venta_pos', 'control', 0.435, 'pos_service.py', w=0.070, font_size=7.2, sub_size=6.0)
+    d.add_participant('ticket_ctrl', 'generar_ticket', 'control', 0.515, 'pos_service.py', w=0.068, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('var', 'PrendaVariante', 'entity', 0.595, 'db / variante', w=0.068, font_size=7.2, sub_size=6.0)
+    d.add_participant('inv', 'Inventario', 'entity', 0.675, 'db / inventario', w=0.068, font_size=7.2, sub_size=6.0)
+    d.add_participant('mov', 'Kardex', 'entity', 0.755, 'db / kardex', w=0.068, font_size=7.2, sub_size=6.0)
+    d.add_participant('venta', 'Venta / Detalle', 'entity', 0.835, 'db / venta', w=0.068, font_size=7.2, sub_size=6.0)
+    d.add_participant('pago', 'Pago', 'entity', 0.910, 'db / pago', w=0.065, font_size=7.2, sub_size=6.0)
+    d.add_participant('aud', 'BitacoraAuditoria', 'entity', 0.975, 'db / bitacora', w=0.055, font_size=6.8, sub_size=5.8)
+    
+    # 1. Escaneo Barcode
+    d.add_message('cajero', 'pos_ui', 0.84, "1. Escanear código de barras o SKU")
+    d.add_message('pos_ui', 'buscar_ctrl', 0.80, "2. GET /api/v1/pos/scanner (código de barras o SKU)")
+    d.add_message('buscar_ctrl', 'var', 0.76, "3. GET: identificar variante por código")
+    d.add_message('buscar_ctrl', 'inv', 0.72, "4. GET: verificar stock local sucursal")
+    d.add_message('buscar_ctrl', 'pos_ui', 0.68, "5. Response 200 (variante encontrada, precio, existencias)", is_return=True)
+    d.add_message('pos_ui', 'cajero', 0.65, "6. Añadir ítem a la línea de venta activa", is_return=True)
+    
+    # 2. Cobro presencial
+    d.add_message('cajero', 'cobro_ui', 0.61, "7. Abrir modal y confirmar cobro (efectivo/tarjeta)")
+    d.add_message('cobro_ui', 'venta_ctrl', 0.57, "8. POST /api/v1/pos/ventas (items, pago, cliente)")
+    
+    # alt: Stock disponible vs insuficiente
+    d.add_frame(
+        "alt", "[Stock físico disponible en mostrador]",
+        0.02, 0.99, 0.54, 0.22,
+        divider_y=0.29,
+        else_guard="[else: Stock insuficiente en sucursal]"
+    )
+    d.add_message('venta_ctrl', 'inv', 0.50, "9. PATCH / UPDATE: descontar stock_fisico (-)")
+    d.add_message('venta_ctrl', 'mov', 0.46, "10. POST: kárdex inmutable tipo 'salida_pos'")
+    d.add_message('venta_ctrl', 'venta', 0.42, "11. POST: crear venta estado 'pagada'")
+    d.add_message('venta_ctrl', 'pago', 0.38, "12. POST: registrar pago contado / cambio")
+    d.add_message('venta_ctrl', 'aud', 0.34, "13. POST: auditar venta presencial")
+    d.add_message('venta_ctrl', 'cobro_ui', 0.30, "14. Response 200 OK (venta_id, pago_id)", is_return=True)
+    
+    d.add_message('venta_ctrl', 'cobro_ui', 0.26, "15. Error 409 Conflict: 'Stock insuficiente'", is_return=True)
+    d.add_message('cobro_ui', 'cajero', 0.23, "16. Notificar alerta de falta de existencias", is_return=True)
+    
+    # 3. Emisión de Ticket
+    d.add_message('cajero', 'ticket_ui', 0.19, "17. Solicitar emisión de ticket de venta")
+    d.add_message('ticket_ui', 'ticket_ctrl', 0.15, "18. GET /api/v1/pos/ventas/{id}/ticket")
+    d.add_message('ticket_ctrl', 'venta', 0.12, "19. GET: recuperar cabecera, líneas y pago")
+    d.add_message('ticket_ctrl', 'ticket_ui', 0.09, "20. Response 200 (datos de comprobante fiscal y QR)", is_return=True)
+    d.add_message('ticket_ui', 'cajero', 0.06, "21. Imprimir ticket térmico y entregar al cliente", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu23_punto_venta_pos.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu23_punto_venta_pos.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-24: Procesamiento de Pagos, Pasarelas y Reembolsos
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu24(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-24: PROCESAMIENTO DE PAGOS, PASARELAS Y REEMBOLSOS",
+        "PaymentIntent Stripe, Webhook con Firma Criptográfica, Polling e Idempotencia | Metodología ICONIX",
+        width=19, height=14
+    )
+    # 11 Participantes idénticos al Diagrama de Robustez de CU-24
+    d.add_participant('actor', 'Cliente / Stripe', 'actor', 0.050, 'Usuario / Pasarela', w=0.075, font_size=7.5, sub_size=6.2)
+    d.add_participant('elements_ui', 'StripeElements', 'boundary', 0.140, 'stripe-elements.html', w=0.075, font_size=7.5, sub_size=6.2)
+    d.add_participant('webhook_ui', 'WebhookEndpoint', 'boundary', 0.230, 'API Webhook Pública', w=0.075, font_size=7.5, sub_size=6.2)
+    d.add_participant('confirm_ui', 'ConfirmacionPago', 'boundary', 0.320, 'pago-confirmado.html', w=0.075, font_size=7.5, sub_size=6.2)
+    
+    d.add_participant('intencion_ctrl', 'crear_intencion', 'control', 0.415, 'pago_service.py', w=0.075, font_size=7.5, sub_size=6.2)
+    d.add_participant('webhook_ctrl', 'procesar_webhook', 'control', 0.510, 'pago_service.py', w=0.075, font_size=7.5, sub_size=6.2)
+    d.add_participant('polling_ctrl', 'consultar_polling', 'control', 0.605, 'pago_service.py', w=0.075, font_size=7.5, sub_size=6.2)
+    
+    d.add_participant('pago', 'Pago', 'entity', 0.700, 'db / pago', w=0.075, font_size=7.5, sub_size=6.2)
+    d.add_participant('stripe_ev', 'StripeEvento', 'entity', 0.795, 'db / stripe_evento', w=0.075, font_size=7.5, sub_size=6.2)
+    d.add_participant('venta', 'Venta', 'entity', 0.885, 'db / venta', w=0.072, font_size=7.5, sub_size=6.2)
+    d.add_participant('aud', 'BitacoraAuditoria', 'entity', 0.965, 'db / bitacora', w=0.062, font_size=7.0, sub_size=5.8)
+    
+    # 1. Creación de Intención de Pago
+    d.add_message('actor', 'elements_ui', 0.84, "1. Seleccionar 'Pagar con Tarjeta' en checkout")
+    d.add_message('elements_ui', 'intencion_ctrl', 0.80, "2. POST /api/v1/pagos/intencion (orden_id, metodo)")
+    d.add_message('intencion_ctrl', 'venta', 0.76, "3. GET: verificar orden pendiente")
+    d.add_message('intencion_ctrl', 'pago', 0.72, "4. POST: crear pago 'pendiente' (client_secret)")
+    d.add_message('intencion_ctrl', 'elements_ui', 0.68, "5. Response 200 (client_secret para montar tarjeta)", is_return=True)
+    d.add_message('elements_ui', 'actor', 0.64, "6. Montar formulario seguro de Stripe Elements", is_return=True)
+    
+    # 2. Webhook Asíncrono de Confirmación (Pasarela Stripe)
+    d.add_message('actor', 'webhook_ui', 0.59, "7. POST /api/v1/pagos/webhook/stripe (Stripe-Signature, evento)")
+    d.add_message('webhook_ui', 'webhook_ctrl', 0.55, "8. procesar_webhook(payload, signature)")
+    
+    # alt: Firma válida vs inválida
+    d.add_frame(
+        "alt", "[Firma criptográfica válida y evento no duplicado]",
+        0.02, 0.99, 0.52, 0.25,
+        divider_y=0.31,
+        else_guard="[else: Firma inválida o evento duplicado (Replay)]"
+    )
+    d.add_message('webhook_ctrl', 'stripe_ev', 0.48, "9. POST: registrar evento (prevenir replay)")
+    d.add_message('webhook_ctrl', 'pago', 0.44, "10. PATCH: marcar pago 'completado'")
+    d.add_message('webhook_ctrl', 'venta', 0.40, "11. PATCH: actualizar venta a 'pagada'")
+    d.add_message('webhook_ctrl', 'aud', 0.36, "12. POST: auditar cobro pasarela")
+    d.add_message('webhook_ctrl', 'webhook_ui', 0.32, "13. Response 200 {'received': True}", is_return=True)
+    
+    d.add_message('webhook_ctrl', 'webhook_ui', 0.27, "14. Response 400 Bad Request o ignore duplicado", is_return=True)
+    
+    # 3. Polling de Confirmación en Frontend
+    d.add_message('actor', 'confirm_ui', 0.21, "15. Cliente espera confirmación en pantalla")
+    d.add_message('confirm_ui', 'polling_ctrl', 0.17, "16. GET /api/v1/pagos/{id}/polling")
+    d.add_message('polling_ctrl', 'pago', 0.13, "17. GET: consultar estado actual del pago")
+    d.add_message('polling_ctrl', 'confirm_ui', 0.09, "18. Response 200 (estado='completado', venta_id)", is_return=True)
+    d.add_message('confirm_ui', 'actor', 0.06, "19. Redirigir a comprobante de compra exitosa", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu24_procesamiento_pagos.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu24_procesamiento_pagos.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-25: Descargar Catálogo Offline
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu25(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-25: DESCARGAR CATÁLOGO OFFLINE",
+        "Descarga de Lote Multitenant, Almacenamiento en IndexedDB/SQLite y Caché Local | Metodología ICONIX",
+        width=18, height=13
+    )
+    # 9 Participantes idénticos al Diagrama de Robustez de CU-25
+    d.add_participant('actor', 'Cliente / Cajero', 'actor', 0.055, 'Dispositivo Offline (PWA)', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('cat_ui', 'CatalogoOffline', 'boundary', 0.160, 'catalogo-offline.html', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('sw_cache', 'ServiceWorkerCache', 'boundary', 0.270, 'IndexedDB/SQLite View', w=0.075, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('desc_ctrl', 'descargar_catalogo', 'control', 0.385, 'sync_service.py', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('persist_ctrl', 'persistir_local', 'control', 0.500, 'IDB/SQLite Controller', w=0.075, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('empresa', 'Empresa', 'entity', 0.615, 'db / empresa', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('prenda', 'Prenda', 'entity', 0.725, 'db / prenda', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('variante', 'Variante', 'entity', 0.835, 'db / variante', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('inventario', 'Inventario', 'entity', 0.945, 'db / inventario', w=0.075, font_size=7.2, sub_size=6.0)
+    
+    # Mensajes
+    d.add_message('actor', 'cat_ui', 0.84, "1. Solicitar sincronización de catálogo offline")
+    d.add_message('cat_ui', 'desc_ctrl', 0.80, "2. GET /api/v1/sync/catalogo-offline (sucursal_id)")
+    d.add_message('desc_ctrl', 'empresa', 0.75, "3. GET: verificar tenant activo")
+    d.add_message('desc_ctrl', 'prenda', 0.70, "4. GET: consultar prendas activas")
+    d.add_message('desc_ctrl', 'variante', 0.65, "5. GET: obtener variantes, precios y tallas")
+    d.add_message('desc_ctrl', 'inventario', 0.60, "6. GET: descargar existencias sucursal")
+    d.add_message('desc_ctrl', 'cat_ui', 0.55, "7. Response 200 OK (lote de catálogo estructurado)", is_return=True)
+    
+    d.add_message('cat_ui', 'sw_cache', 0.49, "8. Notificar lote descargado a Service Worker")
+    d.add_message('sw_cache', 'persist_ctrl', 0.44, "9. almacenarLoteLocal(prendas, variantes, stock)")
+    
+    d.add_frame(
+        "loop", "[Por cada registro de prendas, variantes e inventario]",
+        0.44, 0.98, 0.40, 0.22
+    )
+    d.add_message('persist_ctrl', 'persist_ctrl', 0.35, "10. PUT / POST: sincronizar tabla local SQLite/IDB", self_call=True)
+    d.add_message('persist_ctrl', 'sw_cache', 0.27, "11. Confirmar lote local indexado y persistido", is_return=True)
+    
+    d.add_message('sw_cache', 'cat_ui', 0.17, "12. Actualizar estado de caché offline (100% disponible)", is_return=True)
+    d.add_message('cat_ui', 'actor', 0.11, "13. Notificar 'Catálogo listo para operar sin conexión'", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu25_descargar_catalogo_offline.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu25_descargar_catalogo_offline.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-26: Registrar Reserva Offline
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu26(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-26: REGISTRAR RESERVA OFFLINE",
+        "Generación de UUID v4 en Cliente, Registro en Cola Offline y Descuento de Stock Local | Metodología ICONIX",
+        width=18, height=13
+    )
+    # 8 Participantes idénticos al Diagrama de Robustez de CU-26
+    d.add_participant('actor', 'Cliente', 'actor', 0.065, 'Usuario sin conexión', w=0.080, font_size=7.5, sub_size=6.2)
+    d.add_participant('form_ui', 'FormularioReserva', 'boundary', 0.190, 'reserva-offline.html', w=0.080, font_size=7.5, sub_size=6.2)
+    d.add_participant('voucher_ui', 'VoucherLocalView', 'boundary', 0.320, 'voucher-local.html (UUID)', w=0.080, font_size=7.5, sub_size=6.2)
+    
+    d.add_participant('uuid_ctrl', 'generar_uuid_local', 'control', 0.455, 'UUID v4 Generador Cliente', w=0.080, font_size=7.5, sub_size=6.2)
+    d.add_participant('sync_ctrl', 'registrar_reserva', 'control', 0.590, 'sync_service.py', w=0.080, font_size=7.5, sub_size=6.2)
+    
+    d.add_participant('op_pend', 'OperacionPendiente', 'entity', 0.725, 'db / operacion_pendiente', w=0.080, font_size=7.5, sub_size=6.2)
+    d.add_participant('inv_local', 'InventarioLocal', 'entity', 0.850, 'IDB/SQLite Inventario', w=0.080, font_size=7.5, sub_size=6.2)
+    d.add_participant('auditoria', 'BitacoraAuditoria', 'entity', 0.955, 'db / bitacora', w=0.065, font_size=7.0, sub_size=5.8)
+    
+    d.add_message('actor', 'form_ui', 0.84, "1. Solicitar reserva de prenda en modo offline")
+    d.add_message('form_ui', 'uuid_ctrl', 0.79, "2. solicitarReservaOffline(prendas, fecha_visita)")
+    d.add_message('uuid_ctrl', 'uuid_ctrl', 0.74, "3. emitirUUID() (asignar identificador cliente)", self_call=True)
+    d.add_message('uuid_ctrl', 'sync_ctrl', 0.68, "4. POST /api/v1/sync/reservas-offline (payload encolado)")
+    
+    d.add_frame(
+        "alt", "[Stock local disponible en almacenamiento del cliente]",
+        0.03, 0.98, 0.63, 0.22,
+        divider_y=0.33,
+        else_guard="[else: Existencias locales agotadas]"
+    )
+    d.add_message('sync_ctrl', 'op_pend', 0.58, "5. POST / INSERT: encolar op 'reserva_offline' (pendiente)")
+    d.add_message('sync_ctrl', 'inv_local', 0.52, "6. PATCH: descontar stock_disponible local")
+    d.add_message('sync_ctrl', 'auditoria', 0.46, "7. POST: auditar registro offline")
+    d.add_message('sync_ctrl', 'voucher_ui', 0.40, "8. Renderizar voucher local con UUID y código QR", is_return=True)
+    d.add_message('voucher_ui', 'actor', 0.35, "9. Entregar comprobante provisional (pendiente_sync)", is_return=True)
+    
+    d.add_message('sync_ctrl', 'form_ui', 0.29, "10. Error: Prenda agotada en caché local", is_return=True)
+    d.add_message('form_ui', 'actor', 0.25, "11. Mostrar notificación de stock no disponible", is_return=True)
+    
+    d.add_message('voucher_ui', 'actor', 0.15, "12. Notificar sincronización en segundo plano al reconectar", is_return=True)
+    d.add_message('voucher_ui', 'actor', 0.08, "13. Operación encolada en IndexedDB con estado 'pendiente'", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu26_registrar_reserva_offline.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu26_registrar_reserva_offline.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-27: Bloquear Stock Soft-Lock con TTL
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu27(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-27: BLOQUEAR STOCK SOFT-LOCK CON TTL",
+        "Bloqueo Temporal de Existencias con TTL de 45 Minutos y Liberación Automática | Metodología ICONIX",
+        width=18, height=13
+    )
+    # 9 Participantes idénticos al Diagrama de Robustez de CU-27
+    d.add_participant('actor', 'Cliente / Terminal', 'actor', 0.055, 'Terminal Desconectado', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('detalle_ui', 'DetallePrenda', 'boundary', 0.160, 'prenda-detalle.html', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('badge_ui', 'BadgeTTL', 'boundary', 0.270, 'Badge Reservado 45 min', w=0.075, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('crear_ctrl', 'crear_soft_lock', 'control', 0.385, 'sync_service.py', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('expira_ctrl', 'verificar_expira', 'control', 0.500, 'TTL Check Controller', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('liberar_ctrl', 'liberar_soft_lock', 'control', 0.615, 'sync_service.py', w=0.075, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('softlock', 'SoftLock', 'entity', 0.730, 'db / soft_lock (45m)', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('inventario', 'Inventario', 'entity', 0.840, 'db / inventario', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('auditoria', 'BitacoraAuditoria', 'entity', 0.948, 'db / bitacora', w=0.068, font_size=7.0, sub_size=5.8)
+    
+    d.add_message('actor', 'detalle_ui', 0.85, "1. Iniciar reserva de prenda")
+    d.add_message('detalle_ui', 'crear_ctrl', 0.81, "2. POST /api/v1/sync/soft-locks (variante_id, cantidad, dispositivo)")
+    d.add_message('crear_ctrl', 'inventario', 0.77, "3. GET: verificar stock no bloqueado")
+    d.add_message('crear_ctrl', 'softlock', 0.72, "4. POST / INSERT: crear soft_lock (expira_en=now+45m)")
+    d.add_message('crear_ctrl', 'badge_ui', 0.67, "5. Inicializar temporizador de 45 minutos")
+    d.add_message('badge_ui', 'actor', 0.63, "6. Mostrar insignia 'Reservado por 45 min'", is_return=True)
+    
+    d.add_message('badge_ui', 'expira_ctrl', 0.57, "7. comprobarTTL() (tiempo transcurrido)")
+    d.add_message('expira_ctrl', 'softlock', 0.52, "8. GET: consultar expira_en vs now()")
+    
+    d.add_frame(
+        "alt", "[TTL expirado > 45 min y sin confirmación]",
+        0.03, 0.98, 0.48, 0.17,
+        divider_y=0.28,
+        else_guard="[else: Venta confirmada dentro del tiempo límite]"
+    )
+    d.add_message('expira_ctrl', 'liberar_ctrl', 0.43, "9. [TTL expirado > 45 min] liberar bloqueo")
+    d.add_message('liberar_ctrl', 'softlock', 0.38, "10. DELETE: eliminar soft_lock expirado")
+    d.add_message('liberar_ctrl', 'auditoria', 0.33, "11. POST: auditar liberación por TTL")
+    d.add_message('liberar_ctrl', 'badge_ui', 0.29, "12. Notificar liberación de prenda", is_return=True)
+    
+    d.add_message('expira_ctrl', 'softlock', 0.24, "13. Mantener soft-lock activo y proceder al cobro")
+    d.add_message('badge_ui', 'actor', 0.13, "14. Mostrar alerta: 'Tiempo agotado, prenda devuelta al stock general'", is_return=True)
+    d.add_message('detalle_ui', 'actor', 0.07, "15. Actualizar vista de prenda con inventario liberado", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu27_bloquear_stock_soft_lock.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu27_bloquear_stock_soft_lock.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-28: Venta de Contado Offline
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu28(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-28: VENTA DE CONTADO OFFLINE",
+        "Cobro en Efectivo sin Conexión, Cola OperacionPendiente y Ticket Preliminar | Metodología ICONIX",
+        width=19, height=14
+    )
+    # 10 Participantes idénticos al Diagrama de Robustez de CU-28
+    d.add_participant('actor', 'Cajero', 'actor', 0.050, 'Mostrador Desconectado', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('pos_ui', 'POSOffline', 'boundary', 0.145, 'pos-offline.component', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('modal_cobro', 'ModalCobroEfectivo', 'boundary', 0.245, 'cobro-efectivo-offline', w=0.074, font_size=7.0, sub_size=5.8)
+    d.add_participant('ticket_view', 'TicketPreliminar', 'boundary', 0.350, 'Ticket PENDIENTE', w=0.072, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('venta_ctrl', 'asentar_venta', 'control', 0.460, 'sync_service.py', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('ticket_ctrl', 'generar_ticket', 'control', 0.570, 'pos_offline_service', w=0.072, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('op_pend', 'OperacionPendiente', 'entity', 0.680, 'db / operacion_pendiente', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('inv_local', 'InventarioLocal', 'entity', 0.790, 'SQLite / IDB Inventario', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('venta', 'Venta', 'entity', 0.890, 'db / venta (pendiente_sync)', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('auditoria', 'BitacoraAuditoria', 'entity', 0.965, 'db / bitacora', w=0.060, font_size=6.8, sub_size=5.6)
+    
+    d.add_message('actor', 'pos_ui', 0.85, "1. Registrar prendas seleccionadas en terminal offline")
+    d.add_message('pos_ui', 'modal_cobro', 0.81, "2. Desplegar modal para pago en efectivo")
+    d.add_message('actor', 'modal_cobro', 0.77, "3. Ingresar efectivo recibido y confirmar cobro")
+    d.add_message('modal_cobro', 'venta_ctrl', 0.73, "4. confirmarCobroLocal()")
+    d.add_message('pos_ui', 'venta_ctrl', 0.69, "5. POST /api/v1/sync/ventas-offline (datos venta, efectivo recibido)")
+    
+    d.add_message('venta_ctrl', 'op_pend', 0.64, "6. POST / INSERT: guardar en operacion_pendiente (uuid)")
+    d.add_message('venta_ctrl', 'inv_local', 0.59, "7. PATCH / UPDATE: reducir stock físico local")
+    d.add_message('venta_ctrl', 'ticket_ctrl', 0.54, "8. imprimirComprobante() (leyenda sync)")
+    
+    d.add_message('ticket_ctrl', 'venta', 0.49, "9. POST / INSERT: venta local 'pendiente_sync'")
+    d.add_message('ticket_ctrl', 'auditoria', 0.44, "10. POST: auditar cobro en efectivo offline")
+    d.add_message('ticket_ctrl', 'ticket_view', 0.39, "11. Enviar datos de comprobante para impresión física")
+    d.add_message('ticket_view', 'actor', 0.34, "12. Imprimir ticket preliminar con marca 'PENDIENTE DE SINCRONIZACIÓN'", is_return=True)
+    
+    d.add_message('venta_ctrl', 'modal_cobro', 0.28, "13. Transacción local exitosa (en cola)", is_return=True)
+    d.add_message('modal_cobro', 'pos_ui', 0.22, "14. Cerrar modal de cobro y reiniciar mostrador", is_return=True)
+    d.add_message('pos_ui', 'actor', 0.15, "15. Notificar: Venta registrada en dispositivo, lista para sincronizar", is_return=True)
+    d.add_message('ticket_view', 'actor', 0.08, "16. Entregar ticket impreso al cliente", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu28_venta_contado_offline.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu28_venta_contado_offline.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-29: Validar Comprobante y Cambio QR Offline
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu29(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-29: VALIDAR COMPROBANTE Y CAMBIO QR OFFLINE",
+        "Validación Criptográfica HMAC-SHA256, Reingreso y Salida de Inventario sin Internet | Metodología ICONIX",
+        width=18, height=13
+    )
+    # 9 Participantes idénticos al Diagrama de Robustez de CU-29
+    d.add_participant('actor', 'Cajero', 'actor', 0.055, 'Mostrador / Devoluciones', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('qr_ui', 'LectorQRCambios', 'boundary', 0.160, 'lector-qr-cambio.html', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('nota_ui', 'FormNotaCambio', 'boundary', 0.270, 'nota-cambio-form.html', w=0.075, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('qr_ctrl', 'validar_qr', 'control', 0.385, 'HMAC-SHA256 Controller', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('cambio_ctrl', 'procesar_cambio', 'control', 0.500, 'sync_service.py', w=0.075, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('venta', 'Venta', 'entity', 0.615, 'db / venta (ticket)', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('nota_cambio', 'NotaCambio', 'entity', 0.725, 'db / nota_cambio', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('inventario', 'Inventario', 'entity', 0.835, 'db / inventario (+ / -)', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('auditoria', 'BitacoraAuditoria', 'entity', 0.948, 'db / bitacora', w=0.068, font_size=7.0, sub_size=5.8)
+    
+    d.add_message('actor', 'qr_ui', 0.85, "1. Escanear código QR de ticket impreso")
+    d.add_message('qr_ui', 'qr_ctrl', 0.81, "2. POST /api/v1/sync/validar-qr (qr_data)")
+    d.add_message('qr_ctrl', 'venta', 0.76, "3. GET: verificar firma HMAC y venta original")
+    
+    d.add_frame(
+        "alt", "[Firma criptográfica válida y dentro del período de cambio]",
+        0.03, 0.98, 0.72, 0.20,
+        divider_y=0.33,
+        else_guard="[else: Firma inválida o ticket alterado]"
+    )
+    d.add_message('qr_ctrl', 'qr_ui', 0.67, "4. Retornar ticket original válido y prendas elegibles", is_return=True)
+    d.add_message('qr_ui', 'nota_ui', 0.62, "5. Cargar formulario para cambio de prenda")
+    d.add_message('actor', 'nota_ui', 0.57, "6. Seleccionar prenda devuelta y nueva prenda")
+    d.add_message('nota_ui', 'cambio_ctrl', 0.52, "7. POST /api/v1/sync/nota-cambio (variante_devuelta, nueva, firma)")
+    
+    d.add_message('cambio_ctrl', 'nota_cambio', 0.47, "8. POST / INSERT: emitir nota_cambio con firma QR")
+    d.add_message('cambio_ctrl', 'inventario', 0.42, "9. PATCH / UPDATE: reingresar devuelta (+) y descontar nueva (-)")
+    d.add_message('cambio_ctrl', 'auditoria', 0.37, "10. POST: auditar cambio de prenda")
+    
+    d.add_message('qr_ctrl', 'qr_ui', 0.28, "11. Error: Firma QR apócrifa o ticket fuera de plazo", is_return=True)
+    d.add_message('qr_ui', 'actor', 0.24, "12. Notificar rechazo de cambio al cajero", is_return=True)
+    
+    d.add_message('cambio_ctrl', 'nota_ui', 0.15, "13. Comprobante de cambio generado exitosamente", is_return=True)
+    d.add_message('nota_ui', 'actor', 0.08, "14. Imprimir nota de cambio física con nuevo hash QR", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu29_validar_qr_cambio_offline.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu29_validar_qr_cambio_offline.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-30: Consultar Cola de Operaciones Offline
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu30(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-30: CONSULTAR COLA DE OPERACIONES OFFLINE",
+        "Inspección FIFO, Filtro por Estados y Auditoría de Sincronización Pendiente | Metodología ICONIX",
+        width=18, height=13
+    )
+    # 8 Participantes idénticos al Diagrama de Robustez de CU-30
+    d.add_participant('actor', 'Cajero / Admin', 'actor', 0.065, 'Monitor de Sync', w=0.080, font_size=7.5, sub_size=6.2)
+    d.add_participant('cola_ui', 'ColaOperaciones', 'boundary', 0.190, 'cola-sync.component', w=0.080, font_size=7.5, sub_size=6.2)
+    d.add_participant('modal_ui', 'DetalleModal', 'boundary', 0.320, 'operacion-detalle.html', w=0.080, font_size=7.5, sub_size=6.2)
+    
+    d.add_participant('cola_ctrl', 'consultar_cola', 'control', 0.455, 'sync_service.py', w=0.080, font_size=7.5, sub_size=6.2)
+    d.add_participant('filtro_ctrl', 'filtrar_estado', 'control', 0.590, 'sync_service.py', w=0.080, font_size=7.5, sub_size=6.2)
+    
+    d.add_participant('op_pend', 'OperacionPendiente', 'entity', 0.725, 'db / operacion_pendiente', w=0.080, font_size=7.5, sub_size=6.2)
+    d.add_participant('sucursal', 'Sucursal', 'entity', 0.850, 'db / sucursal', w=0.080, font_size=7.5, sub_size=6.2)
+    d.add_participant('auditoria', 'BitacoraAuditoria', 'entity', 0.955, 'db / bitacora', w=0.065, font_size=7.0, sub_size=5.8)
+    
+    d.add_message('actor', 'cola_ui', 0.85, "1. Abrir monitor de sincronización")
+    d.add_message('cola_ui', 'cola_ctrl', 0.80, "2. GET /api/v1/sync/cola (sucursal_id)")
+    d.add_message('cola_ctrl', 'sucursal', 0.75, "3. GET: verificar sucursal asociada")
+    d.add_message('cola_ctrl', 'op_pend', 0.70, "4. GET: listar operaciones pendientes (FIFO)")
+    d.add_message('cola_ctrl', 'cola_ui', 0.65, "5. Renderizar lista de operaciones encoladas", is_return=True)
+    
+    d.add_message('actor', 'cola_ui', 0.59, "6. Seleccionar filtro por estado ('pendiente', 'conflicto')")
+    d.add_message('cola_ui', 'filtro_ctrl', 0.54, "7. filtrarOperaciones(estado: pendiente, conflicto, resuelta)")
+    d.add_message('filtro_ctrl', 'cola_ui', 0.49, "8. Actualizar vista de tabla con operaciones filtradas", is_return=True)
+    
+    d.add_message('actor', 'cola_ui', 0.43, "9. Clic en 'Ver Detalle' de una operación")
+    d.add_message('cola_ui', 'modal_ui', 0.38, "10. Desplegar modal de inspección técnica")
+    d.add_message('modal_ui', 'cola_ctrl', 0.33, "11. Solicitar payload completo y registro de errores")
+    d.add_message('cola_ctrl', 'op_pend', 0.28, "12. GET: inspeccionar payload y errores")
+    d.add_message('cola_ctrl', 'auditoria', 0.23, "13. POST: auditar inspección de cola")
+    d.add_message('cola_ctrl', 'modal_ui', 0.17, "14. Devolver detalle JSON y trazabilidad de sincronización", is_return=True)
+    d.add_message('modal_ui', 'actor', 0.11, "15. Mostrar visor JSON de payload y traza técnica", is_return=True)
+    d.add_message('modal_ui', 'actor', 0.05, "16. Habilitar opciones de reintento o resolución manual", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu30_cola_operaciones_offline.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu30_cola_operaciones_offline.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-31: Sincronizar Operaciones Pendientes
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu31(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-31: SINCRONIZAR OPERACIONES PENDIENTES",
+        "Garantía de Idempotencia (RNF05), Procesamiento FIFO de Lotes y Commit Central | Metodología ICONIX",
+        width=19, height=14
+    )
+    # 10 Participantes idénticos al Diagrama de Robustez de CU-31
+    d.add_participant('actor', 'Sistema / Cajero', 'actor', 0.050, 'Disparador Sync', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('btn_ui', 'BotonSync', 'boundary', 0.145, 'sync-toolbar.component', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('modal_ui', 'SyncProgress', 'boundary', 0.245, 'sync-progress.modal', w=0.072, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('lote_ctrl', 'procesar_lote', 'control', 0.355, 'sync_service.py', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('idemp_ctrl', 'validar_idemp', 'control', 0.470, 'RNF05 Controller', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('asentar_ctrl', 'asentar_op', 'control', 0.580, 'FIFO Commit Controller', w=0.072, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('idemp_ent', 'SyncIdempotencia', 'entity', 0.690, 'db / sync_idempotencia', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('op_pend', 'OperacionPendiente', 'entity', 0.795, 'db / operacion_pendiente', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('venta_inv', 'Venta / Inventario', 'entity', 0.895, 'db / venta & inventario', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('auditoria', 'BitacoraAuditoria', 'entity', 0.965, 'db / bitacora', w=0.060, font_size=6.8, sub_size=5.6)
+    
+    d.add_message('actor', 'btn_ui', 0.85, "1. Disparar sincronización (manual o por reconexión)")
+    d.add_message('btn_ui', 'modal_ui', 0.81, "2. Abrir modal y mostrar barra de progreso")
+    d.add_message('btn_ui', 'lote_ctrl', 0.77, "3. POST /api/v1/sync (lote de operaciones)")
+    
+    d.add_frame(
+        "loop", "[Por cada operación del lote en orden cronológico FIFO]",
+        0.31, 0.98, 0.74, 0.23
+    )
+    d.add_message('lote_ctrl', 'idemp_ctrl', 0.70, "4. verificarClave() (idempotency_key)")
+    d.add_message('idemp_ctrl', 'idemp_ent', 0.65, "5. GET / POST: comprobar/guardar idempotency_key")
+    
+    d.add_frame(
+        "alt", "[Clave nueva - aplicar transacción]",
+        0.42, 0.97, 0.61, 0.26,
+        divider_y=0.34,
+        else_guard="[else: Clave existente - replay sin duplicar]"
+    )
+    d.add_message('idemp_ctrl', 'asentar_ctrl', 0.56, "6. [clave nueva] aplicar transacción")
+    d.add_message('asentar_ctrl', 'venta_inv', 0.50, "7. POST / PATCH: insertar venta y descontar stock central")
+    d.add_message('asentar_ctrl', 'op_pend', 0.44, "8. PATCH: estado -> 'aplicada' o 'conflicto'")
+    d.add_message('asentar_ctrl', 'auditoria', 0.38, "9. POST: auditar sincronización de lote")
+    
+    d.add_message('idemp_ctrl', 'lote_ctrl', 0.30, "10. Retornar respuesta previa (idempotente)", is_return=True)
+    
+    d.add_message('lote_ctrl', 'modal_ui', 0.18, "11. Actualizar progreso del lote: 100% procesado", is_return=True)
+    d.add_message('modal_ui', 'btn_ui', 0.12, "12. Notificar lote sincronizado y cerrar modal", is_return=True)
+    d.add_message('btn_ui', 'actor', 0.06, "13. Mostrar badge verde: 'Todas las operaciones sincronizadas'", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu31_sincronizar_operaciones.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu31_sincronizar_operaciones.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-32: Resolver Conflictos de Sincronización
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu32(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-32: RESOLVER CONFLICTOS DE SINCRONIZACIÓN",
+        "Arbitraje de Inconsistencias, Conciliación de Kárdex y Ajustes FIFO / Manual | Metodología ICONIX",
+        width=18, height=13
+    )
+    # 9 Participantes idénticos al Diagrama de Robustez de CU-32
+    d.add_participant('actor', 'Encargado / Admin', 'actor', 0.055, 'Resolutor Discrepancias', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('bandeja_ui', 'BandejaConflictos', 'boundary', 0.160, 'conflictos-sync.html', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('modal_ui', 'ModalResolucion', 'boundary', 0.270, 'resolver-conflicto.html', w=0.075, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('list_ctrl', 'listar_conflictos', 'control', 0.385, 'sync_service.py', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('res_ctrl', 'resolver_conflicto', 'control', 0.500, 'FIFO/Manual Controller', w=0.075, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('op_pend', 'OperacionPendiente', 'entity', 0.615, 'db / op_pendiente (conflicto)', w=0.075, font_size=7.0, sub_size=5.8)
+    d.add_participant('inventario', 'Inventario', 'entity', 0.725, 'db / inventario (ajuste)', w=0.075, font_size=7.0, sub_size=5.8)
+    d.add_participant('mov_inv', 'MovimientoInventario', 'entity', 0.835, 'db / mov_inventario', w=0.075, font_size=7.0, sub_size=5.8)
+    d.add_participant('auditoria', 'BitacoraAuditoria', 'entity', 0.948, 'db / bitacora', w=0.068, font_size=7.0, sub_size=5.8)
+    
+    d.add_message('actor', 'bandeja_ui', 0.85, "1. Abrir bandeja de conflictos de sincronización")
+    d.add_message('bandeja_ui', 'list_ctrl', 0.81, "2. GET /api/v1/sync/conflictos (sucursal_id)")
+    d.add_message('list_ctrl', 'op_pend', 0.76, "3. GET: recuperar operaciones en conflicto y error")
+    d.add_message('list_ctrl', 'bandeja_ui', 0.71, "4. Renderizar lista de transacciones en conflicto", is_return=True)
+    
+    d.add_message('actor', 'bandeja_ui', 0.65, "5. Seleccionar conflicto específico a resolver")
+    d.add_message('bandeja_ui', 'modal_ui', 0.60, "6. Abrir modal con opciones arbitrales")
+    d.add_message('actor', 'modal_ui', 0.55, "7. Elegir decisión: 'ajustar' (forzar inventario) o 'anular'")
+    d.add_message('modal_ui', 'res_ctrl', 0.50, "8. POST /api/v1/sync/conflictos/resolver (decision)")
+    
+    d.add_frame(
+        "alt", "[Decisión = 'ajustar' (aplicar venta y ajustar existencias)]",
+        0.03, 0.98, 0.46, 0.19,
+        divider_y=0.29,
+        else_guard="[else: Decisión = 'anular' (cancelar operación y registrar motivo)]"
+    )
+    d.add_message('res_ctrl', 'op_pend', 0.42, "9. PATCH: cambiar estado a 'resuelta' o 'rechazada'")
+    d.add_message('res_ctrl', 'inventario', 0.38, "10. PATCH / UPDATE: aplicar ajuste de stock correctivo")
+    d.add_message('res_ctrl', 'mov_inv', 0.34, "11. POST: asentar en kárdex la resolución")
+    d.add_message('res_ctrl', 'auditoria', 0.30, "12. POST: auditar decisión administrativa")
+    
+    d.add_message('res_ctrl', 'op_pend', 0.25, "13. PATCH: marcar op como 'rechazada' sin alterar inventario")
+    d.add_message('res_ctrl', 'modal_ui', 0.15, "14. Response 200 OK: Conflicto procesado", is_return=True)
+    d.add_message('modal_ui', 'bandeja_ui', 0.10, "15. Remover operación de la bandeja activa", is_return=True)
+    d.add_message('bandeja_ui', 'actor', 0.05, "16. Notificar al encargado: Conflicto resuelto exitosamente", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu32_resolver_conflictos.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu32_resolver_conflictos.svg")
+    d.save(png_path, svg_path)
+
+
 if __name__ == '__main__':
     out_dir = os.path.join(os.getcwd(), 'docs', 'diagramas')
     os.makedirs(out_dir, exist_ok=True)
@@ -507,5 +1337,21 @@ if __name__ == '__main__':
     generate_seq_cu03(out_dir)
     generate_seq_cu04(out_dir)
     generate_seq_cu05(out_dir)
+    generate_seq_cu17(out_dir)
+    generate_seq_cu18(out_dir)
+    generate_seq_cu19(out_dir)
+    generate_seq_cu20(out_dir)
+    generate_seq_cu21(out_dir)
+    generate_seq_cu22(out_dir)
+    generate_seq_cu23(out_dir)
+    generate_seq_cu24(out_dir)
+    generate_seq_cu25(out_dir)
+    generate_seq_cu26(out_dir)
+    generate_seq_cu27(out_dir)
+    generate_seq_cu28(out_dir)
+    generate_seq_cu29(out_dir)
+    generate_seq_cu30(out_dir)
+    generate_seq_cu31(out_dir)
+    generate_seq_cu32(out_dir)
     print("All sequence diagrams generated successfully!")
 
