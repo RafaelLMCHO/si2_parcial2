@@ -6,14 +6,24 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers import (
     auth,
+    carrito,
     catalogo,
+    checkout,
     colecciones,
     empleados,
+    inventario,
+    pagos,
+    pos,
     proveedores,
+    reservas,
     saas,
     sucursales,
     suscripciones,
+    sync,
     users,
+    reportes,
+    inteligencia,
+    vestidor,
 )
 from app.core.config import get_settings
 from app.db import close_pool, get_pool, init_pool
@@ -63,6 +73,21 @@ app.include_router(sucursales.router, prefix=settings.api_prefix)
 app.include_router(catalogo.router, prefix=settings.api_prefix)
 app.include_router(proveedores.router, prefix=settings.api_prefix)
 app.include_router(colecciones.router, prefix=settings.api_prefix)
+
+# Módulos CU-17 a CU-24
+app.include_router(inventario.router, prefix=settings.api_prefix)
+app.include_router(inventario.prendas_router, prefix=settings.api_prefix)
+app.include_router(reservas.router, prefix=settings.api_prefix)
+app.include_router(carrito.router, prefix=settings.api_prefix)
+app.include_router(checkout.router, prefix=settings.api_prefix)
+app.include_router(pagos.router, prefix=settings.api_prefix)
+app.include_router(pos.router, prefix=settings.api_prefix)
+app.include_router(sync.router, prefix=settings.api_prefix)
+
+# Módulos CU-33 a CU-36
+app.include_router(reportes.router, prefix=settings.api_prefix)
+app.include_router(inteligencia.router, prefix=settings.api_prefix)
+app.include_router(vestidor.router, prefix=settings.api_prefix)
 
 
 @app.get("/health", tags=["Sistema"])

@@ -167,10 +167,10 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
     v_sucursal_id uuid;
-    v_estado varchar(20);
+    v_estado varchar(30);
     v_liberada_en timestamptz;
     v_old_sucursal_id uuid;
-    v_old_estado varchar(20);
+    v_old_estado varchar(30);
     v_old_liberada_en timestamptz;
     v_filas integer;
 BEGIN

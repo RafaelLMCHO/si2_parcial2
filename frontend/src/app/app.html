@@ -8,19 +8,101 @@
     <nav>
       @if (auth.user(); as user) {
         @if (user.rol === 'superadmin' && !user.empresa_id) {
-          <a routerLink="/saas">Panel SaaS</a>
+          <a routerLink="/saas">Empresas (CU-07)</a>
+          <a routerLink="/saas/planes">Planes (CU-06)</a>
+          <a routerLink="/saas/facturacion">Facturación (CU-08)</a>
+          <a routerLink="/saas/metricas">Métricas (CU-09)</a>
+          <a routerLink="/auditoria">Auditoría (CU-05)</a>
         }
         @if (user.rol === 'administrador' && user.empresa_id) {
-          <a routerLink="/mi-suscripcion">Suscripcion</a>
+          <a routerLink="/mi-suscripcion">Suscripción (CU-07)</a>
+          <a routerLink="/inventario">Inventario (CU-17)</a>
+          <a routerLink="/pos">POS (CU-23)</a>
+          
+          <div class="nav-group">
+            <button type="button" class="nav-group-btn">Reservas ▾</button>
+            <div class="nav-dropdown">
+              <a routerLink="/reservas/nueva"><strong>CU-19:</strong> Crear Reserva (Probador)</a>
+              <a routerLink="/reservas/mis-reservas"><strong>CU-20:</strong> Mis Reservas / Consulta</a>
+              <a routerLink="/reservas/staff"><strong>CU-21:</strong> Preparación en Tienda (Staff)</a>
+              <a routerLink="/reservas"><strong>Panel:</strong> Todas las Reservas</a>
+            </div>
+          </div>
+
+          <a routerLink="/catalogo-admin">Catálogo (CU-12)</a>
+          <a routerLink="/empleados">Empleados (CU-10)</a>
+          <a routerLink="/sucursales">Sucursales (CU-11)</a>
+
+          <div class="nav-group">
+            <button type="button" class="nav-group-btn">Reportes & IA ▾</button>
+            <div class="nav-dropdown">
+              <a routerLink="/reportes/convencionales"><strong>CU-33:</strong> Reportes Convencionales</a>
+              <a routerLink="/reportes/ia"><strong>CU-34:</strong> Reporte Predictivo con IA</a>
+              <a routerLink="/analytics-ml"><strong>CU-35:</strong> Dashboard Analítico ML</a>
+            </div>
+          </div>
+
+          <div class="nav-group">
+            <button type="button" class="nav-group-btn">Offline ▾</button>
+            <div class="nav-dropdown">
+              <a routerLink="/offline/catalogo"><strong>CU-25:</strong> Catálogo Offline</a>
+              <a routerLink="/offline/reserva"><strong>CU-26/27:</strong> Reserva y Soft-Lock</a>
+              <a routerLink="/offline/venta"><strong>CU-28:</strong> Venta Contado Offline</a>
+              <a routerLink="/offline/cambio"><strong>CU-29:</strong> Validar QR de Cambio</a>
+              <a routerLink="/offline/cola"><strong>CU-30/31:</strong> Cola y Sincronización</a>
+              <a routerLink="/offline/conflictos"><strong>CU-32:</strong> Resolución Conflictos</a>
+            </div>
+          </div>
+
+          <a routerLink="/vestidor-virtual">Vestidor RA (CU-36)</a>
+        }
+        @if (user.rol === 'cajero' || user.rol === 'encargado') {
+          <a routerLink="/inventario">Inventario (CU-17)</a>
+          <a routerLink="/pos">POS (CU-23)</a>
+          <a routerLink="/reservas/staff">CU-21 Preparación Staff</a>
+          <a routerLink="/offline/cola">Offline (CU-25..32)</a>
+        }
+        @if (user.rol === 'cliente') {
+          <a routerLink="/catalogo">Catálogo (CU-13)</a>
+          <a routerLink="/reservas/nueva">CU-19 Reservar Probador</a>
+          <a routerLink="/reservas/mis-reservas">CU-20 Mis Reservas</a>
+          <a routerLink="/checkout">Carrito (CU-22)</a>
+          <a routerLink="/vestidor-virtual">Vestidor RA (CU-36)</a>
         }
         <a routerLink="/profile">Mi perfil</a>
         <button type="button" class="nav-button" (click)="requestLogout()">Salir</button>
       } @else {
+        <a routerLink="/catalogo">Catálogo (CU-13)</a>
+        <a routerLink="/vestidor-virtual">Vestidor RA (CU-36)</a>
         <a routerLink="/login">Ingresar</a>
         <a class="nav-cta" routerLink="/register">Registrarse</a>
       }
     </nav>
   </header>
+
+  @if (auth.user(); as user) {
+    @if (user.rol === 'administrador') {
+      <div class="sub-nav-bar">
+        <span class="sub-nav-title">Acceso Directo:</span>
+        <div class="sub-nav-links">
+          <a routerLink="/reservas/nueva" class="sub-chip">CU-19 Nueva Reserva</a>
+          <a routerLink="/reservas/mis-reservas" class="sub-chip">CU-20 Consulta Reservas</a>
+          <a routerLink="/reservas/staff" class="sub-chip">CU-21 Preparación Staff</a>
+          <span class="sub-sep">|</span>
+          <a routerLink="/reportes/convencionales" class="sub-chip">CU-33 Reportes PDF/Excel</a>
+          <a routerLink="/reportes/ia" class="sub-chip">CU-34 IA Predictiva</a>
+          <a routerLink="/analytics-ml" class="sub-chip">CU-35 ML Demanda</a>
+          <span class="sub-sep">|</span>
+          <a routerLink="/offline/catalogo" class="sub-chip">CU-25 Off-Cat</a>
+          <a routerLink="/offline/reserva" class="sub-chip">CU-26/27 Off-Reserva</a>
+          <a routerLink="/offline/venta" class="sub-chip">CU-28 Off-Venta</a>
+          <a routerLink="/offline/cambio" class="sub-chip">CU-29 Off-QR</a>
+          <a routerLink="/offline/cola" class="sub-chip">CU-30/31 Sincronización</a>
+          <a routerLink="/offline/conflictos" class="sub-chip">CU-32 Conflictos</a>
+        </div>
+      </div>
+    }
+  }
 
   @if (!network.online()) {
     <div class="system-banner offline" role="status">

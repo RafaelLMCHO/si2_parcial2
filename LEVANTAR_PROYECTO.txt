@@ -1,0 +1,142 @@
+FASHIONSTORE - GUIA PARA LEVANTAR EL PROYECTO CON ENTORNO VIRTUAL
+==================================================================
+
+REQUISITOS
+----------
+- Windows + PowerShell
+- Python 3.12 (probado con 3.12.4)
+- Docker Desktop (PostgreSQL 16)
+- Node.js 20+ (solo para la PWA Angular)
+- Flutter 3.47+ con Android SDK (solo app movil, opcional)
+
+El entorno virtual ya esta creado e instalado en:
+  backend\.venv
+
+
+1. ABRIR LA TERMINAL EN LA RAIZ DEL PROYECTO
+-------------------------------------------
+  cd "C:\Users\rafae\OneDrive\Escritorio\universidad\si2\parcial1\Proyecto_2doparcial\Segundo-parcial"
+
+
+2. LEVANTAR LA BASE DE DATOS (DOCKER)
+------------------------------------
+  .\scripts\init_db.ps1
+
+  Ese script hace:
+    - docker compose up -d db
+    - ejecuta tests\00_reset.sql (BORRA el esquema public)
+    - ejecuta db\run_all.sql (crea tablas, RLS, seeds y datos demo)
+
+  Alternativa sin borrar datos:
+    docker compose up -d db
+
+  Verificar que responda:
+    docker compose ps
+    docker compose exec db pg_isready -U postgres -d fashionstore
+
+
+3. ACTIVAR EL ENTORNO VIRTUAL (TERMINAL DEL BACKEND)
+----------------------------------------------------
+  cd backend
+  .\.venv\Scripts\Activate.ps1
+
+  Si PowerShell bloquea la activacion:
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+  Verificar:
+    python --version        (debe mostrar Python 3.12.x)
+    python -m pip --version
+    python -m pip list
+
+
+4. LEVANTAR EL BACKEND (CON EL VENV ACTIVO, DESDE backend\)
+-----------------------------------------------------------
+  python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+
+  Direcciones:
+    API:      http://127.0.0.1:8000
+    Swagger:  http://127.0.0.1:8000/docs
+    Health:   http://127.0.0.1:8000/health
+
+  Equivalente desde la raiz, sin activar el venv:
+    .\backend\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --app-dir backend
+
+
+5. LEVANTAR EL FRONTEND (OTRA TERMINAL, SIN VENV)
+------------------------------------------------
+  cd frontend
+  npm install        (solo la primera vez o si cambia package.json)
+  npm start
+
+  Abrir: http://127.0.0.1:4200
+
+  Alternativa desde la raiz:
+    .\scripts\run_frontend.ps1
+
+
+6. USUARIOS DEMO
+----------------
+  Administrador: admin@demo.test          / Admin123!      (empresa: demo)
+  Cliente:       cliente@demo.test        / Cliente123!    (empresa: demo)
+  Superadmin:    superadmin@fashionstore.test / Superadmin123!
+
+
+7. PRUEBAS
+----------
+  Backend (venv activo, desde backend\):
+    python -m pytest -q
+
+  SQL + backend (desde la raiz, requiere la DB levantada):
+    .\scripts\run_tests.ps1
+
+  Frontend:
+    cd frontend
+    npm run build
+
+
+8. APP MOVIL (OPCIONAL, FUERA DEL VENV)
+---------------------------------------
+  Backend accesible desde el emulador:
+    .\scripts\run_backend.ps1 -BindHost 0.0.0.0
+
+  Compilar/ejecutar en emulador o dispositivo:
+    .\scripts\run_mobile.ps1
+
+  El emulador Android usa: http://10.0.2.2:8000/api/v1
+
+
+9. RECREAR EL ENTORNO VIRTUAL (SI SE BORRA O CAMBIA DE PC)
+----------------------------------------------------------
+  cd backend
+  py -3.12 -m venv .venv
+  .\.venv\Scripts\python.exe -m pip install --upgrade pip setuptools wheel
+  .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+
+10. DETENER LOS SERVICIOS
+-------------------------
+  Ctrl+C en las terminales de backend y frontend.
+
+  docker compose down        Detiene la DB y conserva los datos.
+  docker compose down -v     Detiene la DB y BORRA los datos.
+
+
+ESTADO VERIFICADO
+-----------------
+Con el venv activo se comprobo:
+
+  - from app.main import app  -> OK (FastAPI, 86 rutas)
+  - uvicorn + GET /health     -> {"status":"ok","app":"FashionStore API"}
+  - pytest tests\test_cu33_a_cu36.py -> 6 passed
+
+Los imports faltantes de sync, inteligencia, reportes y vestidor ya fueron
+corregidos, y se agregaron las dependencias numpy, pandas, scikit-learn,
+openpyxl y reportlab a backend\requirements.txt.
+
+NOTA SOBRE PRUEBAS
+------------------
+La suite completa todavia reporta fallos previos en CU-17 a CU-32, ajenos al
+entorno virtual. Las causas son un esquema de BD desactualizado respecto a
+db\21_ajustes_cu17_cu24.sql (por ejemplo venta.cliente_nombre y stripe_evento),
+una columna faltante en carrito_detalle y bugs en sync_service. Los modulos
+corregidos CU-33 a CU-36 pasan sus 6 pruebas.

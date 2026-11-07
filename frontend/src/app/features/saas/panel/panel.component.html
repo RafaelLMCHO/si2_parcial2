@@ -8,6 +8,13 @@
     <a class="cta" routerLink="/saas/empresas/nueva">Registrar empresa</a>
   </header>
 
+  <div class="saas-nav-tabs" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.5rem 0; background: #fff; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid #e5e7eb;">
+    <a routerLink="/saas" style="padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 700; background: #fdf2f8; color: #be185d; text-decoration: none;">Empresas y Suscripciones (CU-07)</a>
+    <a routerLink="/saas/planes" style="padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 600; color: #4b5563; text-decoration: none;">Planes SaaS (CU-06)</a>
+    <a routerLink="/saas/facturacion" style="padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 600; color: #4b5563; text-decoration: none;">Facturación SaaS (CU-08)</a>
+    <a routerLink="/saas/metricas" style="padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 600; color: #4b5563; text-decoration: none;">Métricas Globales (CU-09)</a>
+  </div>
+
   @if (!network.online()) {
     <p class="warning" role="status">
       Sin conexion. El panel SaaS requiere red para consultar informacion actualizada.

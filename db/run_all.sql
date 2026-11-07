@@ -19,4 +19,8 @@
 \ir 16_seeds.sql
 \ir 18_ajustes_cu01_05.sql
 \ir 20_ajustes_cu06_cu09.sql
+\ir 21_ajustes_cu17_cu24.sql
+\ir 22_ajustes_cu25_cu32.sql
+\ir 23_ajustes_cu33_cu36.sql
+\ir 24_empresas_adicionales.sql
 \ir 99_verificacion.sql

@@ -168,7 +168,7 @@
 <body>
   <div class="container">
     <header>
-      <h1>FashionStore SaaS - Diagramas ICONIX (CU-01 al CU-05)</h1>
+      <h1>FashionStore SaaS - Diagramas ICONIX (CU-01 al CU-36)</h1>
       <p class="lead">Diagramas de Secuencia y Robustez generados en Alta Resolución (PNG 300 DPI y Vectorial SVG)</p>
       <div class="nav-links">
         <a href="#secuencia" class="nav-btn nav-btn-seq">Ir a Diagramas de Secuencia</a>
@@ -177,7 +177,7 @@
     </header>
 
     <!-- SECCIÓN: DIAGRAMAS DE SECUENCIA -->
-    <h2 id="secuencia" class="section-title">Diagramas de Secuencia (CU-01 al CU-05) con alt, opt, loop</h2>
+    <h2 id="secuencia" class="section-title">Diagramas de Secuencia (CU-01 a CU-05 y CU-17 a CU-24) con alt, opt, loop</h2>
     <div class="grid">
 
       <!-- SECUENCIA CU-01 -->
@@ -265,11 +265,623 @@
         </div>
       </div>
 
+      <!-- SECUENCIA CU-17 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-17: Gestión de Inventario, Kárdex y Ajustes</h3>
+            <div class="card-desc">Actor: Encargado / Admin | Fragmentos: alt [Stock suficiente / insuficiente 409] | CRUD: GET, PATCH, POST (kárdex inmutable y auditoría)</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu17_gestion_inventario.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu17_gestion_inventario.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu17_gestion_inventario.png" alt="Secuencia CU-17 Gestión de Inventario">
+        </div>
+      </div>
+
+      <!-- SECUENCIA CU-18 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-18: Disponibilidad en Tiendas / Búsqueda Omnicanal</h3>
+            <div class="card-desc">Actor: Cliente | Fragmentos: loop [Por cada sucursal física], alt [Stock disponible / Agotado] | CRUD: GET (cálculo stock físico vs reservado)</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu18_disponibilidad_tiendas.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu18_disponibilidad_tiendas.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu18_disponibilidad_tiendas.png" alt="Secuencia CU-18 Disponibilidad en Tiendas">
+        </div>
+      </div>
+
+      <!-- SECUENCIA CU-19 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-19: Creación de Reservas y Probador</h3>
+            <div class="card-desc">Actor: Cliente | Fragmentos: alt [Apartado exitoso TTL 48h / Conflicto 409] | CRUD: GET, PATCH (stock_reservado), POST (voucher y auditoría)</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu19_creacion_reservas.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu19_creacion_reservas.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu19_creacion_reservas.png" alt="Secuencia CU-19 Creación de Reservas">
+        </div>
+      </div>
+
+      <!-- SECUENCIA CU-20 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-20: Consulta y Gestión de Reservas del Cliente</h3>
+            <div class="card-desc">Actor: Cliente | Fragmentos: alt [Cancelación válida / Restricción 400] | CRUD: GET, PATCH (reserva 'cancelada', liberación stock)</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu20_consulta_reservas.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu20_consulta_reservas.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu20_consulta_reservas.png" alt="Secuencia CU-20 Consulta de Reservas">
+        </div>
+      </div>
+
+      <!-- SECUENCIA CU-21 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-21: Preparación y Validación de Reservas (Staff)</h3>
+            <div class="card-desc">Actor: Encargado | Boundaries: BandejaReservas, ModalPreparacion, ModalIncidencia | Control: listar_reservas, preparar_reserva, registrar_incid | Entities: Reserva, ReservaHistorial, Inventario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu21_preparacion_reservas.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu21_preparacion_reservas.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu21_preparacion_reservas.png" alt="Secuencia CU-21 Preparación de Reservas">
+        </div>
+      </div>
+
+      <!-- SECUENCIA CU-22 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-22: Carrito de Compras y Checkout Omnicanal</h3>
+            <div class="card-desc">Actor: Cliente | Fragmentos: alt [Orden creada Idempotente / Conflicto 409] | CRUD: GET (cupones y stock), POST (venta, envío, auditoría)</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu22_checkout_carrito.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu22_checkout_carrito.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu22_checkout_carrito.png" alt="Secuencia CU-22 Checkout Omnicanal">
+        </div>
+      </div>
+
+      <!-- SECUENCIA CU-23 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-23: Punto de Venta (POS) - Caja y Facturación</h3>
+            <div class="card-desc">Coincidencia 1:1 Robustez | Actor: Cajero | Boundaries: PantallaPOSComponent, ModalCobroPOS, TicketImpresionView | Controllers: buscar_por_barcode, procesar_venta_pos, generar_ticket | Entities: PrendaVariante, Inventario, MovimientoInventario, Venta, Pago, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu23_punto_venta_pos.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu23_punto_venta_pos.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu23_punto_venta_pos.png" alt="Secuencia CU-23 Punto de Venta POS">
+        </div>
+      </div>
+
+      <!-- SECUENCIA CU-24 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-24: Procesamiento de Pagos, Pasarelas y Reembolsos</h3>
+            <div class="card-desc">Coincidencia 1:1 Robustez | Actor: Cliente / Stripe | Boundaries: PasarelaStripeElements, WebhookStripeEndpoint, ConfirmacionPagoView | Controllers: crear_intencion_pago, procesar_webhook, consultar_pago_polling | Entities: Pago, StripeEvento, Venta, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu24_procesamiento_pagos.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu24_procesamiento_pagos.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu24_procesamiento_pagos.png" alt="Secuencia CU-24 Procesamiento de Pagos">
+        </div>
+      </div>
+
+      <!-- CU-25 SECUENCIA -->
+      <div class="card seq">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-25: Descargar Catálogo Offline</h3>
+            <div class="card-desc">Actor: Cliente / Cajero | Boundaries: CatalogoOffline, ServiceWorkerCache | Control: descargar_catalogo, persistir_local | Entities: Empresa, Prenda, Variante, Inventario</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu25_descargar_catalogo_offline.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu25_descargar_catalogo_offline.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu25_descargar_catalogo_offline.png" alt="Secuencia CU-25 Descargar Catálogo Offline">
+        </div>
+      </div>
+
+      <!-- CU-26 SECUENCIA -->
+      <div class="card seq">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-26: Registrar Reserva Offline</h3>
+            <div class="card-desc">Actor: Cliente | Boundaries: FormularioReserva, VoucherLocalView | Control: generar_uuid_local, registrar_reserva | Entities: OperacionPendiente, InventarioLocal, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu26_registrar_reserva_offline.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu26_registrar_reserva_offline.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu26_registrar_reserva_offline.png" alt="Secuencia CU-26 Registrar Reserva Offline">
+        </div>
+      </div>
+
+      <!-- CU-27 SECUENCIA -->
+      <div class="card seq">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-27: Bloquear Stock Soft-Lock con TTL</h3>
+            <div class="card-desc">Actor: Cliente / Terminal | Boundaries: DetallePrenda, BadgeTTL | Control: crear_soft_lock, verificar_expira, liberar_soft_lock | Entities: SoftLock, Inventario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu27_bloquear_stock_soft_lock.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu27_bloquear_stock_soft_lock.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu27_bloquear_stock_soft_lock.png" alt="Secuencia CU-27 Bloquear Stock Soft-Lock con TTL">
+        </div>
+      </div>
+
+      <!-- CU-28 SECUENCIA -->
+      <div class="card seq">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-28: Venta de Contado Offline</h3>
+            <div class="card-desc">Actor: Cajero | Boundaries: POSOffline, ModalCobroEfectivo, TicketPreliminar | Control: asentar_venta, generar_ticket | Entities: OperacionPendiente, InventarioLocal, Venta, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu28_venta_contado_offline.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu28_venta_contado_offline.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu28_venta_contado_offline.png" alt="Secuencia CU-28 Venta de Contado Offline">
+        </div>
+      </div>
+
+      <!-- CU-29 SECUENCIA -->
+      <div class="card seq">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-29: Validar Comprobante y Cambio QR Offline</h3>
+            <div class="card-desc">Actor: Cajero | Boundaries: LectorQRCambios, FormNotaCambio | Control: validar_qr, procesar_cambio | Entities: Venta, NotaCambio, Inventario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu29_validar_qr_cambio_offline.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu29_validar_qr_cambio_offline.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu29_validar_qr_cambio_offline.png" alt="Secuencia CU-29 Validar Comprobante y Cambio QR Offline">
+        </div>
+      </div>
+
+      <!-- CU-30 SECUENCIA -->
+      <div class="card seq">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-30: Consultar Cola de Operaciones Offline</h3>
+            <div class="card-desc">Actor: Cajero / Admin | Boundaries: ColaOperaciones, DetalleModal | Control: consultar_cola, filtrar_estado | Entities: OperacionPendiente, Sucursal, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu30_cola_operaciones_offline.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu30_cola_operaciones_offline.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu30_cola_operaciones_offline.png" alt="Secuencia CU-30 Consultar Cola de Operaciones Offline">
+        </div>
+      </div>
+
+      <!-- CU-31 SECUENCIA -->
+      <div class="card seq">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-31: Sincronizar Operaciones Pendientes</h3>
+            <div class="card-desc">Actor: Sistema / Cajero | Boundaries: BotonSync, SyncProgress | Control: procesar_lote, validar_idemp, asentar_op | Entities: SyncIdempotencia, OperacionPendiente, Venta / Inventario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu31_sincronizar_operaciones.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu31_sincronizar_operaciones.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu31_sincronizar_operaciones.png" alt="Secuencia CU-31 Sincronizar Operaciones Pendientes">
+        </div>
+      </div>
+
+      <!-- CU-32 SECUENCIA -->
+      <div class="card seq">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-32: Resolver Conflictos de Sincronización</h3>
+            <div class="card-desc">Actor: Encargado / Admin | Boundaries: BandejaConflictos, ModalResolucion | Control: listar_conflictos, resolver_conflicto | Entities: OperacionPendiente, Inventario, MovimientoInventario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu32_resolver_conflictos.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu32_resolver_conflictos.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu32_resolver_conflictos.png" alt="Secuencia CU-32 Resolver Conflictos de Sincronización">
+        </div>
+      </div>
+
     </div>
 
     <!-- SECCIÓN: DIAGRAMAS DE ROBUSTEZ -->
-    <h2 id="robustez" class="section-title rob">Diagramas de Robustez (CU-01 al CU-05)</h2>
+    <h2 id="robustez" class="section-title rob">Diagramas de Robustez (ICONIX)</h2>
     <div class="grid">
+
+      <!-- CU-17 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-17: Gestión de Inventario, Kárdex y Ajustes</h3>
+            <div class="card-desc">Actor: Encargado / Admin | Boundaries: MatrizInventario, FormularioAjuste, AlertaNotification | Control: listar_existencias, registrar_ajuste, notificar_error | Entities: Inventario, PrendaVariante, MovimientoInventario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu17_gestion_inventario.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu17_gestion_inventario.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu17_gestion_inventario.png" alt="Robustez CU-17 Gestión de Inventario">
+        </div>
+      </div>
+
+      <!-- CU-18 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-18: Disponibilidad en Tiendas / Búsqueda Omnicanal</h3>
+            <div class="card-desc">Actor: Cliente / Visitante | Boundaries: CatalogoPrendaComponent, MapaDisponibilidadModal | Control: consultar_disponibilidad, filtrar_sucursales | Entities: PrendaVariante, Inventario, Sucursal, Empresa</div>
+          </div>
+          <div class="actions">
+            <a href="cu18_disponibilidad_tiendas.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu18_disponibilidad_tiendas.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu18_disponibilidad_tiendas.png" alt="Robustez CU-18 Disponibilidad en Tiendas">
+        </div>
+      </div>
+
+      <!-- CU-19 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-19: Creación de Reservas y Probador</h3>
+            <div class="card-desc">Actor: Cliente | Boundaries: ModalReservaProbador, ComprobanteReservaComponent, AlertaNotification | Control: validar_disponibilidad, crear_reserva, notificar_error | Entities: Reserva, ReservaItem, Inventario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu19_creacion_reservas.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu19_creacion_reservas.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu19_creacion_reservas.png" alt="Robustez CU-19 Creación de Reservas">
+        </div>
+      </div>
+
+      <!-- CU-20 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-20: Consulta y Gestión de Reservas del Cliente</h3>
+            <div class="card-desc">Actor: Cliente | Boundaries: MisReservasComponent, DialogoCancelacion | Control: mis_reservas, cancelar_reserva | Entities: Reserva, ReservaEstadoHistorial, Inventario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu20_consulta_reservas.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu20_consulta_reservas.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu20_consulta_reservas.png" alt="Robustez CU-20 Consulta y Cancelación de Reservas">
+        </div>
+      </div>
+
+      <!-- CU-21 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-21: Preparación y Validación de Reservas en Tienda</h3>
+            <div class="card-desc">Actor: Encargado de Sucursal | Boundaries: BandejaReservasSucursal, ModalPreparacionProbador, ModalReporteIncidencia | Control: listar_reservas, preparar_reserva, registrar_incidencia | Entities: Reserva, ReservaEstadoHistorial, Inventario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu21_preparacion_reservas.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu21_preparacion_reservas.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu21_preparacion_reservas.png" alt="Robustez CU-21 Preparación de Reservas Staff">
+        </div>
+      </div>
+
+      <!-- CU-22 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-22: Carrito de Compras y Checkout Omnicanal</h3>
+            <div class="card-desc">Actor: Cliente | Boundaries: CarritoComponent, CheckoutComponent, ResumenOrdenModal | Control: obtener_carrito, agregar_item, validar_checkout, crear_orden | Entities: Carrito, Cupon, Venta, Envio, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu22_checkout_carrito.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu22_checkout_carrito.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu22_checkout_carrito.png" alt="Robustez CU-22 Carrito y Checkout">
+        </div>
+      </div>
+
+      <!-- CU-23 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-23: Punto de Venta (POS) - Caja y Facturación</h3>
+            <div class="card-desc">Actor: Cajero / Vendedor | Boundaries: PantallaPOSComponent, ModalCobroPOS, TicketImpresionView | Control: buscar_por_barcode, procesar_venta_pos, generar_ticket | Entities: PrendaVariante, Inventario, MovimientoInventario, Venta, Pago, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu23_punto_venta_pos.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu23_punto_venta_pos.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu23_punto_venta_pos.png" alt="Robustez CU-23 Punto de Venta POS">
+        </div>
+      </div>
+
+      <!-- CU-24 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-24: Procesamiento de Pagos, Pasarelas y Reembolsos</h3>
+            <div class="card-desc">Actor: Cliente / Pasarela Stripe | Boundaries: PasarelaStripeElements, WebhookStripeEndpoint, ConfirmacionPagoView | Control: crear_intencion_pago, procesar_webhook, consultar_pago_polling | Entities: Pago, StripeEvento, Venta, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu24_procesamiento_pagos.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu24_procesamiento_pagos.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu24_procesamiento_pagos.png" alt="Robustez CU-24 Procesamiento de Pagos Stripe">
+        </div>
+      </div>
+
+      <!-- CU-25 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-25: Descargar Catálogo Offline</h3>
+            <div class="card-desc">Actor: Cliente / Cajero | Boundaries: CatalogoOfflineComponent, ServiceWorkerCacheView | Control: descargar_catalogo, persistir_local | Entities: Prenda, Variante, Inventario, Empresa</div>
+          </div>
+          <div class="actions">
+            <a href="cu25_descargar_catalogo_offline.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu25_descargar_catalogo_offline.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu25_descargar_catalogo_offline.png" alt="Robustez CU-25 Descargar Catálogo Offline">
+        </div>
+      </div>
+
+      <!-- CU-26 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-26: Registrar Reserva Offline</h3>
+            <div class="card-desc">Actor: Cliente | Boundaries: FormularioReservaOffline, VoucherLocalView | Control: generar_uuid_local, registrar_reserva_offline | Entities: OperacionPendiente, InventarioLocal, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu26_registrar_reserva_offline.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu26_registrar_reserva_offline.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu26_registrar_reserva_offline.png" alt="Robustez CU-26 Registrar Reserva Offline">
+        </div>
+      </div>
+
+      <!-- CU-27 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-27: Bloquear Stock Soft-Lock con TTL</h3>
+            <div class="card-desc">Actor: Cliente / Dispositivo | Boundaries: DetallePrendaOffline, BadgeTemporizadorTTL | Control: crear_soft_lock, verificar_expiracion, liberar_soft_lock | Entities: SoftLock, Inventario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu27_bloquear_stock_soft_lock.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu27_bloquear_stock_soft_lock.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu27_bloquear_stock_soft_lock.png" alt="Robustez CU-27 Bloquear Stock Soft-Lock TTL">
+        </div>
+      </div>
+
+      <!-- CU-28 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-28: Venta de Contado Offline</h3>
+            <div class="card-desc">Actor: Cajero | Boundaries: POSOfflineComponent, ModalCobroEfectivoOffline, TicketPreliminarView | Control: asentar_venta_offline, generar_ticket_preliminar | Entities: OperacionPendiente, InventarioLocal, Venta, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu28_venta_contado_offline.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu28_venta_contado_offline.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu28_venta_contado_offline.png" alt="Robustez CU-28 Venta Contado Offline">
+        </div>
+      </div>
+
+      <!-- CU-29 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-29: Validar Comprobante y Cambio QR Offline</h3>
+            <div class="card-desc">Actor: Cajero | Boundaries: LectorQRCambiosView, FormularioNotaCambio | Control: validar_qr_comprobante, procesar_nota_cambio | Entities: Venta, NotaCambio, Inventario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu29_validar_qr_cambio_offline.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu29_validar_qr_cambio_offline.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu29_validar_qr_cambio_offline.png" alt="Robustez CU-29 Validar Comprobante QR Cambio">
+        </div>
+      </div>
+
+      <!-- CU-30 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-30: Consultar Cola de Operaciones Offline</h3>
+            <div class="card-desc">Actor: Cajero / Admin | Boundaries: ColaOperacionesComponent, DetalleOperacionModal | Control: consultar_cola, filtrar_por_estado | Entities: OperacionPendiente, Sucursal, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu30_cola_operaciones_offline.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu30_cola_operaciones_offline.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu30_cola_operaciones_offline.png" alt="Robustez CU-30 Consultar Cola Offline">
+        </div>
+      </div>
+
+      <!-- CU-31 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-31: Sincronizar Operaciones Pendientes</h3>
+            <div class="card-desc">Actor: Sistema / Cajero | Boundaries: BotonSyncComponent, SyncProgressModal | Control: procesar_lote_sync, validar_idempotencia, asentar_operacion | Entities: SyncRegistroIdempotencia, OperacionPendiente, Venta, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu31_sincronizar_operaciones.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu31_sincronizar_operaciones.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu31_sincronizar_operaciones.png" alt="Robustez CU-31 Sincronizar Operaciones Idempotencia">
+        </div>
+      </div>
+
+      <!-- CU-32 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-32: Resolver Conflictos de Sincronización</h3>
+            <div class="card-desc">Actor: Encargado / Admin | Boundaries: BandejaConflictosComponent, ModalResolucionConflicto | Control: listar_conflictos, resolver_conflicto | Entities: OperacionPendiente, Inventario, MovimientoInventario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu32_resolver_conflictos.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu32_resolver_conflictos.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu32_resolver_conflictos.png" alt="Robustez CU-32 Resolver Conflictos Sincronización">
+        </div>
+      </div>
+
+      <!-- CU-33 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-33: Reportes y Dashboards Convencionales</h3>
+            <div class="card-desc">Actor: Administrador / Encargado | Boundaries: ReportesConvencionalesComponent, FiltrosReporteView | Control: obtener_dashboard_convencional, obtener_ventas_periodo, obtener_rotacion_stock | Entities: Venta, VentaDetalle, Inventario, MovimientoInventario</div>
+          </div>
+          <div class="actions">
+            <a href="cu33_reportes_convencionales.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu33_reportes_convencionales.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu33_reportes_convencionales.png" alt="Robustez CU-33 Reportes Convencionales">
+        </div>
+      </div>
+
+      <!-- CU-34 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-34: Reportes Generativos con IA (Whitelist & Exportación)</h3>
+            <div class="card-desc">Actor: Gerente / Admin (Plan Pro) | Boundaries: ReporteIaComponent, ModalExportarDocumento | Control: procesar_reporte_ia (Whitelist BR-08), exportar_reporte | Entities: ConsultaIaLog, ReporteExportado, VistasAgregadas, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu34_reporte_generativo_ia.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu34_reporte_generativo_ia.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu34_reporte_generativo_ia.png" alt="Robustez CU-34 Reportes Generativos IA">
+        </div>
+      </div>
+
+      <!-- CU-35 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-35: Dashboard Analítico ML con Síntesis Audio TTS</h3>
+            <div class="card-desc">Actor: Director Comercial / Gerente | Boundaries: DashboardMlComponent, ReproductorAudioTtsView | Control: entrenar_y_predecir_demanda (Supervisado), segmentar_clientes_kmeans (No Supervisado), generar_audio_tts_sintesis | Entities: ModeloMl, Venta, Cliente, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="cu35_dashboard_analitico_ml.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu35_dashboard_analitico_ml.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu35_dashboard_analitico_ml.png" alt="Robustez CU-35 Dashboard Analítico ML Audio TTS">
+        </div>
+      </div>
+
+      <!-- CU-36 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-36: Vestidor Virtual con Realidad Aumentada (RA)</h3>
+            <div class="card-desc">Actor: Cliente Web / Móvil | Boundaries: VestidorVirtualComponent, CamaraArCanvasView | Control: listar_prendas_ar, obtener_o_crear_avatar, iniciar_sesion_prueba, finalizar_sesion_prueba | Entities: PrendaAr, AvatarCliente, MedidaCorporal, SesionPruebaVirtual</div>
+          </div>
+          <div class="actions">
+            <a href="cu36_vestidor_virtual_ra.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu36_vestidor_virtual_ra.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu36_vestidor_virtual_ra.png" alt="Robustez CU-36 Vestidor Virtual RA">
+        </div>
+      </div>
 
       <!-- CONSOLIDADO ROBUSTEZ -->
       <div class="card rob">

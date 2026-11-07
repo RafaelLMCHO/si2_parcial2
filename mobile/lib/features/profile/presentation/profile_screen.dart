@@ -147,6 +147,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             title: const Text('Mi perfil'),
             actions: [
               IconButton(
+                tooltip: 'Ver catalogo',
+                onPressed: () => context.push('/catalogo'),
+                icon: const Icon(Icons.checkroom_outlined),
+              ),
+              IconButton(
                 tooltip: 'Cerrar sesion',
                 onPressed: _confirmLogout,
                 icon: const Icon(Icons.logout),
