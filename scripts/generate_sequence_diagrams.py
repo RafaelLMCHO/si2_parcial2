@@ -1329,6 +1329,223 @@ def generate_seq_cu32(output_dir):
     d.save(png_path, svg_path)
 
 
+# ----------------------------------------------------------------------------------------
+# CU-33: Reportes y Dashboards Convencionales
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu33(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-33: REPORTES Y DASHBOARDS CONVENCIONALES",
+        "KPIs Ejecutivos, Ventas por Período, Agregación y Rotación de Stock | Metodología ICONIX",
+        width=19, height=14
+    )
+    d.y_lifeline_bottom = 0.04
+    # 10 Participantes idénticos al Diagrama de Robustez de CU-33
+    d.add_participant('actor', 'Administrador', 'actor', 0.050, 'Analista de Métricas', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('rep_ui', 'ReportesComponent', 'boundary', 0.145, 'reportes-convencionales', w=0.074, font_size=7.0, sub_size=5.8)
+    d.add_participant('filtro_ui', 'FiltrosReporte', 'boundary', 0.245, 'Fechas/Sucursal/Cat', w=0.072, font_size=7.0, sub_size=5.8)
+    
+    d.add_participant('dash_ctrl', 'obtener_dashboard', 'control', 0.355, 'reporte_service.py', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('ventas_ctrl', 'ventas_periodo', 'control', 0.465, 'reporte_service.py', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('rot_ctrl', 'rotacion_stock', 'control', 0.575, 'reporte_service.py', w=0.072, font_size=7.2, sub_size=6.0)
+    
+    d.add_participant('venta', 'Venta', 'entity', 0.685, 'db / venta (kpis)', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('detalle', 'VentaDetalle', 'entity', 0.790, 'db / venta_detalle', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('inventario', 'Inventario', 'entity', 0.890, 'db / inventario (stock)', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('mov_inv', 'MovInventario', 'entity', 0.965, 'db / mov_inventario', w=0.060, font_size=6.8, sub_size=5.6)
+    
+    # 1. Carga inicial del dashboard de métricas
+    d.add_message('actor', 'rep_ui', 0.85, "1. Acceder al panel de reportes convencionales")
+    d.add_message('rep_ui', 'dash_ctrl', 0.81, "2. GET /api/v1/reportes/convencionales/dashboard (kpis)")
+    d.add_message('dash_ctrl', 'venta', 0.77, "3. GET: calcular facturación de hoy, mes y ticket promedio")
+    d.add_message('dash_ctrl', 'detalle', 0.73, "4. GET: ranking top 10 prendas más demandadas")
+    d.add_message('dash_ctrl', 'rep_ui', 0.69, "5. Response 200 OK (KPIs consolidados y métricas globales)", is_return=True)
+    d.add_message('rep_ui', 'actor', 0.65, "6. Renderizar tarjetas de métricas y gráficos de ventas", is_return=True)
+    
+    # 2. Consulta de ventas por rango y sucursal
+    d.add_message('actor', 'filtro_ui', 0.59, "7. Seleccionar rango de fechas y sucursal específica")
+    d.add_message('filtro_ui', 'ventas_ctrl', 0.55, "8. GET /api/v1/reportes/convencionales/ventas (fecha_ini, fin, suc)")
+    d.add_message('ventas_ctrl', 'venta', 0.51, "9. GET: agregación temporal de ventas y transacciones")
+    d.add_message('ventas_ctrl', 'filtro_ui', 0.47, "10. Response 200 OK (serie de tiempo de ingresos)", is_return=True)
+    d.add_message('filtro_ui', 'rep_ui', 0.43, "11. Actualizar gráfico comparativo de tendencias", is_return=True)
+    
+    # 3. Análisis de rotación de stock y kárdex
+    d.add_message('actor', 'filtro_ui', 0.37, "12. Solicitar análisis de rotación de inventario por categoría")
+    d.add_message('filtro_ui', 'rot_ctrl', 0.33, "13. GET /api/v1/reportes/convencionales/rotacion (cat_id, suc_id)")
+    d.add_message('rot_ctrl', 'inventario', 0.28, "14. GET: balance existencias y alertas stock crítico")
+    d.add_message('rot_ctrl', 'mov_inv', 0.23, "15. GET: calcular ratio de rotación (entradas vs salidas)")
+    d.add_message('rot_ctrl', 'rep_ui', 0.17, "16. Response 200 OK (índices de rotación y productos en riesgo)", is_return=True)
+    d.add_message('rep_ui', 'actor', 0.11, "17. Desplegar matriz de rotación y sugerencias de reabastecimiento", is_return=True)
+    d.add_message('rep_ui', 'actor', 0.05, "18. Exportar reporte consolidado en CSV/Impresión", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu33_reportes_convencionales.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu33_reportes_convencionales.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-34: Reportes Generativos con IA (Whitelist & Exportación)
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu34(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-34: REPORTES GENERATIVOS CON IA (WHITELIST & EXPORTACIÓN)",
+        "Consultas en Lenguaje Natural, Whitelist BR-08, Logs y Exportación Multi-formato | Metodología ICONIX",
+        width=18, height=13
+    )
+    d.y_lifeline_bottom = 0.04
+    # 9 Participantes idénticos al Diagrama de Robustez de CU-34
+    d.add_participant('actor', 'Gerente / Admin', 'actor', 0.055, 'Usuario Plan Pro (BR-03)', w=0.075, font_size=7.2, sub_size=6.0)
+    d.add_participant('ia_ui', 'ReporteIaComponent', 'boundary', 0.165, 'reporte-ia.html (Texto/Voz)', w=0.075, font_size=7.0, sub_size=5.8)
+    d.add_participant('modal_exp', 'ModalExportar', 'boundary', 0.280, 'Selector XLSX / PDF', w=0.075, font_size=7.0, sub_size=5.8)
+    
+    d.add_participant('ia_ctrl', 'procesar_ia', 'control', 0.400, 'Whitelist BR-08 Controller', w=0.075, font_size=7.0, sub_size=5.8)
+    d.add_participant('exp_ctrl', 'exportar_reporte', 'control', 0.520, 'openpyxl / ReportLab', w=0.075, font_size=7.0, sub_size=5.8)
+    
+    d.add_participant('ia_log', 'ConsultaIaLog', 'entity', 0.640, 'db / consulta_ia_log', w=0.075, font_size=7.0, sub_size=5.8)
+    d.add_participant('rep_exp', 'ReporteExportado', 'entity', 0.750, 'db / reporte_exportado', w=0.075, font_size=7.0, sub_size=5.8)
+    d.add_participant('vistas', 'Venta / Inventario', 'entity', 0.855, 'db / vistas agregadas', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('auditoria', 'BitacoraAuditoria', 'entity', 0.955, 'db / bitacora', w=0.065, font_size=6.8, sub_size=5.6)
+    
+    # 1. Consulta IA
+    d.add_message('actor', 'ia_ui', 0.85, "1. Ingresar consulta en lenguaje natural (texto o voz)")
+    d.add_message('ia_ui', 'ia_ctrl', 0.81, "2. POST /api/v1/reportes/ia/consultar (prompt, canal)")
+    d.add_message('ia_ctrl', 'ia_log', 0.76, "3. POST / INSERT: registrar consulta, prompt, latencia y tokens")
+    
+    # alt: Whitelist válida vs inválida
+    d.add_frame(
+        "alt", "[Consulta acotada bajo Whitelist estricta BR-08]",
+        0.03, 0.98, 0.72, 0.26,
+        divider_y=0.36,
+        else_guard="[else: Consulta no permitida o fuera de Whitelist]"
+    )
+    d.add_message('ia_ctrl', 'vistas', 0.67, "4. GET: consulta SQL acotada bajo Whitelist BR-08")
+    d.add_message('ia_ctrl', 'ia_ui', 0.62, "5. Response 200 OK (datos tabulares + análisis LLM)", is_return=True)
+    d.add_message('ia_ui', 'actor', 0.57, "6. Mostrar tabla de resultados y síntesis ejecutiva", is_return=True)
+    
+    d.add_message('actor', 'modal_exp', 0.51, "7. Solicitar exportación del reporte generado")
+    d.add_message('modal_exp', 'exp_ctrl', 0.46, "8. POST /api/v1/reportes/ia/exportar (formato: 'xlsx' | 'pdf')")
+    d.add_message('exp_ctrl', 'rep_exp', 0.42, "9. POST / INSERT: guardar archivo exportado con TTL")
+    d.add_message('exp_ctrl', 'auditoria', 0.38, "10. POST: auditar exportación masiva de datos")
+    
+    d.add_message('ia_ctrl', 'ia_ui', 0.31, "11. Error 400: 'Consulta denegada por directiva de seguridad BR-08'", is_return=True)
+    d.add_message('ia_ui', 'actor', 0.27, "12. Notificar restricción de consulta al usuario", is_return=True)
+    
+    # Descarga final
+    d.add_message('exp_ctrl', 'modal_exp', 0.18, "13. Response 200 OK (URL de descarga firmada temporal)", is_return=True)
+    d.add_message('modal_exp', 'actor', 0.11, "14. Descarga automática de archivo .xlsx o .pdf corporativo", is_return=True)
+    d.add_message('modal_exp', 'actor', 0.05, "15. Confirmar retención y cifrado en almacenamiento temporal", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu34_reporte_generativo_ia.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu34_reporte_generativo_ia.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-35: Dashboard Analítico ML con Síntesis Audio TTS
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu35(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-35: DASHBOARD ANALÍTICO ML CON SÍNTESIS AUDIO TTS",
+        "Proyección de Demanda, Clustering RFM K-Means y Audio Prescriptivo | Metodología ICONIX",
+        width=19, height=14
+    )
+    d.y_lifeline_bottom = 0.04
+    # 10 Participantes idénticos al Diagrama de Robustez de CU-35
+    d.add_participant('actor', 'Director Comercial', 'actor', 0.050, 'Decisor Estratégico', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('ml_ui', 'DashboardMlComponent', 'boundary', 0.145, 'dashboard-ml.html', w=0.074, font_size=7.0, sub_size=5.8)
+    d.add_participant('audio_ui', 'ReproductorAudioTts', 'boundary', 0.245, 'Barra Audio TTS', w=0.072, font_size=7.0, sub_size=5.8)
+    
+    d.add_participant('dem_ctrl', 'predecir_demanda', 'control', 0.355, 'ml_analytics_service.py', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('rfm_ctrl', 'segmentar_rfm', 'control', 0.465, 'K-Means Clustering', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('tts_ctrl', 'sintesis_audio', 'control', 0.575, 'ml_analytics_service.py', w=0.072, font_size=7.0, sub_size=5.8)
+    
+    d.add_participant('modelo', 'ModeloMl', 'entity', 0.685, 'db / modelo_ml', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('venta', 'Venta', 'entity', 0.790, 'db / venta (series)', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('cliente', 'Cliente', 'entity', 0.890, 'db / cliente (RFM)', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('auditoria', 'BitacoraAuditoria', 'entity', 0.965, 'db / bitacora', w=0.060, font_size=6.8, sub_size=5.6)
+    
+    # 1. Proyección de Demanda Supervisada
+    d.add_message('actor', 'ml_ui', 0.85, "1. Abrir panel analítico y solicitar proyección de demanda")
+    d.add_message('ml_ui', 'dem_ctrl', 0.81, "2. GET /api/v1/inteligencia/ml/demanda (entrenar y proyectar)")
+    d.add_message('dem_ctrl', 'venta', 0.77, "3. GET: extraer dataset histórico de ventas por categoría")
+    d.add_message('dem_ctrl', 'modelo', 0.73, "4. GET / PUT: leer y actualizar métricas r2_score y MAE")
+    d.add_message('dem_ctrl', 'ml_ui', 0.69, "5. Response 200 OK (curva de proyección y horizonte 30 días)", is_return=True)
+    d.add_message('ml_ui', 'actor', 0.65, "6. Renderizar gráfico predictivo de demanda con intervalos de confianza", is_return=True)
+    
+    # 2. Segmentación RFM No Supervisada
+    d.add_message('actor', 'ml_ui', 0.59, "7. Solicitar segmentación no supervisada de clientes")
+    d.add_message('ml_ui', 'rfm_ctrl', 0.55, "8. GET /api/v1/inteligencia/ml/segmentacion (clusters RFM k=3..5)")
+    d.add_message('rfm_ctrl', 'cliente', 0.51, "9. GET: recuperar variables recencia, frecuencia y monto")
+    d.add_message('rfm_ctrl', 'modelo', 0.47, "10. Actualizar métrica Silhouette Score del clustering")
+    d.add_message('rfm_ctrl', 'ml_ui', 0.43, "11. Response 200 OK (centroides y perfiles de cluster)", is_return=True)
+    d.add_message('ml_ui', 'actor', 0.39, "12. Desplegar visualizador 3D/Scatter de clusters de clientes", is_return=True)
+    
+    # 3. Síntesis de Audio Prescriptivo TTS
+    d.add_message('actor', 'audio_ui', 0.33, "13. Presionar 'Reproducir Resumen Ejecutivo en Audio'")
+    d.add_message('audio_ui', 'tts_ctrl', 0.28, "14. POST /api/v1/inteligencia/ml/sintesis-audio (texto diagnóstico)")
+    d.add_message('tts_ctrl', 'auditoria', 0.23, "15. POST: auditar generación y consumo de audio TTS")
+    d.add_message('tts_ctrl', 'audio_ui', 0.17, "16. Response 200 OK (stream de audio sintetizado WAV/MP3)", is_return=True)
+    d.add_message('audio_ui', 'actor', 0.11, "17. Reproducir audio con recomendaciones tácticas de inventario", is_return=True)
+    d.add_message('audio_ui', 'actor', 0.05, "18. Ofrecer descarga del archivo de audio para gerencia", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu35_dashboard_analitico_ml.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu35_dashboard_analitico_ml.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-36: Vestidor Virtual con Realidad Aumentada (RA)
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu36(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-36: VESTIDOR VIRTUAL CON REALIDAD AUMENTADA (RA)",
+        "Modelos 3D GLB, Canvas AR WebRTC, Biometría y Sesión de Prueba Virtual | Metodología ICONIX",
+        width=19, height=14
+    )
+    d.y_lifeline_bottom = 0.04
+    # 10 Participantes idénticos al Diagrama de Robustez de CU-36
+    d.add_participant('actor', 'Cliente Digital', 'actor', 0.050, 'Comprador Web/Móvil', w=0.072, font_size=7.2, sub_size=6.0)
+    d.add_participant('vest_ui', 'VestidorComponent', 'boundary', 0.145, 'vestidor-virtual.html', w=0.074, font_size=7.0, sub_size=5.8)
+    d.add_participant('ar_ui', 'CamaraArCanvas', 'boundary', 0.245, 'videoElement + arCanvas', w=0.074, font_size=7.0, sub_size=5.8)
+    
+    d.add_participant('ar_ctrl', 'listar_prendas_ar', 'control', 0.355, 'vestidor_ar_service.py', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('av_ctrl', 'obtener_avatar', 'control', 0.465, 'vestidor_ar_service.py', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('ses_ctrl', 'sesion_prueba', 'control', 0.575, 'vestidor_ar_service.py', w=0.072, font_size=7.0, sub_size=5.8)
+    
+    d.add_participant('prenda_ar', 'PrendaAr', 'entity', 0.685, 'db / prenda_ar (3D)', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('avatar', 'AvatarCliente', 'entity', 0.790, 'db / avatar_cliente', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('medida', 'MedidaCorporal', 'entity', 0.890, 'db / medida_corporal', w=0.072, font_size=7.0, sub_size=5.8)
+    d.add_participant('sesion', 'SesionPrueba', 'entity', 0.965, 'db / sesion_prueba_ar', w=0.060, font_size=6.8, sub_size=5.6)
+    
+    # 1. Explorar catálogo de prendas compatibles con RA
+    d.add_message('actor', 'vest_ui', 0.85, "1. Abrir probador virtual y explorar catálogo")
+    d.add_message('vest_ui', 'ar_ctrl', 0.81, "2. GET /api/v1/vestidor/prendas (catálogo con modelos 3D / RA)")
+    d.add_message('ar_ctrl', 'prenda_ar', 0.77, "3. GET: recuperar modelo 3D GLB y puntos de ajuste")
+    d.add_message('ar_ctrl', 'vest_ui', 0.73, "4. Response 200 OK (prendas con activos 3D disponibles)", is_return=True)
+    d.add_message('vest_ui', 'actor', 0.69, "5. Mostrar selector de prendas, tallas y variantes de color", is_return=True)
+    
+    # 2. Carga del avatar biométrico del cliente
+    d.add_message('actor', 'vest_ui', 0.63, "6. Seleccionar avatar guardado o ingresar medidas anatómicas")
+    d.add_message('vest_ui', 'av_ctrl', 0.59, "7. GET /api/v1/vestidor/avatar (perfil anatómico del usuario)")
+    d.add_message('av_ctrl', 'avatar', 0.55, "8. GET / POST: obtener o registrar avatar 3D del usuario")
+    d.add_message('av_ctrl', 'medida', 0.51, "9. GET: leer medidas anatómicas (busto, cintura, hombro)")
+    d.add_message('av_ctrl', 'vest_ui', 0.47, "10. Response 200 OK (avatar 3D parametrizado con medidas)", is_return=True)
+    
+    # 3. Activación de cámara y sesión de prueba en tiempo real
+    d.add_message('actor', 'ar_ui', 0.41, "11. Activar cámara web/móvil para superposición en vivo")
+    d.add_message('ar_ui', 'ses_ctrl', 0.36, "12. POST /api/v1/vestidor/sesiones (prenda_id, variante, avatar)")
+    d.add_message('ses_ctrl', 'sesion', 0.31, "13. POST / PUT: iniciar y finalizar sesión guardando captura")
+    d.add_message('ses_ctrl', 'ar_ui', 0.26, "14. Response 200 OK (sesión activa y anclajes anatómicos)", is_return=True)
+    
+    # Renderizado y ajuste
+    d.add_message('ar_ui', 'actor', 0.19, "15. Renderizar prenda 3D superpuesta en tiempo real sobre el cuerpo", is_return=True)
+    d.add_message('actor', 'vest_ui', 0.13, "16. Confirmar ajuste de talla visualizado satisfactoriamente")
+    d.add_message('vest_ui', 'actor', 0.07, "17. Opción directa: Añadir talla seleccionada al Carrito (CU-22)", is_return=True)
+    
+    png_path = os.path.join(output_dir, "secuencia_cu36_vestidor_virtual_ra.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu36_vestidor_virtual_ra.svg")
+    d.save(png_path, svg_path)
+
+
 if __name__ == '__main__':
     out_dir = os.path.join(os.getcwd(), 'docs', 'diagramas')
     os.makedirs(out_dir, exist_ok=True)
@@ -1353,5 +1570,9 @@ if __name__ == '__main__':
     generate_seq_cu30(out_dir)
     generate_seq_cu31(out_dir)
     generate_seq_cu32(out_dir)
+    generate_seq_cu33(out_dir)
+    generate_seq_cu34(out_dir)
+    generate_seq_cu35(out_dir)
+    generate_seq_cu36(out_dir)
     print("All sequence diagrams generated successfully!")
 
