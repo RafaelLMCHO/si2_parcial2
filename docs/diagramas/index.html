@@ -663,6 +663,142 @@
         </div>
       </div>
 
+      <!-- CLASES CU-03 -->
+      <div class="card" style="border-top: 3px solid #9333ea;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-03: Gestionar Perfil y Cambio de Contraseña</h3>
+            <div class="card-desc">Boundary: ProfileComponent | Control: AuthService | Schemas: UserUpdateRequest, ChangePasswordRequest, UserOut | Entities BD: Usuario, Sesion, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="diagrama de clases/clases_cu03_gestionar_perfil.png" download class="btn" style="background:#9333ea; color:#fff;">Descargar PNG</a>
+            <a href="diagrama de clases/clases_cu03_gestionar_perfil.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="diagrama de clases/clases_cu03_gestionar_perfil.png" alt="Diagrama de Clases CU-03 Gestionar Perfil">
+        </div>
+      </div>
+
+      <!-- CLASES CU-04 -->
+      <div class="card" style="border-top: 3px solid #9333ea;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-04: Cerrar Sesión y Refresco de Tokens</h3>
+            <div class="card-desc">Boundaries: NavbarComponent, AuthInterceptor | Control: AuthService | Schemas: TokenRefreshRequest | Entities BD: Sesion, Usuario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="diagrama de clases/clases_cu04_cerrar_sesion.png" download class="btn" style="background:#9333ea; color:#fff;">Descargar PNG</a>
+            <a href="diagrama de clases/clases_cu04_cerrar_sesion.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="diagrama de clases/clases_cu04_cerrar_sesion.png" alt="Diagrama de Clases CU-04 Cerrar Sesión">
+        </div>
+      </div>
+
+      <!-- CLASES CU-05 -->
+      <div class="card" style="border-top: 3px solid #9333ea;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-05: Registrar Auditoría del Sistema</h3>
+            <div class="card-desc">Boundary: HttpRequestBoundary | Control: AuditMiddleware | Schemas: AuditContext | Entities BD: Usuario, Empresa, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="diagrama de clases/clases_cu05_registrar_auditoria.png" download class="btn" style="background:#9333ea; color:#fff;">Descargar PNG</a>
+            <a href="diagrama de clases/clases_cu05_registrar_auditoria.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="diagrama de clases/clases_cu05_registrar_auditoria.png" alt="Diagrama de Clases CU-05 Registrar Auditoría">
+        </div>
+      </div>
+
+      <!-- CLASES CU-06 -->
+      <div class="card" style="border-top: 3px solid #9333ea;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-06: Gestión de Planes y Registro de Empresas SaaS</h3>
+            <div class="card-desc">Boundaries: PlanesSaaSComponent, ModalCrearEmpresa | Control: SaaSService | Entities BD: PlanSaaS, Empresa, Rol, Usuario, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="diagrama de clases/clases_cu06_gestion_planes.png" download class="btn" style="background:#9333ea; color:#fff;">Descargar PNG</a>
+            <a href="diagrama de clases/clases_cu06_gestion_planes.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="diagrama de clases/clases_cu06_gestion_planes.png" alt="Diagrama de Clases CU-06 Gestión de Planes">
+        </div>
+      </div>
+
+      <!-- CLASES CU-07 -->
+      <div class="card" style="border-top: 3px solid #9333ea;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-07: Suscripciones SaaS y Asignación de Planes</h3>
+            <div class="card-desc">Boundaries: SuscripcionesSaasComponent, ModalAsignarPlan | Control: CU07SuscripcionesController | Entities BD: Suscripcion, Plan, Empresa, Sucursal, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="diagrama de clases/clases_cu07_suscripciones_saas.png" download class="btn" style="background:#9333ea; color:#fff;">Descargar PNG</a>
+            <a href="diagrama de clases/clases_cu07_suscripciones_saas.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="diagrama de clases/clases_cu07_suscripciones_saas.png" alt="Diagrama de Clases CU-07 Suscripciones SaaS">
+        </div>
+      </div>
+
+      <!-- CLASES CU-08 -->
+      <div class="card" style="border-top: 3px solid #9333ea;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-08: Facturación SaaS e Historial de Facturas</h3>
+            <div class="card-desc">Boundaries: FacturacionSaasComponent, FacturaDetalleModal | Control: CU08FacturacionController | Entities BD: FacturaSaaS, Empresa, Suscripcion, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="diagrama de clases/clases_cu08_facturacion_saas.png" download class="btn" style="background:#9333ea; color:#fff;">Descargar PNG</a>
+            <a href="diagrama de clases/clases_cu08_facturacion_saas.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="diagrama de clases/clases_cu08_facturacion_saas.png" alt="Diagrama de Clases CU-08 Facturación SaaS">
+        </div>
+      </div>
+
+      <!-- CLASES CU-09 -->
+      <div class="card" style="border-top: 3px solid #9333ea;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-09: Métricas Globales SaaS (Dashboard Superadmin)</h3>
+            <div class="card-desc">Boundary: MetricasDashboardComponent | Control: CU09MetricasController | Schema: MetricasSaaSOut | Entities BD: Empresa, Usuario, Sucursal, Suscripcion, Plan</div>
+          </div>
+          <div class="actions">
+            <a href="diagrama de clases/clases_cu09_metricas_saas.png" download class="btn" style="background:#9333ea; color:#fff;">Descargar PNG</a>
+            <a href="diagrama de clases/clases_cu09_metricas_saas.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="diagrama de clases/clases_cu09_metricas_saas.png" alt="Diagrama de Clases CU-09 Métricas SaaS">
+        </div>
+      </div>
+
+      <!-- CLASES CU-10 -->
+      <div class="card" style="border-top: 3px solid #9333ea;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-10: Gestión de Empleados, Usuarios y Roles</h3>
+            <div class="card-desc">Boundaries: GestionEmpleadosComponent, ModalEmpleadoForm | Control: CU10GestionEmpleadosController | Entities BD: Usuario, Rol, Empresa, Sucursal, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="diagrama de clases/clases_cu10_gestion_empleados.png" download class="btn" style="background:#9333ea; color:#fff;">Descargar PNG</a>
+            <a href="diagrama de clases/clases_cu10_gestion_empleados.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="diagrama de clases/clases_cu10_gestion_empleados.png" alt="Diagrama de Clases CU-10 Gestión de Empleados">
+        </div>
+      </div>
+
     </div>
 
     <!-- SECCIÓN: DIAGRAMAS DE ROBUSTEZ -->
