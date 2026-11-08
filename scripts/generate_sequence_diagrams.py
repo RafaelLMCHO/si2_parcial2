@@ -265,14 +265,14 @@ def generate_seq_cu02(output_dir):
     )
     
     d.add_participant('actor', 'Cliente', 'actor', 0.05, 'Visitante')
-    d.add_participant('reg_ui', 'RegisterUI', 'boundary', 0.15, 'register.html')
-    d.add_participant('ver_ui', 'VerifyEmailUI', 'boundary', 0.25, 'verify-email.html')
+    d.add_participant('reg_ui', 'RegisterComponent', 'boundary', 0.15, 'register.html')
+    d.add_participant('ver_ui', 'VerifyEmailComponent', 'boundary', 0.25, 'verify-email.html')
     d.add_participant('reg_ctrl', 'register()', 'control', 0.36, 'auth_service.py')
     d.add_participant('ver_ctrl', 'verify_email()', 'control', 0.47, 'auth_service.py')
     d.add_participant('empresa', 'Empresa', 'entity', 0.58, 'db / empresa')
     d.add_participant('rol', 'Rol', 'entity', 0.68, 'db / rol')
     d.add_participant('usuario', 'Usuario', 'entity', 0.78, 'db / usuario')
-    d.add_participant('token', 'Verificacion', 'entity', 0.88, 'db / verificacion')
+    d.add_participant('token', 'VerificacionCorreo', 'entity', 0.88, 'db / verificacion')
     d.add_participant('audit', 'BitacoraAuditoria', 'entity', 0.96, 'db / bitacora')
     
     # FASE 1: REGISTRO
@@ -336,7 +336,7 @@ def generate_seq_cu03(output_dir):
         "Consulta de Perfil, Actualización Personal y Revocación de Sesiones | Metodología ICONIX"
     )
     
-    d.add_participant('actor', 'Usuario Auth', 'actor', 0.06, 'Sesión Activa')
+    d.add_participant('actor', 'Usuario', 'actor', 0.06, 'Autenticado')
     d.add_participant('profile_ui', 'ProfileComponent', 'boundary', 0.19, 'profile.html')
     d.add_participant('get_ctrl', 'get_me()', 'control', 0.32, 'auth_service.py')
     d.add_participant('upd_ctrl', 'update_me()', 'control', 0.45, 'auth_service.py')
@@ -401,8 +401,8 @@ def generate_seq_cu04(output_dir):
         "Logout Seguro, Preservación Offline y Rotación de Refresh Token | Metodología ICONIX"
     )
     
-    d.add_participant('actor', 'Usuario Auth', 'actor', 0.06, 'Sesión Activa')
-    d.add_participant('nav_ui', 'Navbar/Profile', 'boundary', 0.19, 'app.html')
+    d.add_participant('actor', 'Usuario', 'actor', 0.06, 'Autenticado')
+    d.add_participant('nav_ui', 'Navbar / Profile', 'boundary', 0.19, 'Acción Logout')
     d.add_participant('int_ui', 'AuthInterceptor', 'boundary', 0.33, 'auth.interceptor.ts')
     d.add_participant('out_ctrl', 'logout()', 'control', 0.47, 'auth_service.py')
     d.add_participant('ref_ctrl', 'refresh()', 'control', 0.60, 'auth_service.py')
@@ -460,8 +460,8 @@ def generate_seq_cu05(output_dir):
     )
     
     d.add_participant('actor', 'Actor / Sistema', 'actor', 0.06, 'Usuario / Superadmin')
-    d.add_participant('http_ui', 'HttpBoundary', 'boundary', 0.20, 'Vistas / Clientes HTTP')
-    d.add_participant('mw', 'AuditMiddleware', 'control', 0.36, 'audit.py')
+    d.add_participant('http_ui', 'HttpRequestBoundary', 'boundary', 0.20, 'Vistas / HTTP')
+    d.add_participant('mw', 'audit_middleware()', 'control', 0.36, 'audit.py')
     d.add_participant('router', 'FastAPI Router', 'control', 0.52, 'Router Endpoints')
     d.add_participant('usuario', 'Usuario', 'entity', 0.68, 'db / usuario')
     d.add_participant('empresa', 'Empresa', 'entity', 0.82, 'db / empresa')
@@ -501,6 +501,78 @@ def generate_seq_cu05(output_dir):
     
     png_path = os.path.join(output_dir, "secuencia_cu05_registrar_auditoria.png")
     svg_path = os.path.join(output_dir, "secuencia_cu05_registrar_auditoria.svg")
+    d.save(png_path, svg_path)
+
+
+# ----------------------------------------------------------------------------------------
+# CU-06: Gestión de Planes y Registro de Empresas SaaS
+# ----------------------------------------------------------------------------------------
+def generate_seq_cu06(output_dir):
+    d = SequenceDiagram(
+        "DIAGRAMA DE SECUENCIA - CU-06: GESTIÓN DE PLANES Y REGISTRO DE EMPRESAS SAAS",
+        "Catálogo de Tarifas SaaS, Onboarding de Tenant y Creación de Admin Inicial | Metodología ICONIX",
+        width=18, height=13.5
+    )
+    d.y_lifeline_bottom = 0.03
+    
+    d.add_participant('actor', 'Superadmin', 'actor', 0.05, 'Admin SaaS')
+    d.add_participant('planes_ui', 'PlanesSaaSComponent', 'boundary', 0.14, 'planes-saas.html')
+    d.add_participant('modal_ui', 'ModalCrearEmpresa', 'boundary', 0.24, 'empresa-modal.html')
+    d.add_participant('planes_ctrl', 'listar_planes()', 'control', 0.35, 'cu06_planes_ctrl.py')
+    d.add_participant('empresa_ctrl', 'create_empresa()', 'control', 0.46, 'saas_service.py')
+    d.add_participant('plan', 'PlanSaaS', 'entity', 0.57, 'db / plan_saas')
+    d.add_participant('empresa', 'Empresa', 'entity', 0.68, 'db / empresa')
+    d.add_participant('rol', 'Rol', 'entity', 0.78, 'db / rol y permiso')
+    d.add_participant('usuario', 'Usuario', 'entity', 0.88, 'db / usuario')
+    d.add_participant('audit', 'BitacoraAuditoria', 'entity', 0.97, 'db / bitacora')
+    
+    # FASE 1: CONSULTA DE PLANES Y CREACIÓN OPCIONAL
+    d.add_message('actor', 'planes_ui', 0.85, "1. Abrir vista de planes y tenants SaaS")
+    d.add_message('planes_ui', 'planes_ctrl', 0.81, "2. GET /api/v1/saas/planes (Bearer Superadmin)")
+    d.add_message('planes_ctrl', 'plan', 0.77, "3. GET: consultar planes activos y cuotas")
+    d.add_message('plan', 'planes_ctrl', 0.74, "4. planes_saas (precios, límites sucursales/usuarios)", is_return=True)
+    d.add_message('planes_ctrl', 'planes_ui', 0.71, "5. 200 OK: list[PlanOut]", is_return=True)
+    d.add_message('planes_ui', 'actor', 0.68, "6. Renderizar tabla de planes disponibles y botón 'Nueva Empresa'")
+    
+    # opt: Superadmin define nuevo plan
+    d.add_frame("opt", "[Superadmin define nuevo plan tarifario]", 0.03, 0.62, 0.655, 0.540)
+    d.add_message('actor', 'planes_ui', 0.62, "7. Ingresar nuevo plan (nombre, precio, límites)")
+    d.add_message('planes_ui', 'planes_ctrl', 0.58, "8. POST /api/v1/saas/planes (nombre, precio, límites)")
+    d.add_message('planes_ctrl', 'plan', 0.55, "9. POST: insertar nuevo plan_saas con límites")
+    
+    # FASE 2: ONBOARDING DE EMPRESA TENANT
+    d.add_message('actor', 'modal_ui', 0.51, "10. Clic 'Nueva Empresa' y completar datos (nombre, nit, correo_admin)")
+    d.add_message('modal_ui', 'empresa_ctrl', 0.47, "11. POST /api/v1/saas/empresas (EmpresaCreateRequest)")
+    d.add_message('empresa_ctrl', 'empresa_ctrl', 0.435, "pg_advisory_xact_lock(nit, correo_admin)", self_call=True)
+    d.add_message('empresa_ctrl', 'empresa', 0.40, "12. GET: verificar si NIT ya está registrado")
+    d.add_message('empresa_ctrl', 'usuario', 0.365, "13. GET: verificar si correo_admin ya existe")
+    
+    # alt: Conflicto duplicados vs Registro exitoso
+    d.add_frame(
+        "alt", "[NIT y correo disponibles (Unicidad confirmada)]",
+        0.03, 0.98, 0.345, 0.045,
+        divider_y=0.095,
+        else_guard="[else: Conflicto NIT o Correo ya registrados]"
+    )
+    
+    d.add_message('empresa_ctrl', 'empresa_ctrl', 0.315, "_unique_slug(nombre) -> slug generado", self_call=True)
+    d.add_message('empresa_ctrl', 'empresa', 0.28, "14. POST: insertar empresa (estado='pendiente_plan', slug)")
+    
+    # loop: Roles y permisos
+    d.add_frame("loop", "[Para cada rol base: admin, cajero, encargado, cliente]", 0.44, 0.82, 0.260, 0.210)
+    d.add_message('empresa_ctrl', 'rol', 0.225, "15. POST: crear rol base y vincular rol_permiso")
+    
+    d.add_message('empresa_ctrl', 'usuario', 0.190, "16. POST: crear usuario admin activo con password temporal")
+    d.add_message('empresa_ctrl', 'audit', 0.165, "17. POST: registrar auditoría superadmin (_safe_audit)")
+    d.add_message('empresa_ctrl', 'modal_ui', 0.135, "18. 201 Created: EmpresaCreateResponse (empresa_id, slug, password_temporal)", is_return=True)
+    d.add_message('modal_ui', 'actor', 0.115, "19. Mostrar credenciales temporales generadas (Listo para CU-07)")
+    
+    # else branch
+    d.add_message('empresa_ctrl', 'modal_ui', 0.075, "20. 409 Conflict: NIT_DUPLICADO / CORREO_ADMIN_DUPLICADO", is_return=True)
+    d.add_message('modal_ui', 'actor', 0.050, "21. Notificar conflicto de unicidad en pantalla")
+    
+    png_path = os.path.join(output_dir, "secuencia_cu06_gestion_planes.png")
+    svg_path = os.path.join(output_dir, "secuencia_cu06_gestion_planes.svg")
     d.save(png_path, svg_path)
 
 
@@ -1554,6 +1626,7 @@ if __name__ == '__main__':
     generate_seq_cu03(out_dir)
     generate_seq_cu04(out_dir)
     generate_seq_cu05(out_dir)
+    generate_seq_cu06(out_dir)
     generate_seq_cu17(out_dir)
     generate_seq_cu18(out_dir)
     generate_seq_cu19(out_dir)

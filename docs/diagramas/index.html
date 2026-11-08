@@ -177,7 +177,7 @@
     </header>
 
     <!-- SECCIÓN: DIAGRAMAS DE SECUENCIA -->
-    <h2 id="secuencia" class="section-title">Diagramas de Secuencia (CU-01 a CU-05 y CU-17 a CU-24) con alt, opt, loop</h2>
+    <h2 id="secuencia" class="section-title">Diagramas de Secuencia (CU-01 a CU-36) con alt, opt, loop</h2>
     <div class="grid">
 
       <!-- SECUENCIA CU-01 -->
@@ -262,6 +262,23 @@
         </div>
         <div class="img-wrapper">
           <img src="secuencia_cu05_registrar_auditoria.png" alt="Secuencia CU-05 Registrar Auditoría">
+        </div>
+      </div>
+
+      <!-- SECUENCIA CU-06 -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-06: Gestión de Planes y Registro de Empresas SaaS</h3>
+            <div class="card-desc">Actor: Superadmin | Fragmentos: opt [Superadmin define nuevo plan], alt [Unicidad confirmada / 409 Duplicado], loop [Roles base y permisos] | CRUD: GET, POST</div>
+          </div>
+          <div class="actions">
+            <a href="secuencia_cu06_gestion_planes.png" download class="btn btn-green">Descargar PNG</a>
+            <a href="secuencia_cu06_gestion_planes.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="secuencia_cu06_gestion_planes.png" alt="Secuencia CU-06 Gestión de Planes SaaS">
         </div>
       </div>
 
@@ -610,6 +627,108 @@
     <!-- SECCIÓN: DIAGRAMAS DE ROBUSTEZ -->
     <h2 id="robustez" class="section-title rob">Diagramas de Robustez (ICONIX)</h2>
     <div class="grid">
+
+      <!-- CU-01 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-01: Iniciar Sesión (Login)</h3>
+            <div class="card-desc">Actor: Usuario (Admin / Cliente) | Boundary: LoginComponent | Control: login() | Entities: Empresa, Suscripcion, Rol, Usuario, Sesion, BitacoraAuditoria | CRUD: GET, PATCH, POST</div>
+          </div>
+          <div class="actions">
+            <a href="cu01_iniciar_sesion.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu01_iniciar_sesion.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu01_iniciar_sesion.png" alt="Robustez CU-01 Iniciar Sesión">
+        </div>
+      </div>
+
+      <!-- CU-02 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-02: Registrarse y Verificar Correo</h3>
+            <div class="card-desc">Actor: Cliente (Visitante) | Boundaries: RegisterComponent, VerifyEmailComponent | Control: register(), verify_email() | Entities: Empresa, Rol, Usuario, VerificacionCorreo, BitacoraAuditoria | CRUD: GET, POST, PATCH, DELETE</div>
+          </div>
+          <div class="actions">
+            <a href="cu02_registrarse.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu02_registrarse.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu02_registrarse.png" alt="Robustez CU-02 Registrarse y Verificar Correo">
+        </div>
+      </div>
+
+      <!-- CU-03 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-03: Gestionar Perfil y Cambio de Contraseña</h3>
+            <div class="card-desc">Actor: Usuario (Autenticado) | Boundary: ProfileComponent | Control: get_me(), update_me(), change_password() | Entities: Usuario, Sesion, BitacoraAuditoria | CRUD: GET, PUT/PATCH, POST, DELETE</div>
+          </div>
+          <div class="actions">
+            <a href="cu03_gestionar_perfil.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu03_gestionar_perfil.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu03_gestionar_perfil.png" alt="Robustez CU-03 Gestionar Perfil">
+        </div>
+      </div>
+
+      <!-- CU-04 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-04: Cerrar Sesión y Refresco de Tokens</h3>
+            <div class="card-desc">Actor: Usuario (Autenticado) | Boundaries: Navbar / Profile, AuthInterceptor | Control: logout(), refresh() | Entities: Sesion, Usuario, BitacoraAuditoria | CRUD: GET, PUT/PATCH, POST, DELETE</div>
+          </div>
+          <div class="actions">
+            <a href="cu04_cerrar_sesion.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu04_cerrar_sesion.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu04_cerrar_sesion.png" alt="Robustez CU-04 Cerrar Sesión">
+        </div>
+      </div>
+
+      <!-- CU-05 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-05: Registrar Auditoría del Sistema</h3>
+            <div class="card-desc">Actor: Actor / Sistema | Boundary: HttpRequestBoundary | Control: audit_middleware() | Entities: Usuario, Empresa, BitacoraAuditoria | CRUD: GET, POST (audita GET, POST, PUT, DELETE)</div>
+          </div>
+          <div class="actions">
+            <a href="cu05_registrar_auditoria.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu05_registrar_auditoria.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu05_registrar_auditoria.png" alt="Robustez CU-05 Registrar Auditoría">
+        </div>
+      </div>
+
+      <!-- CU-06 ROBUSTEZ -->
+      <div class="card rob">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-06: Gestión de Planes y Registro de Empresas SaaS</h3>
+            <div class="card-desc">Actor: Superadmin | Boundaries: PlanesSaaSComponent, ModalCrearEmpresa | Control: listar_planes(), create_empresa() | Entities: PlanSaaS, Empresa, Rol, Usuario, BitacoraAuditoria | CRUD: GET, POST</div>
+          </div>
+          <div class="actions">
+            <a href="cu06_gestion_planes.png" download class="btn btn-primary">Descargar PNG</a>
+            <a href="cu06_gestion_planes.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="cu06_gestion_planes.png" alt="Robustez CU-06 Gestión de Planes SaaS">
+        </div>
+      </div>
 
       <!-- CU-17 ROBUSTEZ -->
       <div class="card rob">
