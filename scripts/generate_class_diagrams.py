@@ -114,14 +114,13 @@ class UMLClassDiagram:
         div2_y = div1_y - attr_h
         self.ax.plot([x_left, x_right], [div2_y, div2_y], color=theme['border'], linewidth=1.2, zorder=4)
         
-        # 3. Attributes Text
+        # 3. Attributes Text (Mantenidos en español / nombres de BD)
         curr_y = div1_y - 0.012
         for attr in attributes:
-            # Color code PK, FK, UNIQUE badges
             self.ax.text(x_left + 0.008, curr_y, attr, fontsize=6.8, ha='left', va='center', fontfamily='monospace', color='#1E293B', zorder=4)
             curr_y -= line_h
             
-        # 4. Methods Text
+        # 4. Methods Text (Métodos en Inglés)
         curr_y = div2_y - 0.012
         for meth in methods:
             self.ax.text(x_left + 0.008, curr_y, meth, fontsize=6.8, ha='left', va='center', fontfamily='monospace', color='#0F172A', zorder=4)
@@ -131,18 +130,15 @@ class UMLClassDiagram:
                       is_dep=False, is_comp=False, rad=0.0):
         """
         Connects class k1 to k2 from side1 to side2.
-        side can be 'left', 'right', 'top', 'bottom'.
         """
         c1 = self.classes[k1]
         c2 = self.classes[k2]
         
-        # Compute start point
         if side1 == 'right': p1 = (c1['x_right'], c1['center_y'])
         elif side1 == 'left': p1 = (c1['x_left'], c1['center_y'])
         elif side1 == 'top': p1 = (c1['x'], c1['y_top'])
         else: p1 = (c1['x'], c1['y_bottom'])
         
-        # Compute end point
         if side2 == 'right': p2 = (c2['x_right'], c2['center_y'])
         elif side2 == 'left': p2 = (c2['x_left'], c2['center_y'])
         elif side2 == 'top': p2 = (c2['x'], c2['y_top'])
@@ -152,7 +148,6 @@ class UMLClassDiagram:
         arrow = '->' if is_dep else '-'
         color = PALETTE['line_dep'] if is_dep else PALETTE['line']
         
-        # Draw connection line
         self.ax.annotate(
             "", xy=p2, xytext=p1,
             arrowprops=dict(
@@ -165,7 +160,6 @@ class UMLClassDiagram:
             zorder=1
         )
         
-        # Midpoint label
         mx = (p1[0] + p2[0]) / 2
         my = (p1[1] + p2[1]) / 2 + (rad * 0.1)
         if label:
@@ -175,7 +169,6 @@ class UMLClassDiagram:
                 bbox=dict(boxstyle="round,pad=0.18", fc="#FFFFFF", ec="#CBD5E1", lw=0.8, alpha=0.92)
             )
             
-        # Multiplicities
         if mult1:
             dx = 0.012 if side1 == 'right' else (-0.012 if side1 == 'left' else 0)
             dy = 0.010 if side1 == 'top' else (-0.010 if side1 == 'bottom' else 0.008)
@@ -186,7 +179,6 @@ class UMLClassDiagram:
             dy = 0.010 if side2 == 'top' else (-0.010 if side2 == 'bottom' else 0.008)
             self.ax.text(p2[0] + dx, p2[1] + dy, mult2, fontsize=7.2, fontweight='bold', color='#334155', zorder=5)
             
-        # Composition Diamond at p1
         if is_comp:
             diam = patches.RegularPolygon(
                 p1, numVertices=4, radius=0.007, orientation=0.785,
@@ -207,7 +199,7 @@ class UMLClassDiagram:
             ("«boundary» UI / Frontend", PALETTE['boundary']['header_fill'], PALETTE['boundary']['border']),
             ("«control» Lógica / Servicio API", PALETTE['control']['header_fill'], PALETTE['control']['border']),
             ("«entity» Modelo / Tabla PostgreSQL", PALETTE['entity']['header_fill'], PALETTE['entity']['border']),
-            ("«schema» DTO Request / Response", PALETTE['dto']['header_fill'], PALETTE['dto']['border']),
+            ("«dto» Schema Request / Response", PALETTE['dto']['header_fill'], PALETTE['dto']['border']),
             ("◆ Composición / Asociación BD", "#334155", "#334155"),
             ("---> Dependencia / Invocación", "#64748B", "#64748B")
         ]
@@ -216,7 +208,6 @@ class UMLClassDiagram:
         for i, (txt, fill, border) in enumerate(items):
             ix = x + i * step + 0.012
             iy = y + 0.019
-            # mini badge
             self.ax.add_patch(patches.Rectangle((ix, iy - 0.007), 0.012, 0.014, fc=fill, ec=border, lw=1))
             self.ax.text(ix + 0.016, iy, txt, fontsize=7.0, ha='left', va='center', color='#1E293B', fontweight='bold')
 
@@ -236,7 +227,7 @@ def generate_clases_cu01(output_dir):
         "Realización del Caso de Uso (ICONIX) | Mapeo Boundary-Control-Entity con Esquema PostgreSQL"
     )
     
-    # 1. Boundary: LoginComponent
+    # 1. Boundary: LoginComponent (Métodos en Inglés)
     d.add_class(
         'login_ui', x=0.12, y_top=0.91, w=0.19,
         name='LoginComponent', stereotype='boundary',
@@ -251,13 +242,13 @@ def generate_clases_cu01(output_dir):
         methods=[
             '+ ngOnInit(): void',
             '+ onSubmit(): Promise<void>',
-            '+ redirigir(ruta: string): void',
-            '+ mostrarError(msg: string): void',
-            '+ limpiarFormulario(): void'
+            '+ redirectTo(route: string): void',
+            '+ showError(message: string): void',
+            '+ resetForm(): void'
         ]
     )
     
-    # 2. Control: AuthService
+    # 2. Control: AuthService (Métodos en Inglés)
     d.add_class(
         'auth_ctrl', x=0.38, y_top=0.91, w=0.23,
         name='AuthService', stereotype='control',
@@ -269,10 +260,10 @@ def generate_clases_cu01(output_dir):
         ],
         methods=[
             '+ login(data: LoginRequest, ip): LoginResponse',
-            '+ verify_password(plain, hashed): bool',
-            '+ create_access_token(data: dict): str',
-            '+ create_refresh_token(data: dict): str',
-            '+ hash_token(token: str): str'
+            '+ verifyPassword(plain, hashed): bool',
+            '+ createAccessToken(data: dict): str',
+            '+ createRefreshToken(data: dict): str',
+            '+ hashToken(token: str): str'
         ]
     )
     
@@ -300,7 +291,7 @@ def generate_clases_cu01(output_dir):
         methods=[]
     )
     
-    # 4. Entity: Empresa
+    # 4. Entity: Empresa (Métodos en Inglés)
     d.add_class(
         'empresa', x=0.67, y_top=0.91, w=0.22,
         name='Empresa', stereotype='entity', table='empresa',
@@ -314,12 +305,12 @@ def generate_clases_cu01(output_dir):
             '+ created_at: timestamptz'
         ],
         methods=[
-            '+ buscar_por_slug(slug: str): Empresa',
-            '+ esta_activa(): bool'
+            '+ findBySlug(slug: str): Empresa',
+            '+ isActive(): bool'
         ]
     )
     
-    # 5. Entity: Suscripcion
+    # 5. Entity: Suscripcion (Métodos en Inglés)
     d.add_class(
         'suscrip', x=0.90, y_top=0.91, w=0.17,
         name='Suscripcion', stereotype='entity', table='suscripcion',
@@ -332,12 +323,12 @@ def generate_clases_cu01(output_dir):
             '+ fecha_fin: date'
         ],
         methods=[
-            '+ es_vigente(): bool',
-            '+ obtener_activa(emp_id): Suscrip'
+            '+ isValid(): bool',
+            '+ getActiveByCompany(emp_id): Suscrip'
         ]
     )
     
-    # 6. Entity: Rol
+    # 6. Entity: Rol (Métodos en Inglés)
     d.add_class(
         'rol', x=0.38, y_top=0.60, w=0.21,
         name='Rol', stereotype='entity', table='rol',
@@ -349,12 +340,12 @@ def generate_clases_cu01(output_dir):
             '+ es_global: boolean'
         ],
         methods=[
-            '+ obtener_por_id(rol_id): Rol',
-            '+ consultar_permisos(): list'
+            '+ findById(rol_id): Rol',
+            '+ getPermissions(): list[str]'
         ]
     )
     
-    # 7. Entity: Usuario
+    # 7. Entity: Usuario (Métodos en Inglés)
     d.add_class(
         'usuario', x=0.67, y_top=0.60, w=0.22,
         name='Usuario', stereotype='entity', table='usuario',
@@ -370,13 +361,13 @@ def generate_clases_cu01(output_dir):
             '+ ultimo_acceso: timestamptz'
         ],
         methods=[
-            '+ buscar_por_correo(correo, slug): Usuario',
-            '+ actualizar_ultimo_acceso(id): void',
-            '+ es_activo(): bool'
+            '+ findByEmail(correo, slug): Usuario',
+            '+ updateLastAccess(id): void',
+            '+ isActive(): bool'
         ]
     )
     
-    # 8. Entity: Sesion
+    # 8. Entity: Sesion (Métodos en Inglés)
     d.add_class(
         'sesion', x=0.67, y_top=0.24, w=0.22,
         name='Sesion', stereotype='entity', table='sesion',
@@ -390,13 +381,13 @@ def generate_clases_cu01(output_dir):
             '+ revocado_en: timestamptz'
         ],
         methods=[
-            '+ crear_sesion(user_id, hash, exp): Sesion',
-            '+ es_activa_y_vigente(): bool',
-            '+ revocar_sesion(id): void'
+            '+ createSession(user_id, hash, exp): Sesion',
+            '+ isValid(): bool',
+            '+ revokeSession(id): void'
         ]
     )
     
-    # 9. Entity: BitacoraAuditoria
+    # 9. Entity: BitacoraAuditoria (Métodos en Inglés)
     d.add_class(
         'audit', x=0.38, y_top=0.24, w=0.22,
         name='BitacoraAuditoria', stereotype='entity', table='bitacora_auditoria',
@@ -412,21 +403,21 @@ def generate_clases_cu01(output_dir):
             '+ ocurrido_en: timestamptz'
         ],
         methods=[
-            '+ registrar_evento_login(user_id, ip): void',
-            '+ registrar_intento_fallido(correo, ip): void'
+            '+ logLoginSuccess(user_id, ip): void',
+            '+ logLoginFailure(correo, ip): void'
         ]
     )
     
     # Relationships
-    d.add_connector('login_ui', 'auth_ctrl', side1='right', side2='left', label="«invoca» POST /login", is_dep=True)
+    d.add_connector('login_ui', 'auth_ctrl', side1='right', side2='left', label="«invokes» POST /login", is_dep=True)
     d.add_connector('login_ui', 'login_req', side1='bottom', side2='top', label="«submits»", is_dep=True)
     d.add_connector('auth_ctrl', 'login_res', side1='bottom', side2='right', label="«returns»", is_dep=True)
     
     # Control to Entities
-    d.add_connector('auth_ctrl', 'empresa', side1='right', side2='left', label="«consulta slug»", is_dep=True)
-    d.add_connector('auth_ctrl', 'usuario', side1='right', side2='left', label="«valida y actualiza»", is_dep=True)
-    d.add_connector('auth_ctrl', 'sesion', side1='bottom', side2='left', label="«crea sesión»", is_dep=True, rad=-0.1)
-    d.add_connector('auth_ctrl', 'audit', side1='bottom', side2='top', label="«audita login»", is_dep=True)
+    d.add_connector('auth_ctrl', 'empresa', side1='right', side2='left', label="«queries slug»", is_dep=True)
+    d.add_connector('auth_ctrl', 'usuario', side1='right', side2='left', label="«validates / updates»", is_dep=True)
+    d.add_connector('auth_ctrl', 'sesion', side1='bottom', side2='left', label="«creates session»", is_dep=True, rad=-0.1)
+    d.add_connector('auth_ctrl', 'audit', side1='bottom', side2='top', label="«logs login»", is_dep=True)
     
     # Domain / DB Associations
     d.add_connector('empresa', 'suscrip', side1='right', side2='left', mult1="1", mult2="0..*", is_comp=True)
@@ -451,7 +442,7 @@ def generate_clases_cu02(output_dir):
         "Realización del Caso de Uso (ICONIX) | Mapeo Boundary-Control-Entity con Esquema PostgreSQL"
     )
     
-    # 1. Boundary: RegisterComponent
+    # 1. Boundary: RegisterComponent (Métodos en Inglés)
     d.add_class(
         'reg_ui', x=0.12, y_top=0.91, w=0.19,
         name='RegisterComponent', stereotype='boundary',
@@ -468,12 +459,12 @@ def generate_clases_cu02(output_dir):
         methods=[
             '+ ngOnInit(): void',
             '+ onSubmit(): Promise<void>',
-            '+ validarPassword(): boolean',
-            '+ navegarAVerificacion(): void'
+            '+ validatePassword(): boolean',
+            '+ navigateToVerification(): void'
         ]
     )
     
-    # 2. Boundary: VerifyEmailComponent
+    # 2. Boundary: VerifyEmailComponent (Métodos en Inglés)
     d.add_class(
         'ver_ui', x=0.12, y_top=0.51, w=0.19,
         name='VerifyEmailComponent', stereotype='boundary',
@@ -486,12 +477,12 @@ def generate_clases_cu02(output_dir):
         ],
         methods=[
             '+ ngOnInit(): void',
-            '+ verificarToken(): Promise<void>',
-            '+ redirigirALogin(): void'
+            '+ verifyToken(): Promise<void>',
+            '+ redirectToLogin(): void'
         ]
     )
     
-    # 3. Control: AuthService
+    # 3. Control: AuthService (Métodos en Inglés)
     d.add_class(
         'auth_ctrl', x=0.38, y_top=0.91, w=0.23,
         name='AuthService', stereotype='control',
@@ -501,10 +492,10 @@ def generate_clases_cu02(output_dir):
         ],
         methods=[
             '+ register(data: RegisterRequest): RegisterResponse',
-            '+ verify_email(data: VerifyEmailRequest): VerifyEmailResponse',
-            '+ generate_token(): str',
-            '+ hash_token(token: str): str',
-            '+ send_verification_email(email, token): void'
+            '+ verifyEmail(data: VerifyEmailRequest): VerifyEmailResponse',
+            '+ generateToken(): str',
+            '+ hashToken(token: str): str',
+            '+ sendVerificationEmail(email, token): void'
         ]
     )
     
@@ -532,7 +523,7 @@ def generate_clases_cu02(output_dir):
         methods=[]
     )
     
-    # 5. Entity: Empresa
+    # 5. Entity: Empresa (Métodos en Inglés)
     d.add_class(
         'empresa', x=0.67, y_top=0.91, w=0.22,
         name='Empresa', stereotype='entity', table='empresa',
@@ -544,12 +535,12 @@ def generate_clases_cu02(output_dir):
             '+ estado: varchar(20)'
         ],
         methods=[
-            '+ validar_existencia_por_slug(slug): bool',
-            '+ esta_activa(): bool'
+            '+ validateExistenceBySlug(slug): bool',
+            '+ isActive(): bool'
         ]
     )
     
-    # 6. Entity: Rol
+    # 6. Entity: Rol (Métodos en Inglés)
     d.add_class(
         'rol', x=0.91, y_top=0.91, w=0.16,
         name='Rol', stereotype='entity', table='rol',
@@ -560,11 +551,11 @@ def generate_clases_cu02(output_dir):
             '+ es_global: boolean'
         ],
         methods=[
-            '+ obtener_rol_cliente(emp_id): Rol'
+            '+ getClientRole(emp_id): Rol'
         ]
     )
     
-    # 7. Entity: Usuario
+    # 7. Entity: Usuario (Métodos en Inglés)
     d.add_class(
         'usuario', x=0.67, y_top=0.60, w=0.22,
         name='Usuario', stereotype='entity', table='usuario',
@@ -580,13 +571,13 @@ def generate_clases_cu02(output_dir):
             '+ estado: varchar(20) = "activo"'
         ],
         methods=[
-            '+ existe_correo(correo, emp_id): bool',
-            '+ crear_usuario_inactivo(data): Usuario',
-            '+ activar_correo(user_id): void'
+            '+ emailExists(correo, emp_id): bool',
+            '+ createInactiveUser(data): Usuario',
+            '+ activateEmail(user_id): void'
         ]
     )
     
-    # 8. Entity: VerificacionCorreo
+    # 8. Entity: VerificacionCorreo (Métodos en Inglés)
     d.add_class(
         'token_ent', x=0.91, y_top=0.60, w=0.17,
         name='VerificacionCorreo', stereotype='entity', table='verificacion_correo',
@@ -600,13 +591,13 @@ def generate_clases_cu02(output_dir):
             '+ creado_en: timestamptz'
         ],
         methods=[
-            '+ crear_token(user_id, hash, exp): Verif',
-            '+ validar_token_vigente(hash): Verif',
-            '+ marcar_consumido(id): void'
+            '+ createToken(user_id, hash, exp): Verif',
+            '+ validateActiveToken(hash): Verif',
+            '+ markAsConsumed(id): void'
         ]
     )
     
-    # 9. Entity: BitacoraAuditoria
+    # 9. Entity: BitacoraAuditoria (Métodos en Inglés)
     d.add_class(
         'audit', x=0.67, y_top=0.22, w=0.22,
         name='BitacoraAuditoria', stereotype='entity', table='bitacora_auditoria',
@@ -621,22 +612,22 @@ def generate_clases_cu02(output_dir):
             '+ ocurrido_en: timestamptz'
         ],
         methods=[
-            '+ registrar_registro_usuario(user_id): void',
-            '+ registrar_verificacion_email(user_id): void'
+            '+ logUserRegistration(user_id): void',
+            '+ logEmailVerification(user_id): void'
         ]
     )
     
     # Relationships
-    d.add_connector('reg_ui', 'auth_ctrl', side1='right', side2='left', label="«invoca» POST /register", is_dep=True)
-    d.add_connector('ver_ui', 'auth_ctrl', side1='right', side2='bottom', label="«invoca» POST /verify-email", is_dep=True, rad=0.08)
+    d.add_connector('reg_ui', 'auth_ctrl', side1='right', side2='left', label="«invokes» POST /register", is_dep=True)
+    d.add_connector('ver_ui', 'auth_ctrl', side1='right', side2='bottom', label="«invokes» POST /verify-email", is_dep=True, rad=0.08)
     d.add_connector('reg_ui', 'reg_req', side1='bottom', side2='top', label="«submits»", is_dep=True)
     d.add_connector('ver_ui', 'ver_req', side1='bottom', side2='left', label="«submits»", is_dep=True, rad=-0.05)
     
     # Control to Entities
-    d.add_connector('auth_ctrl', 'empresa', side1='right', side2='left', label="«valida tenant»", is_dep=True)
-    d.add_connector('auth_ctrl', 'usuario', side1='right', side2='left', label="«crea / activa»", is_dep=True)
-    d.add_connector('auth_ctrl', 'token_ent', side1='bottom', side2='left', label="«genera / consume»", is_dep=True, rad=-0.08)
-    d.add_connector('auth_ctrl', 'audit', side1='bottom', side2='left', label="«audita eventos»", is_dep=True, rad=-0.12)
+    d.add_connector('auth_ctrl', 'empresa', side1='right', side2='left', label="«validates tenant»", is_dep=True)
+    d.add_connector('auth_ctrl', 'usuario', side1='right', side2='left', label="«creates / activates»", is_dep=True)
+    d.add_connector('auth_ctrl', 'token_ent', side1='bottom', side2='left', label="«generates / consumes»", is_dep=True, rad=-0.08)
+    d.add_connector('auth_ctrl', 'audit', side1='bottom', side2='left', label="«logs events»", is_dep=True, rad=-0.12)
     
     # Domain / DB Associations
     d.add_connector('empresa', 'rol', side1='right', side2='left', mult1="1", mult2="0..*", is_comp=True)
