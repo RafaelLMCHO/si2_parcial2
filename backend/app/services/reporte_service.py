@@ -35,7 +35,7 @@ async def obtener_ventas_periodo(
         "v.empresa_id = $1",
         "v.fecha_hora::date >= $2",
         "v.fecha_hora::date <= $3",
-        "v.estado IN ('pagada', 'completada', 'emitida')",
+        "v.estado IN ('pagada', 'completada', 'entregada', 'enviada')",
     ]
     params: List[Any] = [empresa_id, fecha_inicio, fecha_fin]
 
@@ -104,20 +104,32 @@ async def obtener_rotacion_stock(
         sucursal_filter = f"AND i.sucursal_id = ${len(params)}"
 
     sql = f"""
+        WITH stock AS (
+            SELECT var.prenda_id, COALESCE(SUM(i.stock_disponible), 0)::int AS stock_actual
+            FROM variante var
+            JOIN inventario i ON i.variante_id = var.id AND i.empresa_id = var.empresa_id
+            WHERE var.empresa_id = $1 {sucursal_filter}
+            GROUP BY var.prenda_id
+        ),
+        salidas AS (
+            SELECT var.prenda_id, COALESCE(SUM(vd.cantidad), 0)::int AS salidas
+            FROM venta_detalle vd
+            JOIN variante var ON var.id = vd.variante_id AND var.empresa_id = vd.empresa_id
+            WHERE vd.empresa_id = $1
+            GROUP BY var.prenda_id
+        )
         SELECT
             p.id AS prenda_id,
             p.codigo,
             p.nombre,
             COALESCE(cat.nombre, 'Sin categoría') AS categoria,
-            COALESCE(SUM(i.stock_actual), 0)::int AS stock_actual,
-            COALESCE(SUM(vd.cantidad), 0)::int AS salidas
+            COALESCE(st.stock_actual, 0)::int AS stock_actual,
+            COALESCE(sa.salidas, 0)::int AS salidas
         FROM prenda p
         LEFT JOIN categoria cat ON cat.id = p.categoria_id AND cat.empresa_id = p.empresa_id
-        LEFT JOIN variante var ON var.prenda_id = p.id AND var.empresa_id = p.empresa_id
-        LEFT JOIN inventario i ON i.variante_id = var.id AND i.empresa_id = p.empresa_id {sucursal_filter}
-        LEFT JOIN venta_detalle vd ON vd.variante_id = var.id AND vd.empresa_id = p.empresa_id
+        LEFT JOIN stock st ON st.prenda_id = p.id
+        LEFT JOIN salidas sa ON sa.prenda_id = p.id
         WHERE {where_clause}
-        GROUP BY p.id, p.codigo, p.nombre, cat.nombre
         ORDER BY salidas DESC, stock_actual ASC
         LIMIT 50
     """

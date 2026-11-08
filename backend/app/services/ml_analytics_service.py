@@ -70,7 +70,7 @@ async def entrenar_y_predecir_demanda(
             JOIN venta v ON v.id = vd.venta_id AND v.empresa_id = vd.empresa_id
             JOIN variante var ON var.id = vd.variante_id AND var.empresa_id = vd.empresa_id
             JOIN prenda p ON p.id = var.prenda_id AND p.empresa_id = vd.empresa_id
-            WHERE vd.empresa_id = $1 AND p.categoria_id = $2 AND v.estado IN ('pagada', 'completada', 'emitida')
+            WHERE vd.empresa_id = $1 AND p.categoria_id = $2 AND v.estado IN ('pagada', 'completada', 'entregada', 'enviada')
             GROUP BY to_char(v.fecha_hora, 'YYYY-MM')
             ORDER BY periodo ASC
             """,
@@ -158,8 +158,9 @@ async def segmentar_clientes_kmeans(
             COALESCE(AVG(v.total), 0)::float AS ticket_promedio,
             COALESCE(EXTRACT(DAY FROM (now() - MAX(v.fecha_hora))), 90)::float AS recencia_dias
         FROM usuario u
-        LEFT JOIN venta v ON v.cliente_id = u.id AND v.empresa_id = u.empresa_id AND v.estado IN ('pagada', 'completada', 'emitida')
-        WHERE u.empresa_id = $1 AND u.rol = 'cliente'
+        LEFT JOIN venta v ON v.usuario_id = u.id AND v.empresa_id = u.empresa_id AND v.estado IN ('pagada', 'completada', 'entregada', 'enviada')
+        JOIN rol r ON r.id = u.rol_id
+        WHERE u.empresa_id = $1 AND r.nombre = 'cliente'
         GROUP BY u.id
         """,
         empresa_id,

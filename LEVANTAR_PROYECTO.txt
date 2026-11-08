@@ -34,6 +34,14 @@ El entorno virtual ya esta creado e instalado en:
     docker compose ps
     docker compose exec db pg_isready -U postgres -d fashionstore
 
+  Cargar datos demo adicionales (solo tenant "demo", idempotente):
+    .\scripts\seed_demo.ps1
+
+  Ese script agrega sucursales, clientes, catalogo, inventario, ventas,
+  reservas, carritos, movimientos, transferencias, operaciones offline,
+  predicciones ML, consultas IA, reportes y datos de vestidor virtual.
+  No modifica db\run_all.sql ni afecta a otras empresas.
+
 
 3. ACTIVAR EL ENTORNO VIRTUAL (TERMINAL DEL BACKEND)
 ----------------------------------------------------
