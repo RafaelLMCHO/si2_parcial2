@@ -14,6 +14,12 @@ PALETTE = {
     'line_dep': '#64748B',
     
     # Stereotype color themes
+    'actor': {
+        'header_fill': '#DDD6FE',
+        'body_fill': '#F5F3FF',
+        'border': '#7C3AED',
+        'tag_color': '#6D28D9'
+    },
     'boundary': {
         'header_fill': '#BAE6FD',
         'body_fill': '#F0F9FF',
@@ -42,7 +48,7 @@ PALETTE = {
 
 
 class UMLClassDiagram:
-    def __init__(self, title, subtitle, width=20, height=14):
+    def __init__(self, title, subtitle, width=22, height=14):
         self.fig, self.ax = plt.subplots(figsize=(width, height), dpi=300)
         self.fig.patch.set_facecolor(PALETTE['bg'])
         self.ax.set_facecolor(PALETTE['bg'])
@@ -101,9 +107,9 @@ class UMLClassDiagram:
         # Header Text
         st_label = f"«{stereotype}»"
         self.ax.text(x, y_top - 0.010, st_label, fontsize=7.2, fontweight='bold', ha='center', va='center', color=theme['tag_color'], zorder=4)
-        self.ax.text(x, y_top - 0.023, name, fontsize=8.8, fontweight='bold', ha='center', va='center', color=PALETTE['title'], zorder=4)
+        self.ax.text(x, y_top - 0.023, name, fontsize=8.6, fontweight='bold', ha='center', va='center', color=PALETTE['title'], zorder=4)
         if table:
-            self.ax.text(x, y_top - 0.037, f"[Tabla: {table}]", fontsize=6.8, fontstyle='italic', ha='center', va='center', color=PALETTE['subtitle'], zorder=4)
+            self.ax.text(x, y_top - 0.037, f"[Tabla: {table}]", fontsize=6.6, fontstyle='italic', ha='center', va='center', color=PALETTE['subtitle'], zorder=4)
             
         # Divider 1: Header - Attributes
         div1_y = y_top - header_h
@@ -116,13 +122,13 @@ class UMLClassDiagram:
         # 3. Attributes Text (Mantenidos con esquema BD)
         curr_y = div1_y - 0.012
         for attr in attributes:
-            self.ax.text(x_left + 0.008, curr_y, attr, fontsize=6.8, ha='left', va='center', fontfamily='monospace', color='#1E293B', zorder=4)
+            self.ax.text(x_left + 0.006, curr_y, attr, fontsize=6.6, ha='left', va='center', fontfamily='monospace', color='#1E293B', zorder=4)
             curr_y -= line_h
             
         # 4. Methods Text (En Inglés)
         curr_y = div2_y - 0.012
         for meth in methods:
-            self.ax.text(x_left + 0.008, curr_y, meth, fontsize=6.8, ha='left', va='center', fontfamily='monospace', color='#0F172A', zorder=4)
+            self.ax.text(x_left + 0.006, curr_y, meth, fontsize=6.6, ha='left', va='center', fontfamily='monospace', color='#0F172A', zorder=4)
             curr_y -= line_h
 
     def add_connector(self, k1, k2, side1='right', side2='left', label="", mult1="", mult2="",
@@ -182,7 +188,7 @@ class UMLClassDiagram:
             )
             self.ax.add_patch(diam)
 
-    def add_legend(self, x=0.02, y=0.04):
+    def add_legend(self, x=0.02, y=0.035):
         box = patches.FancyBboxPatch(
             (x, y), 0.96, 0.038,
             boxstyle="round,pad=0.004,rounding_size=0.006",
@@ -191,6 +197,7 @@ class UMLClassDiagram:
         self.ax.add_patch(box)
         
         items = [
+            ("«actor» Actor del Caso de Uso", PALETTE['actor']['header_fill'], PALETTE['actor']['border']),
             ("«boundary» UI / Frontend", PALETTE['boundary']['header_fill'], PALETTE['boundary']['border']),
             ("«control» Lógica / Servicio API", PALETTE['control']['header_fill'], PALETTE['control']['border']),
             ("«entity» Modelo / Tabla PostgreSQL", PALETTE['entity']['header_fill'], PALETTE['entity']['border']),
@@ -201,10 +208,10 @@ class UMLClassDiagram:
         
         step = 0.96 / len(items)
         for i, (txt, fill, border) in enumerate(items):
-            ix = x + i * step + 0.012
+            ix = x + i * step + 0.008
             iy = y + 0.019
-            self.ax.add_patch(patches.Rectangle((ix, iy - 0.007), 0.012, 0.014, fc=fill, ec=border, lw=1))
-            self.ax.text(ix + 0.016, iy, txt, fontsize=7.0, ha='left', va='center', color='#1E293B', fontweight='bold')
+            self.ax.add_patch(patches.Rectangle((ix, iy - 0.007), 0.011, 0.014, fc=fill, ec=border, lw=1))
+            self.ax.text(ix + 0.014, iy, txt, fontsize=6.8, ha='left', va='center', color='#1E293B', fontweight='bold')
 
     def save(self, png_path, svg_path):
         self.fig.savefig(png_path, bbox_inches='tight')
@@ -219,29 +226,65 @@ class UMLClassDiagram:
 def generate_clases_cu01(output_dir):
     d = UMLClassDiagram(
         "DIAGRAMA DE CLASES UML - CU-01: INICIAR SESIÓN (LOGIN)",
-        "Realización del Caso de Uso (ICONIX) | Mapeo Boundary-Control-Entity con Esquema PostgreSQL"
+        "Realización del Caso de Uso (ICONIX) | Actor, Boundary, Control y Entities con PostgreSQL"
     )
+    # Actor
     d.add_class(
-        'login_ui', x=0.12, y_top=0.91, w=0.19,
+        'actor', x=0.065, y_top=0.91, w=0.105,
+        name='Usuario', stereotype='actor',
+        attributes=[
+            '- sesionActiva: bool = false'
+        ],
+        methods=[
+            '+ enterCredentials(): void',
+            '+ submitLogin(): void'
+        ]
+    )
+    # Boundary
+    d.add_class(
+        'login_ui', x=0.21, y_top=0.91, w=0.165,
         name='LoginComponent', stereotype='boundary',
         attributes=[
             '- empresa_slug: string = ""',
             '- correo: string = ""',
             '- password: string = ""',
-            '- rememberMe: boolean = false',
-            '- loading: boolean = false',
+            '- rememberMe: bool = false',
+            '- loading: bool = false',
             '- errorMessage: string = ""'
         ],
         methods=[
             '+ ngOnInit(): void',
             '+ onSubmit(): Promise<void>',
-            '+ redirectTo(route: string): void',
-            '+ showError(message: string): void',
+            '+ redirectTo(route): void',
+            '+ showError(msg): void',
             '+ resetForm(): void'
         ]
     )
+    # DTOs
     d.add_class(
-        'auth_ctrl', x=0.38, y_top=0.91, w=0.23,
+        'login_req', x=0.21, y_top=0.62, w=0.165,
+        name='LoginRequest', stereotype='dto',
+        attributes=[
+            '+ empresa_slug: str | None',
+            '+ correo: EmailStr',
+            '+ password: str'
+        ],
+        methods=[]
+    )
+    d.add_class(
+        'login_res', x=0.21, y_top=0.45, w=0.165,
+        name='LoginResponse', stereotype='dto',
+        attributes=[
+            '+ access_token: str',
+            '+ refresh_token: str',
+            '+ token_type: str = "bearer"',
+            '+ user: UserOut'
+        ],
+        methods=[]
+    )
+    # Control
+    d.add_class(
+        'auth_ctrl', x=0.43, y_top=0.91, w=0.22,
         name='AuthService', stereotype='control',
         attributes=[
             '- pool: asyncpg.Pool',
@@ -257,29 +300,9 @@ def generate_clases_cu01(output_dir):
             '+ hashToken(token: str): str'
         ]
     )
+    # Entities
     d.add_class(
-        'login_req', x=0.12, y_top=0.62, w=0.19,
-        name='LoginRequest', stereotype='dto',
-        attributes=[
-            '+ empresa_slug: str | None',
-            '+ correo: EmailStr',
-            '+ password: str'
-        ],
-        methods=[]
-    )
-    d.add_class(
-        'login_res', x=0.12, y_top=0.45, w=0.19,
-        name='LoginResponse', stereotype='dto',
-        attributes=[
-            '+ access_token: str',
-            '+ refresh_token: str',
-            '+ token_type: str = "bearer"',
-            '+ user: UserOut'
-        ],
-        methods=[]
-    )
-    d.add_class(
-        'empresa', x=0.67, y_top=0.91, w=0.22,
+        'empresa', x=0.70, y_top=0.91, w=0.22,
         name='Empresa', stereotype='entity', table='empresa',
         attributes=[
             '+ id: uuid [PK]',
@@ -296,7 +319,7 @@ def generate_clases_cu01(output_dir):
         ]
     )
     d.add_class(
-        'suscrip', x=0.90, y_top=0.91, w=0.17,
+        'suscrip', x=0.91, y_top=0.91, w=0.15,
         name='Suscripcion', stereotype='entity', table='suscripcion',
         attributes=[
             '+ id: uuid [PK]',
@@ -308,11 +331,11 @@ def generate_clases_cu01(output_dir):
         ],
         methods=[
             '+ isValid(): bool',
-            '+ getActiveByCompany(emp_id): Suscrip'
+            '+ getActiveByCompany(id): Suscrip'
         ]
     )
     d.add_class(
-        'rol', x=0.38, y_top=0.60, w=0.21,
+        'rol', x=0.43, y_top=0.60, w=0.22,
         name='Rol', stereotype='entity', table='rol',
         attributes=[
             '+ id: uuid [PK]',
@@ -327,7 +350,7 @@ def generate_clases_cu01(output_dir):
         ]
     )
     d.add_class(
-        'usuario', x=0.67, y_top=0.60, w=0.22,
+        'usuario', x=0.70, y_top=0.60, w=0.22,
         name='Usuario', stereotype='entity', table='usuario',
         attributes=[
             '+ id: uuid [PK]',
@@ -347,7 +370,7 @@ def generate_clases_cu01(output_dir):
         ]
     )
     d.add_class(
-        'sesion', x=0.67, y_top=0.24, w=0.22,
+        'sesion', x=0.70, y_top=0.24, w=0.22,
         name='Sesion', stereotype='entity', table='sesion',
         attributes=[
             '+ id: uuid [PK]',
@@ -359,13 +382,13 @@ def generate_clases_cu01(output_dir):
             '+ revocado_en: timestamptz'
         ],
         methods=[
-            '+ createSession(user_id, hash, exp): Sesion',
+            '+ createSession(uid, hash, exp): Sesion',
             '+ isValid(): bool',
             '+ revokeSession(id): void'
         ]
     )
     d.add_class(
-        'audit', x=0.38, y_top=0.24, w=0.22,
+        'audit', x=0.43, y_top=0.24, w=0.22,
         name='BitacoraAuditoria', stereotype='entity', table='bitacora_auditoria',
         attributes=[
             '+ id: bigserial [PK]',
@@ -379,14 +402,17 @@ def generate_clases_cu01(output_dir):
             '+ ocurrido_en: timestamptz'
         ],
         methods=[
-            '+ logLoginSuccess(user_id, ip): void',
+            '+ logLoginSuccess(uid, ip): void',
             '+ logLoginFailure(correo, ip): void'
         ]
     )
     
+    # Connectors
+    d.add_connector('actor', 'login_ui', side1='right', side2='left', label="«interacts»")
     d.add_connector('login_ui', 'auth_ctrl', side1='right', side2='left', label="«invokes» POST /login", is_dep=True)
     d.add_connector('login_ui', 'login_req', side1='bottom', side2='top', label="«submits»", is_dep=True)
     d.add_connector('auth_ctrl', 'login_res', side1='bottom', side2='right', label="«returns»", is_dep=True)
+    
     d.add_connector('auth_ctrl', 'empresa', side1='right', side2='left', label="«queries slug»", is_dep=True)
     d.add_connector('auth_ctrl', 'usuario', side1='right', side2='left', label="«validates / updates»", is_dep=True)
     d.add_connector('auth_ctrl', 'sesion', side1='bottom', side2='left', label="«creates session»", is_dep=True, rad=-0.1)
@@ -410,10 +436,23 @@ def generate_clases_cu01(output_dir):
 def generate_clases_cu02(output_dir):
     d = UMLClassDiagram(
         "DIAGRAMA DE CLASES UML - CU-02: REGISTRARSE Y VERIFICAR CORREO",
-        "Realización del Caso de Uso (ICONIX) | Mapeo Boundary-Control-Entity con Esquema PostgreSQL"
+        "Realización del Caso de Uso (ICONIX) | Actor, Boundary, Control y Entities con PostgreSQL"
     )
+    # Actor
     d.add_class(
-        'reg_ui', x=0.12, y_top=0.91, w=0.19,
+        'actor', x=0.065, y_top=0.91, w=0.105,
+        name='Cliente', stereotype='actor',
+        attributes=[
+            '- emailVerificado: bool = false'
+        ],
+        methods=[
+            '+ fillRegistration(): void',
+            '+ submitToken(): void'
+        ]
+    )
+    # Boundaries
+    d.add_class(
+        'reg_ui', x=0.21, y_top=0.91, w=0.165,
         name='RegisterComponent', stereotype='boundary',
         attributes=[
             '- empresa_slug: string = ""',
@@ -428,12 +467,12 @@ def generate_clases_cu02(output_dir):
         methods=[
             '+ ngOnInit(): void',
             '+ onSubmit(): Promise<void>',
-            '+ validatePassword(): boolean',
+            '+ validatePassword(): bool',
             '+ navigateToVerification(): void'
         ]
     )
     d.add_class(
-        'ver_ui', x=0.12, y_top=0.51, w=0.19,
+        'ver_ui', x=0.21, y_top=0.51, w=0.165,
         name='VerifyEmailComponent', stereotype='boundary',
         attributes=[
             '- token: string = ""',
@@ -448,8 +487,9 @@ def generate_clases_cu02(output_dir):
             '+ redirectToLogin(): void'
         ]
     )
+    # Control
     d.add_class(
-        'auth_ctrl', x=0.38, y_top=0.91, w=0.23,
+        'auth_ctrl', x=0.43, y_top=0.91, w=0.22,
         name='AuthService', stereotype='control',
         attributes=[
             '- pool: asyncpg.Pool',
@@ -463,8 +503,9 @@ def generate_clases_cu02(output_dir):
             '+ sendVerificationEmail(email, token): void'
         ]
     )
+    # DTOs
     d.add_class(
-        'reg_req', x=0.12, y_top=0.25, w=0.19,
+        'reg_req', x=0.21, y_top=0.25, w=0.165,
         name='RegisterRequest', stereotype='dto',
         attributes=[
             '+ empresa_slug: str',
@@ -476,7 +517,7 @@ def generate_clases_cu02(output_dir):
         methods=[]
     )
     d.add_class(
-        'ver_req', x=0.38, y_top=0.25, w=0.21,
+        'ver_req', x=0.43, y_top=0.25, w=0.22,
         name='VerifyEmailRequest', stereotype='dto',
         attributes=[
             '+ token: str',
@@ -484,8 +525,9 @@ def generate_clases_cu02(output_dir):
         ],
         methods=[]
     )
+    # Entities
     d.add_class(
-        'empresa', x=0.67, y_top=0.91, w=0.22,
+        'empresa', x=0.70, y_top=0.91, w=0.22,
         name='Empresa', stereotype='entity', table='empresa',
         attributes=[
             '+ id: uuid [PK]',
@@ -500,7 +542,7 @@ def generate_clases_cu02(output_dir):
         ]
     )
     d.add_class(
-        'rol', x=0.91, y_top=0.91, w=0.16,
+        'rol', x=0.91, y_top=0.91, w=0.15,
         name='Rol', stereotype='entity', table='rol',
         attributes=[
             '+ id: uuid [PK]',
@@ -513,7 +555,7 @@ def generate_clases_cu02(output_dir):
         ]
     )
     d.add_class(
-        'usuario', x=0.67, y_top=0.60, w=0.22,
+        'usuario', x=0.70, y_top=0.60, w=0.22,
         name='Usuario', stereotype='entity', table='usuario',
         attributes=[
             '+ id: uuid [PK]',
@@ -522,7 +564,7 @@ def generate_clases_cu02(output_dir):
             '+ nombre: varchar(120)',
             '+ correo: citext',
             '- password_hash: text',
-            '+ email_verificado: boolean = false',
+            '+ email_verificado: bool = false',
             '+ email_verificado_en: timestamptz',
             '+ estado: varchar(20) = "activo"'
         ],
@@ -533,7 +575,7 @@ def generate_clases_cu02(output_dir):
         ]
     )
     d.add_class(
-        'token_ent', x=0.91, y_top=0.60, w=0.17,
+        'token_ent', x=0.91, y_top=0.60, w=0.15,
         name='VerificacionCorreo', stereotype='entity', table='verificacion_correo',
         attributes=[
             '+ id: uuid [PK]',
@@ -545,13 +587,13 @@ def generate_clases_cu02(output_dir):
             '+ creado_en: timestamptz'
         ],
         methods=[
-            '+ createToken(user_id, hash, exp): Verif',
+            '+ createToken(uid, hash, exp): Verif',
             '+ validateActiveToken(hash): Verif',
             '+ markAsConsumed(id): void'
         ]
     )
     d.add_class(
-        'audit', x=0.67, y_top=0.22, w=0.22,
+        'audit', x=0.70, y_top=0.22, w=0.22,
         name='BitacoraAuditoria', stereotype='entity', table='bitacora_auditoria',
         attributes=[
             '+ id: bigserial [PK]',
@@ -564,11 +606,14 @@ def generate_clases_cu02(output_dir):
             '+ ocurrido_en: timestamptz'
         ],
         methods=[
-            '+ logUserRegistration(user_id): void',
-            '+ logEmailVerification(user_id): void'
+            '+ logUserRegistration(uid): void',
+            '+ logEmailVerification(uid): void'
         ]
     )
     
+    # Connectors
+    d.add_connector('actor', 'reg_ui', side1='right', side2='left', label="«registers»")
+    d.add_connector('actor', 'ver_ui', side1='bottom', side2='left', label="«verifies email»", rad=-0.08)
     d.add_connector('reg_ui', 'auth_ctrl', side1='right', side2='left', label="«invokes» POST /register", is_dep=True)
     d.add_connector('ver_ui', 'auth_ctrl', side1='right', side2='bottom', label="«invokes» POST /verify-email", is_dep=True, rad=0.08)
     d.add_connector('reg_ui', 'reg_req', side1='bottom', side2='top', label="«submits»", is_dep=True)
@@ -597,10 +642,23 @@ def generate_clases_cu02(output_dir):
 def generate_clases_cu03(output_dir):
     d = UMLClassDiagram(
         "DIAGRAMA DE CLASES UML - CU-03: GESTIONAR PERFIL Y CAMBIO DE CONTRASEÑA",
-        "Realización del Caso de Uso (ICONIX) | Mapeo Boundary-Control-Entity con Esquema PostgreSQL"
+        "Realización del Caso de Uso (ICONIX) | Actor, Boundary, Control y Entities con PostgreSQL"
+    )
+    # Actor
+    d.add_class(
+        'actor', x=0.065, y_top=0.91, w=0.105,
+        name='Usuario', stereotype='actor',
+        attributes=[
+            '- sesionValida: bool = true'
+        ],
+        methods=[
+            '+ viewProfile(): void',
+            '+ editPersonalData(): void',
+            '+ changePassword(): void'
+        ]
     )
     d.add_class(
-        'profile_ui', x=0.12, y_top=0.91, w=0.19,
+        'profile_ui', x=0.21, y_top=0.91, w=0.165,
         name='ProfileComponent', stereotype='boundary',
         attributes=[
             '- nombre: string = ""',
@@ -620,7 +678,7 @@ def generate_clases_cu03(output_dir):
         ]
     )
     d.add_class(
-        'auth_ctrl', x=0.38, y_top=0.91, w=0.23,
+        'auth_ctrl', x=0.43, y_top=0.91, w=0.22,
         name='AuthService', stereotype='control',
         attributes=[
             '- pool: asyncpg.Pool'
@@ -630,11 +688,11 @@ def generate_clases_cu03(output_dir):
             '+ updateProfile(user_id, data): UserOut',
             '+ changePassword(user_id, data): void',
             '+ verifyPassword(plain, hashed): bool',
-            '+ revokeOtherSessions(user_id, cur_sess): void'
+            '+ revokeOtherSessions(uid, cur_sess): void'
         ]
     )
     d.add_class(
-        'user_upd_req', x=0.12, y_top=0.55, w=0.19,
+        'user_upd_req', x=0.21, y_top=0.55, w=0.165,
         name='UserUpdateRequest', stereotype='dto',
         attributes=[
             '+ nombre: str | None',
@@ -643,7 +701,7 @@ def generate_clases_cu03(output_dir):
         methods=[]
     )
     d.add_class(
-        'pwd_req', x=0.12, y_top=0.38, w=0.19,
+        'pwd_req', x=0.21, y_top=0.38, w=0.165,
         name='ChangePasswordRequest', stereotype='dto',
         attributes=[
             '+ password_actual: str',
@@ -652,18 +710,7 @@ def generate_clases_cu03(output_dir):
         methods=[]
     )
     d.add_class(
-        'user_out', x=0.12, y_top=0.21, w=0.19,
-        name='UserOut', stereotype='dto',
-        attributes=[
-            '+ id: str',
-            '+ nombre: str',
-            '+ correo: str',
-            '+ telefono: str | None'
-        ],
-        methods=[]
-    )
-    d.add_class(
-        'usuario', x=0.68, y_top=0.91, w=0.23,
+        'usuario', x=0.70, y_top=0.91, w=0.22,
         name='Usuario', stereotype='entity', table='usuario',
         attributes=[
             '+ id: uuid [PK]',
@@ -676,12 +723,12 @@ def generate_clases_cu03(output_dir):
         ],
         methods=[
             '+ findById(user_id): Usuario',
-            '+ updatePersonalData(nombre, tel): void',
-            '+ updatePasswordHash(new_hash): void'
+            '+ updatePersonalData(nom, tel): void',
+            '+ updatePasswordHash(hash): void'
         ]
     )
     d.add_class(
-        'sesion', x=0.68, y_top=0.53, w=0.23,
+        'sesion', x=0.70, y_top=0.53, w=0.22,
         name='Sesion', stereotype='entity', table='sesion',
         attributes=[
             '+ id: uuid [PK]',
@@ -689,12 +736,12 @@ def generate_clases_cu03(output_dir):
             '+ revocado_en: timestamptz'
         ],
         methods=[
-            '+ revokeOtherActiveSessions(user_id, cur_id): void',
+            '+ revokeOtherActiveSessions(uid, cur): void',
             '+ getActiveSessions(user_id): list'
         ]
     )
     d.add_class(
-        'audit', x=0.68, y_top=0.24, w=0.23,
+        'audit', x=0.70, y_top=0.24, w=0.22,
         name='BitacoraAuditoria', stereotype='entity', table='bitacora_auditoria',
         attributes=[
             '+ id: bigserial [PK]',
@@ -710,6 +757,7 @@ def generate_clases_cu03(output_dir):
         ]
     )
     
+    d.add_connector('actor', 'profile_ui', side1='right', side2='left', label="«interacts»")
     d.add_connector('profile_ui', 'auth_ctrl', side1='right', side2='left', label="«calls»", is_dep=True)
     d.add_connector('profile_ui', 'user_upd_req', side1='bottom', side2='top', is_dep=True)
     d.add_connector('auth_ctrl', 'usuario', side1='right', side2='left', label="«queries / updates»", is_dep=True)
@@ -731,10 +779,22 @@ def generate_clases_cu03(output_dir):
 def generate_clases_cu04(output_dir):
     d = UMLClassDiagram(
         "DIAGRAMA DE CLASES UML - CU-04: CERRAR SESIÓN Y REFRESCO DE TOKENS",
-        "Realización del Caso de Uso (ICONIX) | Mapeo Boundary-Control-Entity con Esquema PostgreSQL"
+        "Realización del Caso de Uso (ICONIX) | Actor, Boundary, Control y Entities con PostgreSQL"
+    )
+    # Actor
+    d.add_class(
+        'actor', x=0.065, y_top=0.91, w=0.105,
+        name='Usuario', stereotype='actor',
+        attributes=[
+            '- sessionActive: bool'
+        ],
+        methods=[
+            '+ clickLogout(): void',
+            '+ makeApiRequest(): void'
+        ]
     )
     d.add_class(
-        'nav_ui', x=0.13, y_top=0.91, w=0.20,
+        'nav_ui', x=0.21, y_top=0.91, w=0.165,
         name='NavbarComponent', stereotype='boundary',
         attributes=[
             '- currentUser: UserOut | None'
@@ -746,7 +806,7 @@ def generate_clases_cu04(output_dir):
         ]
     )
     d.add_class(
-        'int_ui', x=0.13, y_top=0.64, w=0.20,
+        'int_ui', x=0.21, y_top=0.64, w=0.165,
         name='AuthInterceptor', stereotype='boundary',
         attributes=[
             '- isRefreshing: boolean = false'
@@ -759,7 +819,7 @@ def generate_clases_cu04(output_dir):
         ]
     )
     d.add_class(
-        'ref_req', x=0.13, y_top=0.33, w=0.20,
+        'ref_req', x=0.21, y_top=0.33, w=0.165,
         name='TokenRefreshRequest', stereotype='dto',
         attributes=[
             '+ refresh_token: str'
@@ -767,7 +827,7 @@ def generate_clases_cu04(output_dir):
         methods=[]
     )
     d.add_class(
-        'auth_ctrl', x=0.40, y_top=0.91, w=0.24,
+        'auth_ctrl', x=0.43, y_top=0.91, w=0.22,
         name='AuthService', stereotype='control',
         attributes=[
             '- pool: asyncpg.Pool',
@@ -782,7 +842,7 @@ def generate_clases_cu04(output_dir):
         ]
     )
     d.add_class(
-        'sesion', x=0.70, y_top=0.91, w=0.24,
+        'sesion', x=0.70, y_top=0.91, w=0.22,
         name='Sesion', stereotype='entity', table='sesion',
         attributes=[
             '+ id: uuid [PK]',
@@ -794,11 +854,11 @@ def generate_clases_cu04(output_dir):
         methods=[
             '+ findActiveByHash(hash): Sesion',
             '+ revokeSession(id): void',
-            '+ rotateToken(id, new_hash, new_exp): void'
+            '+ rotateToken(id, hash, exp): void'
         ]
     )
     d.add_class(
-        'usuario', x=0.70, y_top=0.56, w=0.24,
+        'usuario', x=0.70, y_top=0.56, w=0.22,
         name='Usuario', stereotype='entity', table='usuario',
         attributes=[
             '+ id: uuid [PK]',
@@ -811,7 +871,7 @@ def generate_clases_cu04(output_dir):
         ]
     )
     d.add_class(
-        'audit', x=0.70, y_top=0.24, w=0.24,
+        'audit', x=0.70, y_top=0.24, w=0.22,
         name='BitacoraAuditoria', stereotype='entity', table='bitacora_auditoria',
         attributes=[
             '+ id: bigserial [PK]',
@@ -825,6 +885,8 @@ def generate_clases_cu04(output_dir):
         ]
     )
     
+    d.add_connector('actor', 'nav_ui', side1='right', side2='left', label="«clicks logout»")
+    d.add_connector('actor', 'int_ui', side1='bottom', side2='left', label="«triggers 401»", rad=-0.08)
     d.add_connector('nav_ui', 'auth_ctrl', side1='right', side2='left', label="«invokes» POST /logout", is_dep=True)
     d.add_connector('int_ui', 'auth_ctrl', side1='right', side2='bottom', label="«invokes» POST /refresh", is_dep=True, rad=0.08)
     d.add_connector('auth_ctrl', 'sesion', side1='right', side2='left', label="«queries / revokes»", is_dep=True)
@@ -846,10 +908,21 @@ def generate_clases_cu04(output_dir):
 def generate_clases_cu05(output_dir):
     d = UMLClassDiagram(
         "DIAGRAMA DE CLASES UML - CU-05: REGISTRAR AUDITORÍA DEL SISTEMA",
-        "Realización del Caso de Uso (ICONIX) | Mapeo Boundary-Control-Entity con Esquema PostgreSQL"
+        "Realización del Caso de Uso (ICONIX) | Actor, Boundary, Control y Entities con PostgreSQL"
+    )
+    # Actor
+    d.add_class(
+        'actor', x=0.065, y_top=0.91, w=0.105,
+        name='ActorSistema', stereotype='actor',
+        attributes=[
+            '- ipAddress: string'
+        ],
+        methods=[
+            '+ executeOperation(): void'
+        ]
     )
     d.add_class(
-        'http_ui', x=0.13, y_top=0.91, w=0.20,
+        'http_ui', x=0.21, y_top=0.91, w=0.165,
         name='HttpRequestBoundary', stereotype='boundary',
         attributes=[
             '- method: string',
@@ -862,7 +935,7 @@ def generate_clases_cu05(output_dir):
         ]
     )
     d.add_class(
-        'audit_ctx', x=0.13, y_top=0.60, w=0.20,
+        'audit_ctx', x=0.21, y_top=0.60, w=0.165,
         name='AuditContext', stereotype='dto',
         attributes=[
             '+ user_id: str | None',
@@ -873,21 +946,21 @@ def generate_clases_cu05(output_dir):
         methods=[]
     )
     d.add_class(
-        'audit_mw', x=0.40, y_top=0.91, w=0.24,
+        'audit_mw', x=0.43, y_top=0.91, w=0.22,
         name='AuditMiddleware', stereotype='control',
         attributes=[
             '- excluded_paths: list[str]',
             '- pool: asyncpg.Pool'
         ],
         methods=[
-            '+ auditMiddleware(request, call_next): Response',
-            '+ extractClaimsFromJwt(jwt_token): dict',
+            '+ auditMiddleware(req, call_next): Response',
+            '+ extractClaimsFromJwt(jwt): dict',
             '+ redactSensitiveData(payload): dict',
             '+ isExcludedRoute(path): bool'
         ]
     )
     d.add_class(
-        'usuario', x=0.70, y_top=0.91, w=0.24,
+        'usuario', x=0.70, y_top=0.91, w=0.22,
         name='Usuario', stereotype='entity', table='usuario',
         attributes=[
             '+ id: uuid [PK]',
@@ -901,7 +974,7 @@ def generate_clases_cu05(output_dir):
         ]
     )
     d.add_class(
-        'empresa', x=0.70, y_top=0.58, w=0.24,
+        'empresa', x=0.70, y_top=0.58, w=0.22,
         name='Empresa', stereotype='entity', table='empresa',
         attributes=[
             '+ id: uuid [PK]',
@@ -913,7 +986,7 @@ def generate_clases_cu05(output_dir):
         ]
     )
     d.add_class(
-        'audit', x=0.70, y_top=0.25, w=0.24,
+        'audit', x=0.70, y_top=0.25, w=0.22,
         name='BitacoraAuditoria', stereotype='entity', table='bitacora_auditoria',
         attributes=[
             '+ id: bigserial [PK]',
@@ -932,6 +1005,7 @@ def generate_clases_cu05(output_dir):
         ]
     )
     
+    d.add_connector('actor', 'http_ui', side1='right', side2='left', label="«sends HTTP»")
     d.add_connector('http_ui', 'audit_mw', side1='right', side2='left', label="«intercepts HTTP»", is_dep=True)
     d.add_connector('audit_mw', 'usuario', side1='right', side2='left', label="«resolves claims»", is_dep=True)
     d.add_connector('audit_mw', 'empresa', side1='right', side2='left', label="«identifies tenant»", is_dep=True)
@@ -952,10 +1026,22 @@ def generate_clases_cu05(output_dir):
 def generate_clases_cu06(output_dir):
     d = UMLClassDiagram(
         "DIAGRAMA DE CLASES UML - CU-06: GESTIÓN DE PLANES Y REGISTRO DE EMPRESAS SAAS",
-        "Realización del Caso de Uso (ICONIX) | Mapeo Boundary-Control-Entity con Esquema PostgreSQL"
+        "Realización del Caso de Uso (ICONIX) | Actor, Boundary, Control y Entities con PostgreSQL"
+    )
+    # Actor
+    d.add_class(
+        'actor', x=0.065, y_top=0.91, w=0.105,
+        name='Superadmin', stereotype='actor',
+        attributes=[
+            '- isPlatformAdmin: bool = true'
+        ],
+        methods=[
+            '+ configurePlans(): void',
+            '+ onboardCompany(): void'
+        ]
     )
     d.add_class(
-        'planes_ui', x=0.13, y_top=0.91, w=0.20,
+        'planes_ui', x=0.21, y_top=0.91, w=0.165,
         name='PlanesSaaSComponent', stereotype='boundary',
         attributes=[
             '- planes: PlanOut[] = []',
@@ -968,7 +1054,7 @@ def generate_clases_cu06(output_dir):
         ]
     )
     d.add_class(
-        'emp_modal', x=0.13, y_top=0.62, w=0.20,
+        'emp_modal', x=0.21, y_top=0.62, w=0.165,
         name='ModalCrearEmpresa', stereotype='boundary',
         attributes=[
             '- nombre: string = ""',
@@ -983,22 +1069,22 @@ def generate_clases_cu06(output_dir):
         ]
     )
     d.add_class(
-        'saas_service', x=0.40, y_top=0.91, w=0.24,
+        'saas_service', x=0.43, y_top=0.91, w=0.22,
         name='SaaSService', stereotype='control',
         attributes=[
             '- pool: asyncpg.Pool'
         ],
         methods=[
             '+ listPlans(): list[PlanOut]',
-            '+ createPlan(nombre, precio, lims): dict',
-            '+ createEmpresa(data: EmpresaCreateRequest): Response',
+            '+ createPlan(nom, precio, lims): dict',
+            '+ createEmpresa(data): Response',
             '+ generateUniqueSlug(nombre): str',
             '+ seedTenantRoles(empresa_id): void',
-            '+ createTemporaryAdminUser(emp_id, email): dict'
+            '+ createTemporaryAdminUser(id, mail): dict'
         ]
     )
     d.add_class(
-        'plan_ent', x=0.68, y_top=0.91, w=0.21,
+        'plan_ent', x=0.70, y_top=0.91, w=0.22,
         name='PlanSaaS', stereotype='entity', table='plan',
         attributes=[
             '+ id: smallint [PK]',
@@ -1013,7 +1099,7 @@ def generate_clases_cu06(output_dir):
         ]
     )
     d.add_class(
-        'empresa', x=0.68, y_top=0.60, w=0.21,
+        'empresa', x=0.70, y_top=0.60, w=0.22,
         name='Empresa', stereotype='entity', table='empresa',
         attributes=[
             '+ id: uuid [PK]',
@@ -1028,7 +1114,7 @@ def generate_clases_cu06(output_dir):
         ]
     )
     d.add_class(
-        'rol', x=0.91, y_top=0.60, w=0.16,
+        'rol', x=0.91, y_top=0.60, w=0.15,
         name='Rol', stereotype='entity', table='rol',
         attributes=[
             '+ id: uuid [PK]',
@@ -1040,7 +1126,7 @@ def generate_clases_cu06(output_dir):
         ]
     )
     d.add_class(
-        'usuario', x=0.68, y_top=0.24, w=0.21,
+        'usuario', x=0.70, y_top=0.24, w=0.22,
         name='Usuario', stereotype='entity', table='usuario',
         attributes=[
             '+ id: uuid [PK]',
@@ -1055,7 +1141,7 @@ def generate_clases_cu06(output_dir):
         ]
     )
     d.add_class(
-        'audit', x=0.91, y_top=0.24, w=0.16,
+        'audit', x=0.91, y_top=0.24, w=0.15,
         name='BitacoraAuditoria', stereotype='entity', table='bitacora_auditoria',
         attributes=[
             '+ id: bigserial [PK]',
@@ -1067,6 +1153,8 @@ def generate_clases_cu06(output_dir):
         ]
     )
     
+    d.add_connector('actor', 'planes_ui', side1='right', side2='left', label="«manages plans»")
+    d.add_connector('actor', 'emp_modal', side1='bottom', side2='left', label="«creates company»", rad=-0.08)
     d.add_connector('planes_ui', 'saas_service', side1='right', side2='left', label="«calls» listPlans()", is_dep=True)
     d.add_connector('emp_modal', 'saas_service', side1='right', side2='bottom', label="«calls» createEmpresa()", is_dep=True, rad=0.08)
     d.add_connector('saas_service', 'plan_ent', side1='right', side2='left', label="«queries plans»", is_dep=True)
@@ -1090,10 +1178,22 @@ def generate_clases_cu06(output_dir):
 def generate_clases_cu07(output_dir):
     d = UMLClassDiagram(
         "DIAGRAMA DE CLASES UML - CU-07: SUSCRIPCIONES SAAS Y ASIGNACIÓN DE PLANES",
-        "Realización del Caso de Uso (ICONIX) | Mapeo Boundary-Control-Entity con Esquema PostgreSQL"
+        "Realización del Caso de Uso (ICONIX) | Actor, Boundary, Control y Entities con PostgreSQL"
+    )
+    # Actor
+    d.add_class(
+        'actor', x=0.065, y_top=0.91, w=0.105,
+        name='Superadmin', stereotype='actor',
+        attributes=[
+            '- canChangePlans: bool = true'
+        ],
+        methods=[
+            '+ reviewCompanyStatus(): void',
+            '+ assignPlanToTenant(): void'
+        ]
     )
     d.add_class(
-        'suscrip_ui', x=0.13, y_top=0.91, w=0.20,
+        'suscrip_ui', x=0.21, y_top=0.91, w=0.165,
         name='SuscripcionesSaasComponent', stereotype='boundary',
         attributes=[
             '- suscripcionActual: any',
@@ -1106,7 +1206,7 @@ def generate_clases_cu07(output_dir):
         ]
     )
     d.add_class(
-        'modal_plan', x=0.13, y_top=0.62, w=0.20,
+        'modal_plan', x=0.21, y_top=0.62, w=0.165,
         name='ModalAsignarPlan', stereotype='boundary',
         attributes=[
             '- planSeleccionado: string = ""',
@@ -1119,7 +1219,7 @@ def generate_clases_cu07(output_dir):
         ]
     )
     d.add_class(
-        'saas_ctrl', x=0.40, y_top=0.91, w=0.24,
+        'saas_ctrl', x=0.43, y_top=0.91, w=0.22,
         name='CU07SuscripcionesController', stereotype='control',
         attributes=[
             '- pool: asyncpg.Pool'
@@ -1127,12 +1227,12 @@ def generate_clases_cu07(output_dir):
         methods=[
             '+ getSubscription(empresa_id): dict',
             '+ assignSubscription(empresa_id, data): dict',
-            '+ validateDowngradeLimits(empresa_id, plan_id): bool',
+            '+ validateDowngradeLimits(id, plan_id): bool',
             '+ activateTenantAccount(empresa_id): void'
         ]
     )
     d.add_class(
-        'suscrip', x=0.68, y_top=0.91, w=0.21,
+        'suscrip', x=0.70, y_top=0.91, w=0.22,
         name='Suscripcion', stereotype='entity', table='suscripcion',
         attributes=[
             '+ id: uuid [PK]',
@@ -1149,7 +1249,7 @@ def generate_clases_cu07(output_dir):
         ]
     )
     d.add_class(
-        'plan', x=0.91, y_top=0.91, w=0.16,
+        'plan', x=0.91, y_top=0.91, w=0.15,
         name='Plan', stereotype='entity', table='plan',
         attributes=[
             '+ id: smallint [PK]',
@@ -1162,7 +1262,7 @@ def generate_clases_cu07(output_dir):
         ]
     )
     d.add_class(
-        'empresa', x=0.68, y_top=0.55, w=0.21,
+        'empresa', x=0.70, y_top=0.55, w=0.22,
         name='Empresa', stereotype='entity', table='empresa',
         attributes=[
             '+ id: uuid [PK]',
@@ -1173,7 +1273,7 @@ def generate_clases_cu07(output_dir):
         ]
     )
     d.add_class(
-        'sucursal', x=0.91, y_top=0.55, w=0.16,
+        'sucursal', x=0.91, y_top=0.55, w=0.15,
         name='Sucursal', stereotype='entity', table='sucursal',
         attributes=[
             '+ id: uuid [PK]',
@@ -1185,7 +1285,7 @@ def generate_clases_cu07(output_dir):
         ]
     )
     d.add_class(
-        'audit', x=0.68, y_top=0.24, w=0.21,
+        'audit', x=0.70, y_top=0.24, w=0.22,
         name='BitacoraAuditoria', stereotype='entity', table='bitacora_auditoria',
         attributes=[
             '+ id: bigserial [PK]',
@@ -1197,6 +1297,8 @@ def generate_clases_cu07(output_dir):
         ]
     )
     
+    d.add_connector('actor', 'suscrip_ui', side1='right', side2='left', label="«reviews sub»")
+    d.add_connector('actor', 'modal_plan', side1='bottom', side2='left', label="«changes plan»", rad=-0.08)
     d.add_connector('suscrip_ui', 'saas_ctrl', side1='right', side2='left', label="«queries sub»", is_dep=True)
     d.add_connector('modal_plan', 'saas_ctrl', side1='right', side2='bottom', label="«assigns plan»", is_dep=True, rad=0.08)
     d.add_connector('saas_ctrl', 'suscrip', side1='right', side2='left', label="«upserts»", is_dep=True)
@@ -1220,10 +1322,22 @@ def generate_clases_cu07(output_dir):
 def generate_clases_cu08(output_dir):
     d = UMLClassDiagram(
         "DIAGRAMA DE CLASES UML - CU-08: FACTURACIÓN SAAS E HISTORIAL DE FACTURAS",
-        "Realización del Caso de Uso (ICONIX) | Mapeo Boundary-Control-Entity con Esquema PostgreSQL"
+        "Realización del Caso de Uso (ICONIX) | Actor, Boundary, Control y Entities con PostgreSQL"
+    )
+    # Actor
+    d.add_class(
+        'actor', x=0.065, y_top=0.91, w=0.105,
+        name='Administrador', stereotype='actor',
+        attributes=[
+            '- nitEmpresa: string'
+        ],
+        methods=[
+            '+ viewInvoiceHistory(): void',
+            '+ downloadInvoice(): void'
+        ]
     )
     d.add_class(
-        'fact_ui', x=0.13, y_top=0.91, w=0.20,
+        'fact_ui', x=0.21, y_top=0.91, w=0.165,
         name='FacturacionSaasComponent', stereotype='boundary',
         attributes=[
             '- facturas: FacturaSaasOut[] = []',
@@ -1237,7 +1351,7 @@ def generate_clases_cu08(output_dir):
         ]
     )
     d.add_class(
-        'fact_modal', x=0.13, y_top=0.56, w=0.20,
+        'fact_modal', x=0.21, y_top=0.56, w=0.165,
         name='FacturaDetalleModal', stereotype='boundary',
         attributes=[
             '- facturaSeleccionada: any'
@@ -1248,7 +1362,7 @@ def generate_clases_cu08(output_dir):
         ]
     )
     d.add_class(
-        'fact_ctrl', x=0.40, y_top=0.91, w=0.24,
+        'fact_ctrl', x=0.43, y_top=0.91, w=0.22,
         name='CU08FacturacionController', stereotype='control',
         attributes=[
             '- pool: asyncpg.Pool'
@@ -1261,7 +1375,7 @@ def generate_clases_cu08(output_dir):
         ]
     )
     d.add_class(
-        'factura', x=0.68, y_top=0.91, w=0.22,
+        'factura', x=0.70, y_top=0.91, w=0.22,
         name='FacturaSaaS', stereotype='entity', table='factura_saas',
         attributes=[
             '+ id: uuid [PK]',
@@ -1280,7 +1394,7 @@ def generate_clases_cu08(output_dir):
         ]
     )
     d.add_class(
-        'empresa', x=0.68, y_top=0.55, w=0.22,
+        'empresa', x=0.70, y_top=0.55, w=0.22,
         name='Empresa', stereotype='entity', table='empresa',
         attributes=[
             '+ id: uuid [PK]',
@@ -1293,7 +1407,7 @@ def generate_clases_cu08(output_dir):
         ]
     )
     d.add_class(
-        'suscrip', x=0.91, y_top=0.55, w=0.16,
+        'suscrip', x=0.91, y_top=0.55, w=0.15,
         name='Suscripcion', stereotype='entity', table='suscripcion',
         attributes=[
             '+ id: uuid [PK]',
@@ -1304,7 +1418,7 @@ def generate_clases_cu08(output_dir):
         ]
     )
     d.add_class(
-        'audit', x=0.68, y_top=0.24, w=0.22,
+        'audit', x=0.70, y_top=0.24, w=0.22,
         name='BitacoraAuditoria', stereotype='entity', table='bitacora_auditoria',
         attributes=[
             '+ id: bigserial [PK]',
@@ -1316,6 +1430,8 @@ def generate_clases_cu08(output_dir):
         ]
     )
     
+    d.add_connector('actor', 'fact_ui', side1='right', side2='left', label="«consults invoices»")
+    d.add_connector('actor', 'fact_modal', side1='bottom', side2='left', label="«views details»", rad=-0.08)
     d.add_connector('fact_ui', 'fact_ctrl', side1='right', side2='left', label="«lists invoices»", is_dep=True)
     d.add_connector('fact_modal', 'fact_ctrl', side1='right', side2='bottom', label="«downloads receipt»", is_dep=True, rad=0.08)
     d.add_connector('fact_ctrl', 'factura', side1='right', side2='left', label="«queries records»", is_dep=True)
@@ -1337,10 +1453,22 @@ def generate_clases_cu08(output_dir):
 def generate_clases_cu09(output_dir):
     d = UMLClassDiagram(
         "DIAGRAMA DE CLASES UML - CU-09: MÉTRICAS GLOBALES SAAS (DASHBOARD)",
-        "Realización del Caso de Uso (ICONIX) | Mapeo Boundary-Control-Entity con Esquema PostgreSQL"
+        "Realización del Caso de Uso (ICONIX) | Actor, Boundary, Control y Entities con PostgreSQL"
+    )
+    # Actor
+    d.add_class(
+        'actor', x=0.065, y_top=0.91, w=0.105,
+        name='Superadmin', stereotype='actor',
+        attributes=[
+            '- role: str = "superadmin"'
+        ],
+        methods=[
+            '+ viewGlobalKPIs(): void',
+            '+ exportDashboard(): void'
+        ]
     )
     d.add_class(
-        'dash_ui', x=0.13, y_top=0.91, w=0.21,
+        'dash_ui', x=0.21, y_top=0.91, w=0.165,
         name='MetricasDashboardComponent', stereotype='boundary',
         attributes=[
             '- metricsData: MetricasSaaSOut | None',
@@ -1354,7 +1482,7 @@ def generate_clases_cu09(output_dir):
         ]
     )
     d.add_class(
-        'metrics_dto', x=0.13, y_top=0.55, w=0.21,
+        'metrics_dto', x=0.21, y_top=0.55, w=0.165,
         name='MetricasSaaSOut', stereotype='dto',
         attributes=[
             '+ tenants_activos: int',
@@ -1365,7 +1493,7 @@ def generate_clases_cu09(output_dir):
         methods=[]
     )
     d.add_class(
-        'metrics_ctrl', x=0.40, y_top=0.91, w=0.24,
+        'metrics_ctrl', x=0.43, y_top=0.91, w=0.22,
         name='CU09MetricasController', stereotype='control',
         attributes=[
             '- pool: asyncpg.Pool'
@@ -1379,7 +1507,7 @@ def generate_clases_cu09(output_dir):
         ]
     )
     d.add_class(
-        'empresa', x=0.68, y_top=0.91, w=0.21,
+        'empresa', x=0.70, y_top=0.91, w=0.22,
         name='Empresa', stereotype='entity', table='empresa',
         attributes=[
             '+ id: uuid [PK]',
@@ -1391,7 +1519,7 @@ def generate_clases_cu09(output_dir):
         ]
     )
     d.add_class(
-        'usuario', x=0.91, y_top=0.91, w=0.16,
+        'usuario', x=0.91, y_top=0.91, w=0.15,
         name='Usuario', stereotype='entity', table='usuario',
         attributes=[
             '+ id: uuid [PK]',
@@ -1402,7 +1530,7 @@ def generate_clases_cu09(output_dir):
         ]
     )
     d.add_class(
-        'sucursal', x=0.68, y_top=0.55, w=0.21,
+        'sucursal', x=0.70, y_top=0.55, w=0.22,
         name='Sucursal', stereotype='entity', table='sucursal',
         attributes=[
             '+ id: uuid [PK]',
@@ -1413,7 +1541,7 @@ def generate_clases_cu09(output_dir):
         ]
     )
     d.add_class(
-        'suscrip', x=0.91, y_top=0.55, w=0.16,
+        'suscrip', x=0.91, y_top=0.55, w=0.15,
         name='Suscripcion', stereotype='entity', table='suscripcion',
         attributes=[
             '+ id: uuid [PK]',
@@ -1424,7 +1552,7 @@ def generate_clases_cu09(output_dir):
         ]
     )
     d.add_class(
-        'plan', x=0.68, y_top=0.24, w=0.21,
+        'plan', x=0.70, y_top=0.24, w=0.22,
         name='Plan', stereotype='entity', table='plan',
         attributes=[
             '+ id: smallint [PK]',
@@ -1433,6 +1561,7 @@ def generate_clases_cu09(output_dir):
         methods=[]
     )
     
+    d.add_connector('actor', 'dash_ui', side1='right', side2='left', label="«inspects metrics»")
     d.add_connector('dash_ui', 'metrics_ctrl', side1='right', side2='left', label="«fetches metrics»", is_dep=True)
     d.add_connector('dash_ui', 'metrics_dto', side1='bottom', side2='top', is_dep=True)
     d.add_connector('metrics_ctrl', 'empresa', side1='right', side2='left', label="«counts tenants»", is_dep=True)
@@ -1456,10 +1585,22 @@ def generate_clases_cu09(output_dir):
 def generate_clases_cu10(output_dir):
     d = UMLClassDiagram(
         "DIAGRAMA DE CLASES UML - CU-10: GESTIÓN DE EMPLEADOS, USUARIOS Y ROLES",
-        "Realización del Caso de Uso (ICONIX) | Mapeo Boundary-Control-Entity con Esquema PostgreSQL"
+        "Realización del Caso de Uso (ICONIX) | Actor, Boundary, Control y Entities con PostgreSQL"
+    )
+    # Actor
+    d.add_class(
+        'actor', x=0.065, y_top=0.91, w=0.105,
+        name='Administrador', stereotype='actor',
+        attributes=[
+            '- empresa_id: uuid'
+        ],
+        methods=[
+            '+ manageStaff(): void',
+            '+ assignTenantRole(): void'
+        ]
     )
     d.add_class(
-        'emp_ui', x=0.13, y_top=0.91, w=0.20,
+        'emp_ui', x=0.21, y_top=0.91, w=0.165,
         name='GestionEmpleadosComponent', stereotype='boundary',
         attributes=[
             '- empleados: EmpleadoOut[] = []',
@@ -1474,7 +1615,7 @@ def generate_clases_cu10(output_dir):
         ]
     )
     d.add_class(
-        'modal_emp', x=0.13, y_top=0.56, w=0.20,
+        'modal_emp', x=0.21, y_top=0.56, w=0.165,
         name='ModalEmpleadoForm', stereotype='boundary',
         attributes=[
             '- nombre: string = ""',
@@ -1489,7 +1630,7 @@ def generate_clases_cu10(output_dir):
         ]
     )
     d.add_class(
-        'emp_ctrl', x=0.40, y_top=0.91, w=0.24,
+        'emp_ctrl', x=0.43, y_top=0.91, w=0.22,
         name='CU10GestionEmpleadosController', stereotype='control',
         attributes=[
             '- pool: asyncpg.Pool'
@@ -1497,13 +1638,13 @@ def generate_clases_cu10(output_dir):
         methods=[
             '+ listEmployees(empresa_id): list[dict]',
             '+ createEmployee(empresa_id, data): dict',
-            '+ updateEmployee(empresa_id, id, data): dict',
+            '+ updateEmployee(emp_id, id, data): dict',
             '+ validateTenantRoleBR12(role): bool',
-            '+ checkEmailDuplicity(email, emp_id): bool'
+            '+ checkEmailDuplicity(mail, emp_id): bool'
         ]
     )
     d.add_class(
-        'usuario', x=0.68, y_top=0.91, w=0.22,
+        'usuario', x=0.70, y_top=0.91, w=0.22,
         name='Usuario', stereotype='entity', table='usuario',
         attributes=[
             '+ id: uuid [PK]',
@@ -1514,18 +1655,18 @@ def generate_clases_cu10(output_dir):
             '+ correo: citext',
             '- password_hash: text',
             '+ telefono: varchar(20)',
-            '+ email_verificado: boolean = true',
+            '+ email_verificado: bool = true',
             '+ estado: varchar(20) = "activo"'
         ],
         methods=[
             '+ createEmployeeRecord(data): Usuario',
             '+ updateEmployeeData(id, data): void',
-            '+ emailExistsInTenant(email, emp_id): bool',
+            '+ emailExistsInTenant(mail, emp_id): bool',
             '+ deactivateUser(id): void'
         ]
     )
     d.add_class(
-        'rol', x=0.91, y_top=0.91, w=0.16,
+        'rol', x=0.91, y_top=0.91, w=0.15,
         name='Rol', stereotype='entity', table='rol',
         attributes=[
             '+ id: uuid [PK]',
@@ -1539,7 +1680,7 @@ def generate_clases_cu10(output_dir):
         ]
     )
     d.add_class(
-        'empresa', x=0.68, y_top=0.55, w=0.22,
+        'empresa', x=0.70, y_top=0.55, w=0.22,
         name='Empresa', stereotype='entity', table='empresa',
         attributes=[
             '+ id: uuid [PK]',
@@ -1549,7 +1690,7 @@ def generate_clases_cu10(output_dir):
         methods=[]
     )
     d.add_class(
-        'sucursal', x=0.91, y_top=0.55, w=0.16,
+        'sucursal', x=0.91, y_top=0.55, w=0.15,
         name='Sucursal', stereotype='entity', table='sucursal',
         attributes=[
             '+ id: uuid [PK]',
@@ -1561,7 +1702,7 @@ def generate_clases_cu10(output_dir):
         ]
     )
     d.add_class(
-        'audit', x=0.68, y_top=0.24, w=0.22,
+        'audit', x=0.70, y_top=0.24, w=0.22,
         name='BitacoraAuditoria', stereotype='entity', table='bitacora_auditoria',
         attributes=[
             '+ id: bigserial [PK]',
@@ -1576,8 +1717,10 @@ def generate_clases_cu10(output_dir):
         ]
     )
     
-    d.add_connector('emp_ui', 'emp_ctrl', side1='right', side2='left', label="«manages staff»", is_dep=True)
-    d.add_connector('modal_emp', 'emp_ctrl', side1='right', side2='bottom', label="«creates employee»", is_dep=True, rad=0.08)
+    d.add_connector('actor', 'emp_ui', side1='right', side2='left', label="«manages staff»")
+    d.add_connector('actor', 'modal_emp', side1='bottom', side2='left', label="«creates employee»", rad=-0.08)
+    d.add_connector('emp_ui', 'emp_ctrl', side1='right', side2='left', label="«lists employees»", is_dep=True)
+    d.add_connector('modal_emp', 'emp_ctrl', side1='right', side2='bottom', label="«submits employee»", is_dep=True, rad=0.08)
     d.add_connector('emp_ctrl', 'usuario', side1='right', side2='left', label="«inserts / updates»", is_dep=True)
     d.add_connector('emp_ctrl', 'rol', side1='right', side2='left', label="«checks BR-12»", is_dep=True, rad=0.06)
     d.add_connector('emp_ctrl', 'audit', side1='bottom', side2='left', label="«audits staff changes»", is_dep=True, rad=-0.12)
@@ -1608,4 +1751,4 @@ if __name__ == '__main__':
     generate_clases_cu09(out_dir)
     generate_clases_cu10(out_dir)
     
-    print("Class diagrams for CU-01 to CU-10 generated successfully!")
+    print("Class diagrams for CU-01 to CU-10 generated successfully with Actors!")
