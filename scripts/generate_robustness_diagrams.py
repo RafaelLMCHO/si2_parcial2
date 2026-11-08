@@ -408,6 +408,59 @@ def generate_cu05(output_dir):
     print(f"Generated: {png_path}")
 
 # -------------------------------------------------------------
+# CU-06
+# -------------------------------------------------------------
+def generate_cu06(output_dir):
+    fig, ax = setup_canvas(
+        "DIAGRAMA DE ROBUSTEZ - CU-06: GESTIÓN DE PLANES Y REGISTRO DE EMPRESAS SAAS",
+        "Boundaries: PlanesSaaSComponent, ModalCrearEmpresa | Controllers: listar_planes(), create_empresa() | Entities: PlanSaaS, Empresa, Rol, Usuario, BitacoraAuditoria",
+        width=16, height=10
+    )
+    
+    # Actor
+    draw_actor(ax, 0.09, 0.50, "Superadmin", "Admin SaaS")
+    
+    # Boundaries
+    draw_boundary(ax, 0.28, 0.70, "PlanesSaaSComponent", "planes-saas.component.html")
+    draw_boundary(ax, 0.28, 0.32, "ModalCrearEmpresa", "empresa-modal.component.html")
+    
+    # Controllers
+    draw_controller(ax, 0.52, 0.70, "listar_planes()", "cu06_planes_ctrl.py")
+    draw_controller(ax, 0.52, 0.32, "create_empresa()", "saas_service.py")
+    
+    # Entities
+    draw_entity(ax, 0.86, 0.82, "PlanSaaS", "db / plan_saas")
+    draw_entity(ax, 0.86, 0.65, "Empresa", "db / empresa")
+    draw_entity(ax, 0.86, 0.48, "Rol", "db / rol y permiso")
+    draw_entity(ax, 0.86, 0.31, "Usuario", "db / usuario")
+    draw_entity(ax, 0.86, 0.14, "BitacoraAuditoria", "db / bitacora")
+    
+    # Actor -> Boundaries
+    draw_actor_link(ax, 0.15, 0.53, 0.205, 0.70)
+    draw_actor_link(ax, 0.15, 0.47, 0.205, 0.32)
+    
+    # Boundaries -> Controllers
+    draw_call_arrow(ax, 0.355, 0.70, 0.445, 0.70, "GET /api/v1/saas/planes\n(listar catálogo)")
+    draw_call_arrow(ax, 0.355, 0.32, 0.445, 0.32, "POST /api/v1/saas/empresas\n(onboarding tenant)")
+    
+    # listar_planes() -> Entities
+    draw_crud_arrow(ax, 0.595, 0.72, 0.795, 0.82, "GET", "consultar planes y cuotas", rad=-0.03, offset_y=0.02)
+    
+    # create_empresa() -> Entities
+    draw_crud_arrow(ax, 0.595, 0.38, 0.795, 0.65, "GET", "verificar unicidad NIT y correo", rad=-0.06, offset_y=0.025)
+    draw_crud_arrow(ax, 0.595, 0.35, 0.795, 0.63, "POST", "insertar empresa (pendiente_plan)", rad=-0.04, offset_y=0.02)
+    draw_crud_arrow(ax, 0.595, 0.32, 0.795, 0.48, "POST", "crear roles base y asignar permisos", rad=-0.01, offset_y=0.02)
+    draw_crud_arrow(ax, 0.595, 0.29, 0.795, 0.31, "POST", "crear usuario admin tenant (pwd temp)", rad=0.03, offset_y=-0.02)
+    draw_crud_arrow(ax, 0.595, 0.26, 0.795, 0.14, "POST", "registrar auditoría superadmin", rad=0.07, offset_y=-0.025)
+    
+    png_path = os.path.join(output_dir, "cu06_gestion_planes.png")
+    svg_path = os.path.join(output_dir, "cu06_gestion_planes.svg")
+    fig.savefig(png_path, bbox_inches='tight')
+    fig.savefig(svg_path, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Generated: {png_path}")
+
+# -------------------------------------------------------------
 # CU-17
 # -------------------------------------------------------------
 def generate_cu17(output_dir):
@@ -1552,6 +1605,7 @@ if __name__ == '__main__':
     generate_cu03(out_dir)
     generate_cu04(out_dir)
     generate_cu05(out_dir)
+    generate_cu06(out_dir)
     generate_cu17(out_dir)
     generate_cu18(out_dir)
     generate_cu19(out_dir)
