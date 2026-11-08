@@ -1750,5 +1750,49 @@ if __name__ == '__main__':
     generate_clases_cu08(out_dir)
     generate_clases_cu09(out_dir)
     generate_clases_cu10(out_dir)
+
+    # CU-11 to CU-23
+    from class_diagrams_cu11_cu23 import (
+        generate_clases_cu11, generate_clases_cu12, generate_clases_cu13,
+        generate_clases_cu14, generate_clases_cu15, generate_clases_cu16,
+        generate_clases_cu17, generate_clases_cu18, generate_clases_cu19,
+        generate_clases_cu20, generate_clases_cu21, generate_clases_cu22,
+        generate_clases_cu23
+    )
+    generate_clases_cu11(out_dir)
+    generate_clases_cu12(out_dir)
+    generate_clases_cu13(out_dir)
+    generate_clases_cu14(out_dir)
+    generate_clases_cu15(out_dir)
+    generate_clases_cu16(out_dir)
+    generate_clases_cu17(out_dir)
+    generate_clases_cu18(out_dir)
+    generate_clases_cu19(out_dir)
+    generate_clases_cu20(out_dir)
+    generate_clases_cu21(out_dir)
+    generate_clases_cu22(out_dir)
+    generate_clases_cu23(out_dir)
+
+    # CU-24 to CU-36
+    from class_diagrams_cu24_cu36 import (
+        generate_clases_cu24, generate_clases_cu25, generate_clases_cu26,
+        generate_clases_cu27, generate_clases_cu28, generate_clases_cu29,
+        generate_clases_cu30, generate_clases_cu31, generate_clases_cu32,
+        generate_clases_cu33, generate_clases_cu34, generate_clases_cu35,
+        generate_clases_cu36
+    )
+    generate_clases_cu24(out_dir)
+    generate_clases_cu25(out_dir)
+    generate_clases_cu26(out_dir)
+    generate_clases_cu27(out_dir)
+    generate_clases_cu28(out_dir)
+    generate_clases_cu29(out_dir)
+    generate_clases_cu30(out_dir)
+    generate_clases_cu31(out_dir)
+    generate_clases_cu32(out_dir)
+    generate_clases_cu33(out_dir)
+    generate_clases_cu34(out_dir)
+    generate_clases_cu35(out_dir)
+    generate_clases_cu36(out_dir)
     
-    print("Class diagrams for CU-01 to CU-10 generated successfully with Actors!")
+    print("Class diagrams for CU-01 to CU-36 generated successfully with Actors!")
