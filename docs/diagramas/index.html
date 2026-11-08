@@ -173,6 +173,7 @@
       <div class="nav-links">
         <a href="#secuencia" class="nav-btn nav-btn-seq">Ir a Diagramas de Secuencia</a>
         <a href="#robustez" class="nav-btn nav-btn-rob">Ir a Diagramas de Robustez</a>
+        <a href="#clases" class="nav-btn" style="background: #9333ea; color: #ffffff;">Ir a Diagramas de Clases</a>
       </div>
     </header>
 
@@ -619,6 +620,46 @@
         </div>
         <div class="img-wrapper">
           <img src="secuencia_cu36_vestidor_virtual_ra.png" alt="Secuencia CU-36 Vestidor Virtual RA">
+        </div>
+      </div>
+
+    </div>
+
+    <!-- SECCIÓN: DIAGRAMAS DE CLASES UML (REALIZACIÓN DE CASOS DE USO) -->
+    <h2 id="clases" class="section-title" style="color: #9333ea; border-left: 5px solid #9333ea; padding-left: 0.75rem;">Diagramas de Clases UML por Caso de Uso (ICONIX)</h2>
+    <div class="grid">
+
+      <!-- CLASES CU-01 -->
+      <div class="card" style="border-top: 3px solid #9333ea;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-01: Iniciar Sesión (Login)</h3>
+            <div class="card-desc">Boundary: LoginComponent | Control: AuthService | Schemas: LoginRequest, LoginResponse | Entities BD: Empresa, Suscripcion, Rol, Usuario, Sesion, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="diagrama de clases/clases_cu01_iniciar_sesion.png" download class="btn" style="background:#9333ea; color:#fff;">Descargar PNG</a>
+            <a href="diagrama de clases/clases_cu01_iniciar_sesion.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="diagrama de clases/clases_cu01_iniciar_sesion.png" alt="Diagrama de Clases CU-01 Iniciar Sesión">
+        </div>
+      </div>
+
+      <!-- CLASES CU-02 -->
+      <div class="card" style="border-top: 3px solid #9333ea;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">CU-02: Registrarse y Verificar Correo</h3>
+            <div class="card-desc">Boundaries: RegisterComponent, VerifyEmailComponent | Control: AuthService | Schemas: RegisterRequest, VerifyEmailRequest | Entities BD: Empresa, Rol, Usuario, VerificacionCorreo, BitacoraAuditoria</div>
+          </div>
+          <div class="actions">
+            <a href="diagrama de clases/clases_cu02_registrarse.png" download class="btn" style="background:#9333ea; color:#fff;">Descargar PNG</a>
+            <a href="diagrama de clases/clases_cu02_registrarse.svg" download class="btn btn-outline">Descargar SVG</a>
+          </div>
+        </div>
+        <div class="img-wrapper">
+          <img src="diagrama de clases/clases_cu02_registrarse.png" alt="Diagrama de Clases CU-02 Registrarse">
         </div>
       </div>
 
