@@ -76,3 +76,36 @@ async def finalizar_sesion_vestidor(
         conn, user.empresa_id, sesion_id, payload
     )
 
+
+# ---------------------------------------------------------------------------
+# CU-36: Decart Lucy VTON 3.6 - Streaming de Realidad Virtual Generativa
+# ---------------------------------------------------------------------------
+
+@router.post("/lucy-session")
+async def get_lucy_session(
+    user: CurrentUser = Depends(require_permission("catalogo:leer")),
+    conn=Depends(get_conn),
+) -> Dict[str, Any]:
+    """CU-36: Genera credenciales de streaming WebRTC para el modelo Decart Lucy VTON 3.6."""
+    return await vestidor_ar_service.obtener_sesion_decart_lucy(
+        conn, user.empresa_id, user.user_id
+    )
+
+
+@router.post("/lucy-prompt")
+async def get_lucy_prompt(
+    payload: Dict[str, Any],
+    user: CurrentUser = Depends(require_permission("catalogo:leer")),
+    conn=Depends(get_conn),
+) -> Dict[str, Any]:
+    """CU-36: Compila el prompt fotorrealista y la imagen de referencia para Decart Lucy VTON."""
+    prenda_id = UUID(str(payload.get("prenda_id")))
+    return await vestidor_ar_service.preparar_prompt_lucy_vton(
+        conn,
+        user.empresa_id,
+        prenda_id,
+        color_nombre=payload.get("color_nombre"),
+        color_hex=payload.get("color_hex"),
+        talla=payload.get("talla"),
+    )
+

@@ -28,3 +28,18 @@ export const tenantAdminGuard: CanActivateFn = () => {
     ? true
     : router.createUrlTree(['/profile']);
 };
+
+export const adminOrSuperadminGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  const user = auth.user();
+
+  if (!auth.isAuthenticated()) {
+    return router.createUrlTree(['/login']);
+  }
+  const isSuperadmin = user?.rol === 'superadmin' && !user.empresa_id;
+  const isTenantAdmin = user?.rol === 'administrador' && !!user.empresa_id;
+  return isSuperadmin || isTenantAdmin
+    ? true
+    : router.createUrlTree(['/profile']);
+};

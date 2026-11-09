@@ -37,6 +37,7 @@ from .cu33_reportes_convencionales_controller import CU33ReportesConvencionalesC
 from .cu34_reporte_generativo_ia_controller import CU34ReporteGenerativoIaController
 from .cu35_dashboard_analitico_ml_controller import CU35DashboardAnaliticoMlController
 from .cu36_vestidor_virtual_ra_controller import CU36VestidorVirtualRaController
+from .cu37_gestion_backups_controller import CU37GestionBackupsController
 
 __all__ = [
     "CU01RegistroInquilinoController",
@@ -75,4 +76,5 @@ __all__ = [
     "CU34ReporteGenerativoIaController",
     "CU35DashboardAnaliticoMlController",
     "CU36VestidorVirtualRaController",
+    "CU37GestionBackupsController",
 ]

@@ -13,6 +13,7 @@
           <a routerLink="/saas/facturacion">Facturación (CU-08)</a>
           <a routerLink="/saas/metricas">Métricas (CU-09)</a>
           <a routerLink="/auditoria">Auditoría (CU-05)</a>
+          <a routerLink="/saas/backups">Backups (CU-37)</a>
         }
         @if (user.rol === 'administrador' && user.empresa_id) {
           <a routerLink="/mi-suscripcion">Suscripción (CU-07)</a>
@@ -55,6 +56,7 @@
           </div>
 
           <a routerLink="/vestidor-virtual">Vestidor RA (CU-36)</a>
+          <a routerLink="/backups">Backups (CU-37)</a>
         }
         @if (user.rol === 'cajero' || user.rol === 'encargado') {
           <a routerLink="/inventario">Inventario (CU-17)</a>
@@ -99,6 +101,8 @@
           <a routerLink="/offline/cambio" class="sub-chip">CU-29 Off-QR</a>
           <a routerLink="/offline/cola" class="sub-chip">CU-30/31 Sincronización</a>
           <a routerLink="/offline/conflictos" class="sub-chip">CU-32 Conflictos</a>
+          <span class="sub-sep">|</span>
+          <a routerLink="/backups" class="sub-chip">CU-37 Backups (Nube & Local)</a>
         </div>
       </div>
     }

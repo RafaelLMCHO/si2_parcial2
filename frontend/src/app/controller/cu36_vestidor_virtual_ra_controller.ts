@@ -35,6 +35,34 @@ export interface IniciarSesionArResponse {
   iniciada_en: string;
 }
 
+export interface DecartLucySessionResponse {
+  motor: string;
+  modelo: string;
+  token: string;
+  stream_url: string;
+  fps: number;
+  resolucion: string;
+  latencia_estimada_ms: number;
+  estado: string;
+}
+
+export interface DecartLucyPromptPayload {
+  prenda_id: string;
+  color_nombre?: string;
+  color_hex?: string;
+  talla?: string;
+}
+
+export interface DecartLucyPromptResponse {
+  prenda_id: string;
+  prenda_nombre: string;
+  prompt: string;
+  image_url: string;
+  color_hex: string;
+  speed: string;
+  model: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CU36VestidorVirtualRaController {
   private http = inject(HttpClient);
@@ -68,6 +96,15 @@ export class CU36VestidorVirtualRaController {
       `${this.baseUrl}/sesiones/${sesionId}`,
       payload
     );
+  }
+
+  // --- MÉTODOS DECART LUCY VTON 3.6 ---
+  obtenerSesionDecartLucy(): Observable<DecartLucySessionResponse> {
+    return this.http.post<DecartLucySessionResponse>(`${this.baseUrl}/lucy-session`, {});
+  }
+
+  prepararPromptDecartLucy(payload: DecartLucyPromptPayload): Observable<DecartLucyPromptResponse> {
+    return this.http.post<DecartLucyPromptResponse>(`${this.baseUrl}/lucy-prompt`, payload);
   }
 }
 

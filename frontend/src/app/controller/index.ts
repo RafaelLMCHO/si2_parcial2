@@ -35,3 +35,4 @@ export * from './cu33_reportes_convencionales_controller';
 export * from './cu34_reporte_generativo_ia_controller';
 export * from './cu35_dashboard_analitico_ml_controller';
 export * from './cu36_vestidor_virtual_ra_controller';
+export * from './cu37_gestion_backups_controller';

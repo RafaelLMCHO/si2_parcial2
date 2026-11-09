@@ -18,3 +18,13 @@ def require_tenant_admin(
     if current.empresa_id is None or current.rol != "administrador":
         raise api_error(403, "ADMINISTRADOR_REQUERIDO", "Se requiere rol Administrador de Empresa")
     return current
+
+
+def require_admin_or_superadmin(
+    current: CurrentUser = Depends(get_current_user),
+) -> CurrentUser:
+    if current.rol == "superadmin" and current.empresa_id is None:
+        return current
+    if current.rol == "administrador" and current.empresa_id is not None:
+        return current
+    raise api_error(403, "NO_AUTORIZADO", "Se requiere rol Superadministrador o Administrador de Empresa")

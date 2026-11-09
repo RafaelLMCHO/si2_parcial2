@@ -1,11 +1,13 @@
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers import (
     auth,
+    backups,
     carrito,
     catalogo,
     checkout,
@@ -37,11 +39,32 @@ logging.basicConfig(
 settings = get_settings()
 
 
+async def _backup_scheduler_loop() -> None:
+    logger = logging.getLogger("backup_scheduler")
+    while True:
+        try:
+            await asyncio.sleep(30)
+            from app.services.backup_service import BackupService
+            executed = await BackupService.run_scheduled_backups()
+            if executed:
+                logger.info("Backups automaticos ejecutados exitosamente: %s", executed)
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("Error en ciclo de backups automaticos")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await init_pool()
-    yield
-    await close_pool()
+    scheduler_task = asyncio.create_task(_backup_scheduler_loop())
+    try:
+        yield
+    finally:
+        scheduler_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await scheduler_task
+        await close_pool()
 
 
 app = FastAPI(
@@ -88,6 +111,9 @@ app.include_router(sync.router, prefix=settings.api_prefix)
 app.include_router(reportes.router, prefix=settings.api_prefix)
 app.include_router(inteligencia.router, prefix=settings.api_prefix)
 app.include_router(vestidor.router, prefix=settings.api_prefix)
+
+# Módulo CU-37: Gestión de Backups (Personalizado, Automático, Manual / Localhost y Nube)
+app.include_router(backups.router, prefix=settings.api_prefix)
 
 
 @app.get("/health", tags=["Sistema"])

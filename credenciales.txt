@@ -1,0 +1,108 @@
+================================================================================
+                    CREDENCIALES DE ACCESO - FASHIONSTORE
+================================================================================
+
+URLs DE ACCESO LOCAL:
+--------------------------------------------------------------------------------
+- Aplicación Web (Frontend): http://localhost:4200
+- API Backend (FastAPI Docs): http://localhost:8000/docs
+
+
+================================================================================
+1. PLATAFORMA GLOBAL / SUPERADMIN
+================================================================================
+Permite gestionar la plataforma SaaS multi-inquilino, empresas/tenants, métricas 
+globales y backups centralizados de todo el sistema.
+
+- Rol:                Superadmin
+- Empresa / Tenant:   (DEJAR VACÍO en el formulario de login)
+- Correo Electrónico: superadmin@fashionstore.com   (o superadmin@fashionstore.test)
+- Contraseña:         Admin1234!                   (o Superadmin123!)
+- Vistas Principales: Panel SaaS Global (/saas), Gestión de Tenants, Auditoría
+                      y Backups Globales (/saas/backups)
+
+
+================================================================================
+2. EMPRESA PRINCIPAL DEMO (FashionStore Demo S.R.L.)
+================================================================================
+Empresa predeterminada con catálogo, prendas, inventario, variantes y sucursales.
+Slug de empresa a ingresar: demo
+
+--------------------------------------------------------------------------------
+A) ADMINISTRADOR DE TENANT (Para configurar Backups, Catálogo, IA, etc.)
+--------------------------------------------------------------------------------
+- Empresa / Tenant:   demo
+- Rol:                Administrador
+- Correo Electrónico: admin@demo.com               (o admin@demo.test)
+- Contraseña:         Admin1234!                   (o Admin123!)
+- Vistas Principales: Catálogo de prendas, Inventario multi-sucursal, Reportes IA,
+                      Gestión de Empleados, Configuración del Tenant y
+                      Gestión de Backups Localhost/Nube (/backups)
+
+--------------------------------------------------------------------------------
+B) ENCARGADO DE SUCURSAL
+--------------------------------------------------------------------------------
+- Empresa / Tenant:   demo
+- Rol:                Encargado
+- Correo Electrónico: encargado@demo.com           (o encargado@demo.test)
+- Contraseña:         Admin1234!                   (o Encargado123!)
+- Vistas Principales: Inventario de sucursal, Recepción de stock, Traslados
+                      y Gestión de Reservas
+
+--------------------------------------------------------------------------------
+C) CAJERO (Punto de Venta)
+--------------------------------------------------------------------------------
+- Empresa / Tenant:   demo
+- Rol:                Cajero
+- Correo Electrónico: cajero@demo.com              (o cajero@demo.test)
+- Contraseña:         Admin1234!                   (o Cajero123!)
+- Vistas Principales: Punto de Venta POS (/pos), Cobro en Mostrador 
+                      (Efectivo con cálculo de cambio, Tarjeta y QR bancario)
+
+--------------------------------------------------------------------------------
+D) CLIENTE E-COMMERCE (Catálogo y Compras)
+--------------------------------------------------------------------------------
+- Empresa / Tenant:   demo
+- Rol:                Cliente
+- Correo Electrónico: cliente@demo.com             (o cliente@demo.test)
+- Contraseña:         Admin1234!                   (o Cliente123!)
+- Vistas Principales: Catálogo digital de compras, Carrito, Proceso de Checkout
+                      con pasarela Stripe Sandbox (/checkout)
+
+
+================================================================================
+3. OTRAS EMPRESAS MULTI-TENANT (AISLAMIENTO RLS)
+================================================================================
+Cuentas para validar el aislamiento estricto de datos entre empresas:
+Todas admiten la contraseña estándar: Admin1234! (o Admin123!)
+
+A) ZARA BOLIVIA (Slug de empresa: zara)
+- Administrador: admin@zara.bo      | Password: Admin1234! (o Admin123!)
+- Cajero:        cajero@zara.bo     | Password: Admin1234! (o Cajero123!)
+- Encargado:     encargado@zara.bo  | Password: Admin1234! (o Encargado123!)
+- Cliente:       cliente@zara.bo    | Password: Admin1234! (o Cliente123!)
+
+B) MANGO URBAN FASHION (Slug de empresa: mango)
+- Administrador: admin@mango.bo     | Password: Admin1234! (o Admin123!)
+- Cajero:        cajero@mango.bo    | Password: Admin1234! (o Cajero123!)
+
+C) H&M BOLIVIA RETAIL (Slug de empresa: hm)
+- Administrador: admin@hm.bo        | Password: Admin1234! (o Admin123!)
+- Cajero:        cajero@hm.bo       | Password: Admin1234! (o Cajero123!)
+
+D) PULL&BEAR STREETWEAR (Slug de empresa: pullbear)
+- Administrador: admin@pullbear.bo  | Password: Admin1234! (o Admin123!)
+- Cajero:        cajero@pullbear.bo | Password: Admin1234! (o Cajero123!)
+
+E) BERSHKA TEENS BOLIVIA (Slug de empresa: bershka)
+- Administrador: admin@bershka.bo   | Password: Admin1234! (o Admin123!)
+- Cajero:        cajero@bershka.bo  | Password: Admin1234! (o Cajero123!)
+
+
+================================================================================
+4. DATOS DE TARJETA DE PRUEBA (STRIPE SANDBOX - CU-24)
+================================================================================
+- Número de Tarjeta:  4242 4242 4242 4242
+- Expiración:         Cualquier fecha futura (ej. 12/28)
+- CVC:                Cualquier número de 3 dígitos (ej. 123)
+================================================================================

@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { authGuard, guestGuard } from './core/auth.guard';
-import { superadminGuard, tenantAdminGuard } from './core/saas.guard';
+import { adminOrSuperadminGuard, superadminGuard, tenantAdminGuard } from './core/saas.guard';
 
 export const routes: Routes = [
   {
@@ -263,6 +263,18 @@ export const routes: Routes = [
       import('./features/vestidor-virtual/vestidor-virtual.component').then(
         (m) => m.VestidorVirtualComponent,
       ),
+  },
+  {
+    path: 'saas/backups',
+    canActivate: [superadminGuard],
+    loadComponent: () =>
+      import('./features/backups/backups.component').then((m) => m.BackupsComponent),
+  },
+  {
+    path: 'backups',
+    canActivate: [adminOrSuperadminGuard],
+    loadComponent: () =>
+      import('./features/backups/backups.component').then((m) => m.BackupsComponent),
   },
   {
     path: '**',

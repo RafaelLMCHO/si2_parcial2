@@ -17,3 +17,4 @@ frontend/.angular/
 ~$*
 .DS_Store
 Thumbs.db
+backend/storage/backups/

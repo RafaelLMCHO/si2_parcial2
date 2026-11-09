@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     trusted_proxies: str = ""
     expose_verification_token: bool = True
     email_backend: str = "console"
+    decart_api_key: str = ""
+    decart_model: str = "lucy-vton-3.6"
+    decart_api_url: str = "https://api.decart.ai/v1"
 
 
 @lru_cache
