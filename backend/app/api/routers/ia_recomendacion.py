@@ -87,3 +87,4 @@ async def tendencias_temporada(
         prompt="Tendencia actual de alta costura, look sofisticado y moderno",
         genero=genero,
     )
+

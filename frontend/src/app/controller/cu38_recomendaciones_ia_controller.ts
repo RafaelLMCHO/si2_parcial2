@@ -121,3 +121,4 @@ export class CU38RecomendacionesIaController {
     this.modalAbierto.set(false);
   }
 }
+

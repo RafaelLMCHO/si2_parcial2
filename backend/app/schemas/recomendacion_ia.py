@@ -72,3 +72,4 @@ class OutfitParaPrendaRequest(BaseModel):
         description="Ocasión: casual, noche, oficina, fiesta",
     )
     empresa_slug: Optional[str] = Field(None, description="Slug del tenant")
+
