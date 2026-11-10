@@ -27,6 +27,7 @@ from app.api.routers import (
     reportes,
     inteligencia,
     vestidor,
+    ia_recomendacion,
 )
 from app.core.config import get_settings
 from app.db import close_pool, get_pool, init_pool
@@ -116,6 +117,9 @@ app.include_router(vestidor.router, prefix=settings.api_prefix)
 
 # Módulo CU-37: Gestión de Backups (Personalizado, Automático, Manual / Localhost y Nube)
 app.include_router(backups.router, prefix=settings.api_prefix)
+
+# Módulo Extra CU-38: Recomendaciones IA para Catálogos (Personal Stylist & Outfits)
+app.include_router(ia_recomendacion.router, prefix=settings.api_prefix)
 
 
 @app.get("/health", tags=["Sistema"])
