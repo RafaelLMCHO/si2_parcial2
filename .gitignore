@@ -5,6 +5,7 @@ __pycache__/
 .venv/
 venv/
 backend/.env
+backend/.env.*
 
 # Node / Angular
 frontend/node_modules/
@@ -14,6 +15,7 @@ frontend/.angular/
 # Logs / temporales
 *.log
 *.tmp
+supabase_dump*.sql
 ~$*
 .DS_Store
 Thumbs.db
