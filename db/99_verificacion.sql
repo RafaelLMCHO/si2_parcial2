@@ -19,8 +19,8 @@ BEGIN
        AND c.relkind = 'p'
        AND c.relispartition = false;
 
-    IF v_tablas <> 60 THEN
-        RAISE EXCEPTION 'Se esperaban 60 tablas, se encontraron %', v_tablas;
+    IF v_tablas <> 62 THEN
+        RAISE EXCEPTION 'Se esperaban 62 tablas, se encontraron %', v_tablas;
     END IF;
 
     IF v_particionadas <> 3 THEN
