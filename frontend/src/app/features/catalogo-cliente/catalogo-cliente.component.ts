@@ -9,6 +9,7 @@ import { NetworkService } from '../../core/network.service';
 import { CheckoutService } from '../../core/checkout.service';
 import { AuthService } from '../../core/auth.service';
 import { SessionStoreService } from '../../core/session-store.service';
+import { CU38RecomendacionesIaController, OutfitRecomendado } from '../../controller/cu38_recomendaciones_ia_controller';
 
 @Component({
   selector: 'app-catalogo-cliente',
@@ -98,6 +99,60 @@ import { SessionStoreService } from '../../core/session-store.service';
           }
         </div>
       </nav>
+
+      <!-- SECCIÓN BOUTIQUE AI STYLIST (CU-38: ASESOR PERSONAL DE MODA) -->
+      <section class="ai-stylist-banner">
+        <div class="stylist-inner">
+          <div class="stylist-badge">
+            <span class="sparkle-icon">✨</span>
+            <span class="badge-text">PERSONAL STYLIST IA (CU-38)</span>
+          </div>
+          <h2 class="stylist-title">¿Para qué ocasión buscas tu outfit hoy?</h2>
+          <p class="stylist-subtitle">Nuestra inteligencia artificial analiza las prendas disponibles del catálogo y crea combinaciones con armonía de corte, colorimetría y temporada.</p>
+
+          <!-- Chips de Ocasión Rápida -->
+          <div class="stylist-chips-row">
+            <button type="button" class="stylist-chip" (click)="consultarOutfitIa('Cena elegante de noche en Santa Cruz')">
+              🍸 Cena Romántica
+            </button>
+            <button type="button" class="stylist-chip" (click)="consultarOutfitIa('Look profesional para oficina y reuniones ejecutivas')">
+              💼 Oficina & Negocios
+            </button>
+            <button type="button" class="stylist-chip" (click)="consultarOutfitIa('Outfit fresco de verano para clima caluroso')">
+              ☀️ Verano Fresco
+            </button>
+            <button type="button" class="stylist-chip" (click)="consultarOutfitIa('Fiesta de gala o celebración formal de noche')">
+              🎉 Fiesta & Gala
+            </button>
+            <button type="button" class="stylist-chip" (click)="consultarOutfitIa('Look casual chic cómodo para fin de semana')">
+              ☕ Casual Chic
+            </button>
+          </div>
+
+          <!-- Buscador en Lenguaje Natural -->
+          <div class="stylist-input-row">
+            <input
+              type="text"
+              [(ngModel)]="promptIa"
+              (keyup.enter)="consultarOutfitIa(promptIa)"
+              placeholder="Escribe tu ocasión: Ej. Boda civil de tarde, graduación, salida con amigas..."
+              class="stylist-input"
+            />
+            <button
+              type="button"
+              class="btn-stylist-ask"
+              (click)="consultarOutfitIa(promptIa)"
+              [disabled]="stylistIa.cargando() || !promptIa.trim()"
+            >
+              @if (stylistIa.cargando()) {
+                <span>⏳ Curando Look...</span>
+              } @else {
+                <span>✨ Armar Outfit IA</span>
+              }
+            </button>
+          </div>
+        </div>
+      </section>
 
       <!-- CONTENEDOR PRINCIPAL -->
       <div class="catalog-container">
@@ -453,6 +508,78 @@ import { SessionStoreService } from '../../core/session-store.service';
               >
                 <span>⚡ Comprar Ahora</span>
               </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- =================================================================== -->
+      <!-- MODAL DEL OUTFIT RECOMENDADO POR IA (CU-38: AI FASHION STYLIST)       -->
+      <!-- =================================================================== -->
+      @if (stylistIa.modalAbierto() && stylistIa.outfitActual(); as outfit) {
+        <div class="modal-backdrop animate-fade-in" (click)="stylistIa.cerrarModal()">
+          <div class="stylist-modal-card animate-slide-up" (click)="$event.stopPropagation()">
+            <!-- Cabecera del Outfit -->
+            <div class="stylist-modal-header">
+              <div class="outfit-tagline-row">
+                <span class="outfit-pill">✨ Look Curado con IA (CU-38)</span>
+                <span class="match-score">★ {{ outfit.score_total }}% Match de Estilo</span>
+              </div>
+              <h2 class="outfit-modal-title">{{ outfit.titulo_outfit }}</h2>
+              <div class="outfit-meta-badges">
+                <span class="meta-b">👔 {{ outfit.estilo }}</span>
+                <span class="meta-b">📍 {{ outfit.ocasion }}</span>
+              </div>
+              <button type="button" class="btn-close-modal" (click)="stylistIa.cerrarModal()">✕</button>
+            </div>
+
+            <!-- Insight del Estilista -->
+            <div class="stylist-insight-box">
+              <div class="insight-label">💡 Consejo del Personal Stylist IA:</div>
+              <p class="insight-text">{{ outfit.consejo_estilista_ia }}</p>
+            </div>
+
+            <!-- Grid de Prendas del Outfit -->
+            <div class="outfit-items-grid">
+              @for (item of outfit.prendas; track item.id) {
+                <div class="outfit-item-card">
+                  <div class="outfit-item-img-box">
+                    <img [src]="getPrendaImg(item)" [alt]="item.nombre" class="outfit-item-img" />
+                    <span class="role-badge">{{ item.rol_en_outfit }}</span>
+                  </div>
+                  <div class="outfit-item-details">
+                    <h4 class="item-name">{{ item.nombre }}</h4>
+                    <span class="item-cat">{{ item.categoria_nombre }}</span>
+                    <p class="item-reason">{{ item.por_que_combina }}</p>
+                    <div class="item-price">BOB {{ item.precio_base | number:'1.2-2' }}</div>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Footer y Acciones del Outfit -->
+            <div class="stylist-modal-footer">
+              <div class="outfit-total-price">
+                <span class="tot-label">Inversión Look Completo:</span>
+                <span class="tot-amount">BOB {{ outfit.precio_total | number:'1.2-2' }}</span>
+              </div>
+              <div class="outfit-actions-row">
+                <button
+                  type="button"
+                  class="btn-tryon-lucy"
+                  (click)="probarEnDecartLucy(outfit.sugerencia_vestidor_prompt)"
+                  title="Ver cómo te queda este look con IA generativa fotorrealista"
+                >
+                  <span>🪞</span> Probar en Vestidor Lucy (CU-36)
+                </button>
+                <button
+                  type="button"
+                  class="btn-add-outfit-cart"
+                  (click)="agregarOutfitCompleto(outfit)"
+                >
+                  <span>🛍️</span> Añadir Todo a la Bolsa
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1676,6 +1803,357 @@ import { SessionStoreService } from '../../core/session-store.service';
     }
     .animate-fade-in { animation: fadeIn 0.2s ease-out; }
     .animate-slide-left { animation: slideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+    /* =========================================================================
+       ESTILOS CU-38: AI FASHION STYLIST & RECOMENDACIONES IA
+       ========================================================================= */
+    .ai-stylist-banner {
+      background: linear-gradient(135deg, #0b1120 0%, #1e1b4b 100%);
+      color: #ffffff;
+      padding: 32px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .stylist-inner {
+      max-width: 1240px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .stylist-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 14px;
+      border-radius: 9999px;
+      background: rgba(244, 63, 94, 0.2);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      color: #fda4af;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+    .stylist-title {
+      font-size: 2rem;
+      font-weight: 900;
+      margin: 0 0 8px 0;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+    .stylist-subtitle {
+      color: #cbd5e1;
+      font-size: 0.95rem;
+      max-width: 680px;
+      margin: 0 0 20px 0;
+      line-height: 1.5;
+    }
+    .stylist-chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .stylist-chip {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f1f5f9;
+      padding: 8px 16px;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .stylist-chip:hover {
+      background: #be185d;
+      border-color: #be185d;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+    .stylist-input-row {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      max-width: 680px;
+    }
+    .stylist-input {
+      flex: 1;
+      height: 48px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.06);
+      padding: 0 16px;
+      font-size: 0.95rem;
+      color: #ffffff;
+      outline: none;
+      backdrop-filter: blur(8px);
+    }
+    .stylist-input::placeholder {
+      color: #94a3b8;
+    }
+    .stylist-input:focus {
+      border-color: #f43f5e;
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.25);
+    }
+    .btn-stylist-ask {
+      height: 48px;
+      padding: 0 22px;
+      border-radius: 12px;
+      border: 0;
+      background: linear-gradient(135deg, #f43f5e 0%, #be185d 100%);
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 0.92rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 14px rgba(244, 63, 94, 0.35);
+    }
+    .btn-stylist-ask:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(244, 63, 94, 0.45);
+    }
+    .btn-stylist-ask:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Modal Outfit IA */
+    .stylist-modal-card {
+      background: #ffffff;
+      border-radius: 20px;
+      max-width: 840px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 28px;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.35);
+      position: relative;
+    }
+    .stylist-modal-header {
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .outfit-tagline-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .outfit-pill {
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #be185d;
+      background: #fdf2f8;
+      padding: 3px 10px;
+      border-radius: 6px;
+    }
+    .match-score {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #059669;
+      background: #ecfdf5;
+      padding: 3px 10px;
+      border-radius: 6px;
+    }
+    .outfit-modal-title {
+      font-size: 1.6rem;
+      font-weight: 900;
+      color: #0f172a;
+      margin: 0 0 8px 0;
+      letter-spacing: -0.02em;
+    }
+    .outfit-meta-badges {
+      display: flex;
+      gap: 8px;
+    }
+    .meta-b {
+      font-size: 0.78rem;
+      color: #64748b;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 3px 10px;
+      border-radius: 6px;
+    }
+    .btn-close-modal {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #64748b;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+    .stylist-insight-box {
+      background: #fdf2f8;
+      border-left: 4px solid #be185d;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+    }
+    .insight-label {
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #be185d;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .insight-text {
+      color: #334155;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      margin: 0;
+    }
+    .outfit-items-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .outfit-item-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+    }
+    .outfit-item-img-box {
+      position: relative;
+      width: 100%;
+      height: 200px;
+      background: #f8fafc;
+    }
+    .outfit-item-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .role-badge {
+      position: absolute;
+      bottom: 8px;
+      left: 8px;
+      background: rgba(15, 23, 42, 0.8);
+      color: #ffffff;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      backdrop-filter: blur(4px);
+    }
+    .outfit-item-details {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+    .item-name {
+      margin: 0 0 2px 0;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .item-cat {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+    .item-reason {
+      font-size: 0.78rem;
+      color: #475569;
+      line-height: 1.4;
+      margin: 0 0 10px 0;
+      flex: 1;
+    }
+    .item-price {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #be185d;
+    }
+    .stylist-modal-footer {
+      border-top: 1px solid #f1f5f9;
+      padding-top: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .outfit-total-price {
+      display: flex;
+      flex-direction: column;
+    }
+    .tot-label {
+      font-size: 0.75rem;
+      color: #64748b;
+      font-weight: 600;
+    }
+    .tot-amount {
+      font-size: 1.6rem;
+      font-weight: 900;
+      color: #0f172a;
+    }
+    .outfit-actions-row {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-tryon-lucy {
+      padding: 12px 18px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #0f172a;
+      font-weight: 700;
+      font-size: 0.88rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .btn-tryon-lucy:hover {
+      background: #fdf2f8;
+      border-color: #fbcfe8;
+      color: #be185d;
+    }
+    .btn-add-outfit-cart {
+      padding: 12px 22px;
+      border-radius: 10px;
+      border: 0;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 0.92rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s ease;
+    }
+    .btn-add-outfit-cart:hover {
+      box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+      transform: translateY(-1px);
+    }
+    .animate-slide-up {
+      animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
   `]
 })
 export class CatalogoClienteComponent implements OnInit {
@@ -1686,6 +2164,10 @@ export class CatalogoClienteComponent implements OnInit {
   readonly network = inject(NetworkService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  readonly stylistIa = inject(CU38RecomendacionesIaController);
+
+  // Prompt para el Personal Stylist IA (CU-38)
+  promptIa = '';
 
   filtros: CatalogFilterParams = {};
   ordenSeleccionado = 'relevancia';
@@ -2132,6 +2614,62 @@ export class CatalogoClienteComponent implements OnInit {
   irAlCheckout(): void {
     this.cerrarCarritoDrawer();
     this.router.navigate(['/checkout']);
+  }
+
+  // =========================================================================
+  // METODOS CU-38: ASESOR PERSONAL DE MODA CON IA (PERSONAL STYLIST)
+  // =========================================================================
+  consultarOutfitIa(promptTexto: string): void {
+    if (!promptTexto || !promptTexto.trim()) return;
+    this.promptIa = promptTexto;
+    this.stylistIa.abrirModal();
+    this.stylistIa.recomendarPorPrompt(promptTexto.trim(), this.filtros.genero, 'demo').subscribe({
+      error: () => this.mostrarToast('No se pudo curar el outfit con IA en este momento', true),
+    });
+  }
+
+  agregarOutfitCompleto(outfit: OutfitRecomendado): void {
+    if (!this.auth.isAuthenticated()) {
+      this.mostrarToast('Por favor inicia sesión para añadir el look a tu bolsa', true);
+      this.stylistIa.cerrarModal();
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    if (!outfit.prendas || outfit.prendas.length === 0) return;
+
+    let agregados = 0;
+    outfit.prendas.forEach((p) => {
+      // Buscar la prenda completa en el catálogo local para obtener su primera variante disponible
+      const prendaReal = this.prendas().find((pr) => pr.id === p.id);
+      const varianteId = prendaReal?.variantes?.[0]?.id;
+      if (varianteId) {
+        this.checkoutService.agregarAlCarrito(varianteId, 1).subscribe({
+          next: (c: Carrito) => {
+            this.carrito.set(c);
+            agregados++;
+            if (agregados === outfit.prendas.length) {
+              this.mostrarToast(`¡Look completo "${outfit.titulo_outfit}" añadido a tu bolsa!`);
+              this.stylistIa.cerrarModal();
+              this.abrirCarritoDrawer();
+            }
+          },
+          error: () => {},
+        });
+      }
+    });
+
+    if (agregados === 0) {
+      this.mostrarToast('Las prendas del look se reservaron de forma exclusiva.');
+      this.stylistIa.cerrarModal();
+    }
+  }
+
+  probarEnDecartLucy(prompt: string): void {
+    this.stylistIa.cerrarModal();
+    this.router.navigate(['/vestidor-virtual'], {
+      queryParams: { prompt: prompt },
+    });
   }
 
   mostrarToast(mensaje: string, esError = false): void {

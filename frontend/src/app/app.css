@@ -1,105 +1,540 @@
-.shell {
+/* ==========================================================================
+   FASHIONSTORE GLOBAL APPLICATION STYLES (app.css)
+   Dual Experience: SaaS Command Center & Luxury Boutique Storefront
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. SAAS COMMAND CENTER LAYOUT (SUPERADMIN / ADMIN / CAJERO / ENCARGADO)
+   -------------------------------------------------------------------------- */
+.saas-shell {
+  display: grid;
+  grid-template-columns: 270px 1fr;
   min-height: 100vh;
   min-height: 100dvh;
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  background-color: #f8fafc;
+  color: #0f172a;
+  transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.topbar {
+.saas-shell.sidebar-mini {
+  grid-template-columns: 76px 1fr;
+}
+
+/* Backdrop para mobile drawer */
+.mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 40;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* --------------------------------------------------------------------------
+   SIDEBAR LATERAL (DARK SLATE COMMAND CENTER)
+   -------------------------------------------------------------------------- */
+.saas-sidebar {
+  background: #0b1120;
+  color: #94a3b8;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 30;
+  border-right: 1px solid #1e293b;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Cabecera del Sidebar */
+.sidebar-header {
+  height: 64px;
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  padding: 0 1.25rem;
+  border-bottom: 1px solid #1e293b;
+  flex-shrink: 0;
+}
+
+.sidebar-brand {
+  display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  padding-top: max(0.75rem, env(safe-area-inset-top));
-  background: rgba(255, 255, 255, 0.94);
-  border-bottom: 1px solid #f3e8ee;
-  backdrop-filter: blur(12px);
-}
-
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  color: #111827;
   text-decoration: none;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
+  color: #ffffff;
+  overflow: hidden;
 }
 
-.brand small {
-  color: #be185d;
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
+.brand-badge {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f43f5e 0%, #be185d 100%);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 12px rgba(190, 24, 93, 0.35);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+}
+
+.brand-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.brand-subtitle {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #f43f5e;
   text-transform: uppercase;
 }
 
-.brand-mark {
-  display: inline-grid;
+.btn-toggle-sidebar {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: grid;
   place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 9px;
-  background: #be185d;
-  color: #ffffff;
+  cursor: pointer;
   font-size: 0.8rem;
+  transition: all 0.2s ease;
 }
 
-nav {
+.btn-toggle-sidebar:hover {
+  background: #334155;
+  color: #ffffff;
+  border-color: #475569;
+}
+
+/* Navegación y Enlaces */
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem 0.75rem;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 0.7rem;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-nav a {
-  min-height: 40px;
-  display: inline-flex;
+.sidebar-nav::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+.nav-section-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #475569;
+  text-transform: uppercase;
+  padding: 0.75rem 0.65rem 0.35rem 0.65rem;
+  white-space: nowrap;
+}
+
+.sidebar-link {
+  display: flex;
   align-items: center;
-  color: #4b5563;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  color: #94a3b8;
   text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  position: relative;
+  white-space: nowrap;
+}
+
+.sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #f1f5f9;
+}
+
+.sidebar-link.active {
+  background: linear-gradient(90deg, rgba(225, 29, 72, 0.2) 0%, rgba(225, 29, 72, 0.05) 100%);
+  color: #ffffff;
   font-weight: 600;
-  font-size: 0.9rem;
+  border-left: 3px solid #f43f5e;
+  padding-left: calc(0.75rem - 3px);
 }
 
-nav a:hover {
-  color: #be185d;
+.sidebar-link.highlight {
+  background: rgba(244, 63, 94, 0.12);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.25);
 }
 
-.nav-cta {
-  border-radius: 9px;
-  padding: 0.45rem 0.75rem;
-  background: #fdf2f8;
-  color: #be185d !important;
+.sidebar-link.highlight:hover {
+  background: rgba(244, 63, 94, 0.22);
+  color: #ffffff;
 }
 
-.nav-button {
-  min-height: 40px;
-  border: 0;
+.link-icon {
+  font-size: 1.1rem;
+  width: 24px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.link-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cu-tag {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: #1e293b;
+  color: #64748b;
+  border: 1px solid #334155;
+  flex-shrink: 0;
+}
+
+.cu-tag.accent {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+/* Pie del Sidebar */
+.sidebar-footer {
+  padding: 0.85rem 1rem;
+  border-top: 1px solid #1e293b;
+  background: #090e1a;
+  flex-shrink: 0;
+}
+
+.user-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.user-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #334155;
+  color: #f1f5f9;
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 1px solid #475569;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.user-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-role {
+  font-size: 0.68rem;
+  color: #64748b;
+  text-transform: capitalize;
+}
+
+.btn-logout-icon {
   background: transparent;
-  color: #4b5563;
-  font: inherit;
-  font-weight: 600;
-  font-size: 0.9rem;
+  border: 0;
+  color: #94a3b8;
+  font-size: 1.1rem;
+  padding: 0.35rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-logout-icon:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* Estado Colapsado (Mini) */
+.saas-shell.sidebar-mini .brand-text,
+.saas-shell.sidebar-mini .link-text,
+.saas-shell.sidebar-mini .cu-tag,
+.saas-shell.sidebar-mini .nav-section-label,
+.saas-shell.sidebar-mini .user-details {
+  display: none !important;
+}
+
+.saas-shell.sidebar-mini .sidebar-header {
+  justify-content: center;
+  padding: 0 0.5rem;
+}
+
+.saas-shell.sidebar-mini .btn-toggle-sidebar {
+  position: absolute;
+  top: 18px;
+  right: -14px;
+  z-index: 40;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.saas-shell.sidebar-mini .sidebar-link {
+  justify-content: center;
+  padding: 0.65rem 0.5rem;
+}
+
+.saas-shell.sidebar-mini .user-pill {
+  justify-content: center;
+}
+
+/* --------------------------------------------------------------------------
+   ÁREA DE CONTENIDO SAAS Y TOPBAR
+   -------------------------------------------------------------------------- */
+.saas-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #f8fafc;
+}
+
+.saas-topbar {
+  height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  gap: 1rem;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mobile-toggle-btn {
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
   cursor: pointer;
 }
 
-.nav-button:hover {
-  color: #be185d;
+.tenant-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
+.tenant-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.tenant-name {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.tenant-plan {
+  color: #64748b;
+  font-size: 0.75rem;
+  border-left: 1px solid #e2e8f0;
+  padding-left: 0.5rem;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.network-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.network-pill.online {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.network-pill.online .network-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.network-pill.offline {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.network-pill.offline .network-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+
+.btn-preview-store {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-preview-store:hover {
+  border-color: #be185d;
+  color: #be185d;
+  background: #fdf2f8;
+}
+
+.btn-topbar-profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  color: #475569;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-topbar-profile:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.btn-topbar-logout {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #ef4444;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-topbar-logout:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+/* Page Viewport */
+.page-viewport {
+  flex: 1;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Footer SaaS */
+.saas-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Banners del Sistema */
 .system-banner {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.7rem;
-  padding: 0.6rem 1rem;
-  font-size: 0.85rem;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.84rem;
   text-align: center;
 }
 
@@ -115,155 +550,327 @@ nav a:hover {
   color: #1d4ed8;
 }
 
-.system-banner button {
-  min-height: 34px;
+.btn-banner-action {
   border: 0;
-  border-radius: 8px;
-  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  padding: 0.25rem 0.65rem;
   background: #1d4ed8;
   color: #ffffff;
-  font: inherit;
   font-weight: 700;
-  cursor: pointer;
-}
-
-main {
-  width: min(1100px, 100%);
-  margin: 0 auto;
-  padding: 1rem;
-  padding-bottom: max(1rem, env(safe-area-inset-bottom));
-}
-
-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  padding: 0.9rem 1rem;
-  padding-bottom: max(0.9rem, env(safe-area-inset-bottom));
-  border-top: 1px solid #f3e8ee;
-  color: #9ca3af;
-  font-size: 0.75rem;
-}
-
-@media (min-width: 720px) {
-  .topbar {
-    padding: 1rem 1.5rem;
-  }
-
-  main {
-    padding: 1.5rem;
-  }
-}
-
-/* Navigation Dropdowns */
-.nav-group {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.nav-group-btn {
-  min-height: 40px;
-  border: 0;
-  background: transparent;
-  color: #4b5563;
-  font: inherit;
-  font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.nav-group-btn:hover {
-  color: #be185d;
-}
-
-.nav-dropdown {
-  display: none;
-  position: absolute;
-  top: 100%;
-  left: 0;
-  min-width: 260px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
-  padding: 0.5rem;
-  z-index: 100;
-}
-
-.nav-group:hover .nav-dropdown,
-.nav-dropdown:hover {
-  display: block;
-}
-
-.nav-dropdown a {
-  display: block;
-  min-height: 36px;
-  padding: 0.45rem 0.75rem;
-  font-size: 0.85rem;
-  color: #374151;
-  border-radius: 8px;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.nav-dropdown a:hover {
-  background: #fdf2f8;
-  color: #be185d;
-}
-
-/* Secondary Sub-nav Bar for Use Cases */
-.sub-nav-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.45rem 1rem;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
-  overflow-x: auto;
-  white-space: nowrap;
-}
-
-.sub-nav-title {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #9ca3af;
-  letter-spacing: 0.05em;
-  flex-shrink: 0;
-}
-
-.sub-nav-links {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.sub-chip {
-  display: inline-block;
-  padding: 0.25rem 0.6rem;
-  border-radius: 6px;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
-  color: #374151;
   font-size: 0.78rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 0.15s ease;
+  cursor: pointer;
 }
 
-.sub-chip:hover {
+/* --------------------------------------------------------------------------
+   2. STOREFRONT LUXURY BOUTIQUE LAYOUT (CLIENTES & VISITANTES)
+   -------------------------------------------------------------------------- */
+.storefront-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+}
+
+/* Cabecera Boutique de Alta Gama */
+.boutique-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: 72px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  gap: 1.5rem;
+}
+
+.boutique-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  text-decoration: none;
+  color: #0f172a;
+}
+
+.boutique-logo-icon {
+  font-size: 1.5rem;
+  color: #be185d;
+  filter: drop-shadow(0 2px 4px rgba(190, 24, 93, 0.25));
+}
+
+.boutique-brand-titles {
+  display: flex;
+  flex-direction: column;
+}
+
+.boutique-brand-titles .brand-name {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #0f172a;
+  line-height: 1.1;
+}
+
+.boutique-brand-titles .brand-tagline {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: #be185d;
+  text-transform: uppercase;
+}
+
+/* Navegación Storefront */
+.boutique-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+}
+
+.boutique-link {
+  color: #334155;
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  transition: color 0.2s ease;
+  position: relative;
+  padding: 0.5rem 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.boutique-link:hover,
+.boutique-link.active {
+  color: #be185d;
+}
+
+.boutique-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #be185d;
+  border-radius: 2px;
+}
+
+.pill-sparkle {
+  font-size: 0.85rem;
+}
+
+/* Acciones Boutique */
+.boutique-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.btn-boutique-cart {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 9999px;
+  background: #fdf2f8;
+  border: 1px solid #fbcfe8;
+  color: #be185d;
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-boutique-cart:hover {
   background: #be185d;
   color: #ffffff;
-  border-color: #be185d;
 }
 
-.sub-sep {
-  color: #d1d5db;
-  font-size: 0.9rem;
-  margin: 0 0.2rem;
+.boutique-user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 9999px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.btn-boutique-login {
+  color: #334155;
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.5rem 0.85rem;
+}
+
+.btn-boutique-login:hover {
+  color: #be185d;
+}
+
+.btn-boutique-register {
+  background: #0f172a;
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.5rem 1.1rem;
+  border-radius: 9999px;
+  transition: all 0.2s ease;
+}
+
+.btn-boutique-register:hover {
+  background: #be185d;
+}
+
+.btn-boutique-logout {
+  background: transparent;
+  border: 0;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+}
+
+.btn-boutique-logout:hover {
+  color: #ef4444;
+}
+
+/* Área Principal Storefront */
+.storefront-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* Footer Boutique de Lujo */
+.boutique-footer {
+  background: #0b1120;
+  color: #cbd5e1;
+  border-top: 1px solid #1e293b;
+  margin-top: auto;
+}
+
+.footer-content {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 2rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+
+.footer-brand h4 {
+  color: #ffffff;
+  font-size: 1.1rem;
+  letter-spacing: 0.15em;
+  margin: 0 0 0.5rem 0;
+}
+
+.footer-brand p {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  max-width: 420px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.footer-bottom {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid #1e293b;
+  color: #64748b;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   3. RESPONSIVE MEDIA QUERIES (TABLETS & MÓVILES)
+   -------------------------------------------------------------------------- */
+.mobile-only {
+  display: none !important;
+}
+
+.desktop-only {
+  display: inline-flex !important;
+}
+
+@media (max-width: 960px) {
+  .mobile-only {
+    display: inline-flex !important;
+  }
+
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* SaaS Shell Móvil */
+  .saas-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .saas-sidebar {
+    position: fixed;
+    top: 0;
+    left: -290px;
+    bottom: 0;
+    width: 280px;
+    z-index: 50;
+    box-shadow: none;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .saas-sidebar.mobile-open {
+    left: 0;
+    box-shadow: 12px 0 35px rgba(0, 0, 0, 0.4);
+  }
+
+  .saas-topbar {
+    padding: 0 1rem;
+  }
+
+  .tenant-plan {
+    display: none;
+  }
+
+  .page-viewport {
+    padding: 1rem;
+  }
+
+  /* Storefront Móvil */
+  .boutique-topbar {
+    padding: 0 1rem;
+    height: 64px;
+  }
+
+  .boutique-nav {
+    display: none; /* En versión móvil se priorizan las acciones directas */
+  }
+
+  .boutique-brand-titles .brand-tagline {
+    display: none;
+  }
 }

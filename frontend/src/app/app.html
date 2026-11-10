@@ -1,140 +1,448 @@
-<div class="shell">
-  <header class="topbar">
-    <a class="brand" routerLink="/">
-      <span class="brand-mark">FS</span>
-      <span>FashionStore <small>SaaS</small></span>
-    </a>
+@if (isBackoffice(); as backoffice) {
+  <!-- ===================================================================== -->
+  <!-- 1. LAYOUT SAAS COMMAND CENTER (SUPERADMIN, ADMIN, CAJERO, ENCARGADO)  -->
+  <!-- ===================================================================== -->
+  <div class="saas-shell" [class.sidebar-mini]="sidebarCollapsed()">
+    <!-- Backdrop oscuro para móvil -->
+    @if (mobileSidebarOpen()) {
+      <div class="mobile-backdrop" (click)="closeMobileSidebar()"></div>
+    }
 
-    <nav>
-      @if (auth.user(); as user) {
-        @if (user.rol === 'superadmin' && !user.empresa_id) {
-          <a routerLink="/saas">Empresas (CU-07)</a>
-          <a routerLink="/saas/planes">Planes (CU-06)</a>
-          <a routerLink="/saas/facturacion">Facturación (CU-08)</a>
-          <a routerLink="/saas/metricas">Métricas (CU-09)</a>
-          <a routerLink="/auditoria">Auditoría (CU-05)</a>
-          <a routerLink="/saas/backups">Backups (CU-37)</a>
-        }
-        @if (user.rol === 'administrador' && user.empresa_id) {
-          <a routerLink="/mi-suscripcion">Suscripción (CU-07)</a>
-          <a routerLink="/inventario">Inventario (CU-17)</a>
-          <a routerLink="/pos">POS (CU-23)</a>
-          
-          <div class="nav-group">
-            <button type="button" class="nav-group-btn">Reservas ▾</button>
-            <div class="nav-dropdown">
-              <a routerLink="/reservas/nueva"><strong>CU-19:</strong> Crear Reserva (Probador)</a>
-              <a routerLink="/reservas/mis-reservas"><strong>CU-20:</strong> Mis Reservas / Consulta</a>
-              <a routerLink="/reservas/staff"><strong>CU-21:</strong> Preparación en Tienda (Staff)</a>
-              <a routerLink="/reservas"><strong>Panel:</strong> Todas las Reservas</a>
-            </div>
+    <!-- SIDEBAR LATERAL NAVEGACIÓN -->
+    <aside class="saas-sidebar" [class.mobile-open]="mobileSidebarOpen()">
+      <!-- Header del Sidebar con Marca -->
+      <div class="sidebar-header">
+        <a routerLink="/" class="sidebar-brand">
+          <span class="brand-badge">FS</span>
+          <div class="brand-text">
+            <span class="brand-title">FashionStore</span>
+            <span class="brand-subtitle">COMMAND CENTER</span>
           </div>
+        </a>
+        <button
+          type="button"
+          (click)="toggleSidebar()"
+          class="btn-toggle-sidebar desktop-only"
+          title="Colapsar / Expandir barra lateral"
+        >
+          {{ sidebarCollapsed() ? '→' : '←' }}
+        </button>
+      </div>
 
-          <a routerLink="/catalogo-admin">Catálogo (CU-12)</a>
-          <a routerLink="/empleados">Empleados (CU-10)</a>
-          <a routerLink="/sucursales">Sucursales (CU-11)</a>
+      <!-- Menú Scrollable Agrupado -->
+      <nav class="sidebar-nav">
+        @if (auth.user(); as user) {
+          <!-- ROL SUPERADMIN GLOBAL -->
+          @if (user.rol === 'superadmin' && !user.empresa_id) {
+            <div class="nav-section-label">PLATAFORMA SAAS GLOBAL</div>
+            <a routerLink="/saas" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="sidebar-link">
+              <span class="link-icon">🏢</span>
+              <span class="link-text">Empresas / Tenants</span>
+              <span class="cu-tag">CU-07</span>
+            </a>
+            <a routerLink="/saas/planes" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">💎</span>
+              <span class="link-text">Planes y Tarifas</span>
+              <span class="cu-tag">CU-06</span>
+            </a>
+            <a routerLink="/saas/facturacion" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">💳</span>
+              <span class="link-text">Facturación Global</span>
+              <span class="cu-tag">CU-08</span>
+            </a>
+            <a routerLink="/saas/metricas" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">📊</span>
+              <span class="link-text">Métricas y KPIs</span>
+              <span class="cu-tag">CU-09</span>
+            </a>
+            <a routerLink="/auditoria" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🛡️</span>
+              <span class="link-text">Bitácora Auditoría</span>
+              <span class="cu-tag">CU-05</span>
+            </a>
+            <a routerLink="/saas/backups" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">💾</span>
+              <span class="link-text">Gestión de Backups</span>
+              <span class="cu-tag">CU-37</span>
+            </a>
+          }
 
-          <div class="nav-group">
-            <button type="button" class="nav-group-btn">Reportes & IA ▾</button>
-            <div class="nav-dropdown">
-              <a routerLink="/reportes/convencionales"><strong>CU-33:</strong> Reportes Convencionales</a>
-              <a routerLink="/reportes/ia"><strong>CU-34:</strong> Reporte Predictivo con IA</a>
-              <a routerLink="/analytics-ml"><strong>CU-35:</strong> Dashboard Analítico ML</a>
+          <!-- ROL ADMINISTRADOR DE TENANT -->
+          @if (user.rol === 'administrador' && user.empresa_id) {
+            <!-- MÓDULO COMERCIAL & OPERACIONES -->
+            <div class="nav-section-label">OPERACIONES COMERCIALES</div>
+            <a routerLink="/pos" routerLinkActive="active" class="sidebar-link highlight">
+              <span class="link-icon">⚡</span>
+              <span class="link-text">Punto de Venta POS</span>
+              <span class="cu-tag">CU-23</span>
+            </a>
+            <a routerLink="/catalogo-admin" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">👗</span>
+              <span class="link-text">Catálogo & Prendas</span>
+              <span class="cu-tag">CU-12</span>
+            </a>
+            <a routerLink="/inventario" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">📦</span>
+              <span class="link-text">Inventario & Stock</span>
+              <span class="cu-tag">CU-17</span>
+            </a>
+            <a routerLink="/sucursales" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🏪</span>
+              <span class="link-text">Sucursales</span>
+              <span class="cu-tag">CU-11</span>
+            </a>
+            <a routerLink="/empleados" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">👥</span>
+              <span class="link-text">Equipo & Empleados</span>
+              <span class="cu-tag">CU-10</span>
+            </a>
+            <a routerLink="/proveedores" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🚚</span>
+              <span class="link-text">Proveedores</span>
+              <span class="cu-tag">CU-15</span>
+            </a>
+            <a routerLink="/temporadas" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🍁</span>
+              <span class="link-text">Temporadas & Colecciones</span>
+              <span class="cu-tag">CU-16</span>
+            </a>
+
+            <!-- MÓDULO RESERVAS & PROBADORES -->
+            <div class="nav-section-label">RESERVAS & PROBADORES</div>
+            <a routerLink="/reservas/staff" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">📋</span>
+              <span class="link-text">Preparación en Tienda (Staff)</span>
+              <span class="cu-tag">CU-21</span>
+            </a>
+            <a routerLink="/reservas" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="sidebar-link">
+              <span class="link-icon">📅</span>
+              <span class="link-text">Panel de Reservas</span>
+              <span class="cu-tag">Panel</span>
+            </a>
+            <a routerLink="/reservas/nueva" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">✨</span>
+              <span class="link-text">Nueva Reserva</span>
+              <span class="cu-tag">CU-19</span>
+            </a>
+            <a routerLink="/reservas/mis-reservas" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🔍</span>
+              <span class="link-text">Consulta de Reservas</span>
+              <span class="cu-tag">CU-20</span>
+            </a>
+
+            <!-- MÓDULO INTELIGENCIA & ANALÍTICA -->
+            <div class="nav-section-label">INTELIGENCIA & ANALÍTICA</div>
+            <a routerLink="/catalogo" class="sidebar-link highlight">
+              <span class="link-icon">✨</span>
+              <span class="link-text">Recomendaciones IA (Stylist)</span>
+              <span class="cu-tag accent">CU-38</span>
+            </a>
+            <a routerLink="/reportes/ia" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🎙️</span>
+              <span class="link-text">Reporte IA (Voz/Texto)</span>
+              <span class="cu-tag accent">CU-34</span>
+            </a>
+            <a routerLink="/vestidor-virtual" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🪞</span>
+              <span class="link-text">Vestidor Virtual Decart Lucy</span>
+              <span class="cu-tag accent">CU-36</span>
+            </a>
+            <a routerLink="/analytics-ml" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🔮</span>
+              <span class="link-text">Predicción Demanda ML</span>
+              <span class="cu-tag">CU-35</span>
+            </a>
+            <a routerLink="/reportes/convencionales" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">📈</span>
+              <span class="link-text">Reportes PDF / Excel</span>
+              <span class="cu-tag">CU-33</span>
+            </a>
+
+            <!-- MÓDULO RESILIENCIA OFFLINE -->
+            <div class="nav-section-label">MODO OFFLINE & SYNC</div>
+            <a routerLink="/offline/cola" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🔄</span>
+              <span class="link-text">Cola de Sincronización</span>
+              <span class="cu-tag">CU-30/31</span>
+            </a>
+            <a routerLink="/offline/bloqueos" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🔒</span>
+              <span class="link-text">Bloqueos Soft-Lock</span>
+              <span class="cu-tag">CU-27</span>
+            </a>
+            <a routerLink="/offline/catalogo" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🗂️</span>
+              <span class="link-text">Catálogo Local Offline</span>
+              <span class="cu-tag">CU-25</span>
+            </a>
+            <a routerLink="/offline/reserva" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">📝</span>
+              <span class="link-text">Reserva Offline</span>
+              <span class="cu-tag">CU-26</span>
+            </a>
+            <a routerLink="/offline/venta" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">💵</span>
+              <span class="link-text">Venta Contado Offline</span>
+              <span class="cu-tag">CU-28</span>
+            </a>
+            <a routerLink="/offline/cambio" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">📲</span>
+              <span class="link-text">Validar QR de Cambio</span>
+              <span class="cu-tag">CU-29</span>
+            </a>
+            <a routerLink="/offline/conflictos" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">⚠️</span>
+              <span class="link-text">Resolución de Conflictos</span>
+              <span class="cu-tag">CU-32</span>
+            </a>
+
+            <!-- MÓDULO ADMINISTRACIÓN & SEGURIDAD -->
+            <div class="nav-section-label">CONFIGURACIÓN & SEGURIDAD</div>
+            <a routerLink="/mi-suscripcion" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">💼</span>
+              <span class="link-text">Plan y Suscripción</span>
+              <span class="cu-tag">CU-07</span>
+            </a>
+            <a routerLink="/backups" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">💾</span>
+              <span class="link-text">Backups (Localhost / Nube)</span>
+              <span class="cu-tag">CU-37</span>
+            </a>
+            <a routerLink="/auditoria" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🛡️</span>
+              <span class="link-text">Auditoría y Trazabilidad</span>
+              <span class="cu-tag">CU-05</span>
+            </a>
+          }
+
+          <!-- ROL CAJERO / ENCARGADO -->
+          @if (user.rol === 'cajero' || user.rol === 'encargado') {
+            <div class="nav-section-label">OPERACIONES DE MOSTRADOR</div>
+            <a routerLink="/pos" routerLinkActive="active" class="sidebar-link highlight">
+              <span class="link-icon">⚡</span>
+              <span class="link-text">Punto de Venta POS</span>
+              <span class="cu-tag">CU-23</span>
+            </a>
+            <a routerLink="/inventario" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">📦</span>
+              <span class="link-text">Inventario de Sucursal</span>
+              <span class="cu-tag">CU-17</span>
+            </a>
+            <a routerLink="/reservas/staff" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">📋</span>
+              <span class="link-text">Preparación de Reservas</span>
+              <span class="cu-tag">CU-21</span>
+            </a>
+            <a routerLink="/offline/bloqueos" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🔒</span>
+              <span class="link-text">Bloqueos Activos</span>
+              <span class="cu-tag">CU-27</span>
+            </a>
+            <a routerLink="/offline/cola" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🔄</span>
+              <span class="link-text">Sincronización Offline</span>
+              <span class="cu-tag">CU-30/31</span>
+            </a>
+          }
+        }
+      </nav>
+
+      <!-- Pie del Sidebar con Perfil de Usuario -->
+      <div class="sidebar-footer">
+        @if (auth.user(); as user) {
+          <div class="user-pill">
+            <div class="user-avatar">{{ user.nombre.charAt(0) || 'U' }}</div>
+            <div class="user-details">
+              <span class="user-name">{{ user.nombre }}</span>
+              <span class="user-role">{{ user.rol }}</span>
             </div>
+            <button
+              type="button"
+              (click)="requestLogout()"
+              class="btn-logout-icon"
+              title="Cerrar sesión segura"
+            >
+              🚪
+            </button>
           </div>
+        }
+      </div>
+    </aside>
 
-          <div class="nav-group">
-            <button type="button" class="nav-group-btn">Offline ▾</button>
-            <div class="nav-dropdown">
-              <a routerLink="/offline/catalogo"><strong>CU-25:</strong> Catálogo Offline</a>
-              <a routerLink="/offline/reserva"><strong>CU-26/27:</strong> Reserva Offline</a>
-              <a routerLink="/offline/bloqueos"><strong>CU-27:</strong> Bloqueos Activos (Soft-Lock)</a>
-              <a routerLink="/offline/venta"><strong>CU-28:</strong> Venta Contado Offline</a>
-              <a routerLink="/offline/cambio"><strong>CU-29:</strong> Validar QR de Cambio</a>
-              <a routerLink="/offline/cola"><strong>CU-30/31:</strong> Cola y Sincronización</a>
-              <a routerLink="/offline/conflictos"><strong>CU-32:</strong> Resolución Conflictos</a>
-            </div>
+    <!-- ÁREA DE TRABAJO PRINCIPAL (MAIN VIEWPORT) -->
+    <div class="saas-main">
+      <!-- TOPBAR SUPERIOR EJECUTIVA -->
+      <header class="saas-topbar">
+        <div class="topbar-left">
+          <!-- Botón hamburguesa móvil -->
+          <button
+            type="button"
+            (click)="toggleMobileSidebar()"
+            class="mobile-toggle-btn mobile-only"
+            title="Abrir menú lateral"
+          >
+            ☰
+          </button>
+
+          <!-- Identificador de Tenant / Empresa -->
+          <div class="tenant-badge">
+            <span class="tenant-dot"></span>
+            @if (auth.user()?.empresa_id) {
+              <span class="tenant-name">FashionStore Demo</span>
+              <span class="tenant-plan">Plan Profesional (BR-03)</span>
+            } @else {
+              <span class="tenant-name">Administración SaaS Global</span>
+              <span class="tenant-plan">Superadmin</span>
+            }
           </div>
-
-          <a routerLink="/auditoria">Auditoría (CU-05)</a>
-          <a routerLink="/vestidor-virtual">Vestidor RA (CU-36)</a>
-          <a routerLink="/backups">Backups (CU-37)</a>
-        }
-        @if (user.rol === 'cajero' || user.rol === 'encargado') {
-          <a routerLink="/inventario">Inventario (CU-17)</a>
-          <a routerLink="/pos">POS (CU-23)</a>
-          <a routerLink="/reservas/staff">CU-21 Preparación Staff</a>
-          <a routerLink="/offline/bloqueos">CU-27 Bloqueos</a>
-          <a routerLink="/offline/cola">Offline (CU-25..32)</a>
-        }
-        @if (user.rol === 'cliente') {
-          <a routerLink="/catalogo">Catálogo (CU-13)</a>
-          <a routerLink="/reservas/nueva">CU-19 Reservar Probador</a>
-          <a routerLink="/reservas/mis-reservas">CU-20 Mis Reservas</a>
-          <a routerLink="/checkout">Carrito (CU-22)</a>
-          <a routerLink="/vestidor-virtual">Vestidor RA (CU-36)</a>
-        }
-        <a routerLink="/profile">Mi perfil</a>
-        <button type="button" class="nav-button" (click)="requestLogout()">Salir</button>
-      } @else {
-        <a routerLink="/catalogo">Catálogo (CU-13)</a>
-        <a routerLink="/vestidor-virtual">Vestidor RA (CU-36)</a>
-        <a routerLink="/login">Ingresar</a>
-        <a class="nav-cta" routerLink="/register">Registrarse</a>
-      }
-    </nav>
-  </header>
-
-  @if (auth.user(); as user) {
-    @if (user.rol === 'administrador') {
-      <div class="sub-nav-bar">
-        <span class="sub-nav-title">Acceso Directo:</span>
-        <div class="sub-nav-links">
-          <a routerLink="/reservas/nueva" class="sub-chip">CU-19 Nueva Reserva</a>
-          <a routerLink="/reservas/mis-reservas" class="sub-chip">CU-20 Consulta Reservas</a>
-          <a routerLink="/reservas/staff" class="sub-chip">CU-21 Preparación Staff</a>
-          <span class="sub-sep">|</span>
-          <a routerLink="/reportes/convencionales" class="sub-chip">CU-33 Reportes PDF/Excel</a>
-          <a routerLink="/reportes/ia" class="sub-chip">CU-34 IA Predictiva</a>
-          <a routerLink="/analytics-ml" class="sub-chip">CU-35 ML Demanda</a>
-          <span class="sub-sep">|</span>
-          <a routerLink="/offline/catalogo" class="sub-chip">CU-25 Off-Cat</a>
-          <a routerLink="/offline/reserva" class="sub-chip">CU-26 Off-Reserva</a>
-          <a routerLink="/offline/bloqueos" class="sub-chip">CU-27 Bloqueos Activos</a>
-          <a routerLink="/offline/venta" class="sub-chip">CU-28 Off-Venta</a>
-          <a routerLink="/offline/cambio" class="sub-chip">CU-29 Off-QR</a>
-          <a routerLink="/offline/cola" class="sub-chip">CU-30/31 Sincronización</a>
-          <a routerLink="/offline/conflictos" class="sub-chip">CU-32 Conflictos</a>
-          <span class="sub-sep">|</span>
-          <a routerLink="/backups" class="sub-chip">CU-37 Backups (Nube & Local)</a>
         </div>
+
+        <div class="topbar-right">
+          <!-- Indicador de Red Online / Offline -->
+          <div
+            class="network-pill"
+            [class.online]="network.online()"
+            [class.offline]="!network.online()"
+          >
+            <span class="network-dot"></span>
+            <span>{{ network.online() ? 'En Línea (Cloud Sync)' : 'Modo Offline' }}</span>
+          </div>
+
+          <!-- Acceso Directo a Tienda Boutique -->
+          <a routerLink="/catalogo" class="btn-preview-store" target="_blank" title="Ver Tienda Online de Clientes">
+            <span>🛍️</span> Tienda Boutique
+          </a>
+
+          <!-- Enlace Mi Perfil -->
+          <a routerLink="/profile" class="btn-topbar-profile" title="Mi perfil de usuario">
+            👤 Perfil
+          </a>
+
+          <!-- Botón Cerrar Sesión -->
+          <button type="button" (click)="requestLogout()" class="btn-topbar-logout">
+            Salir
+          </button>
+        </div>
+      </header>
+
+      <!-- Banners de Sistema (Offline / Actualización) -->
+      @if (!network.online()) {
+        <div class="system-banner offline" role="status">
+          ⚠️ <strong>Modo Sin Conexión:</strong> Estás trabajando localmente con IndexedDB. Las operaciones se registrarán en la cola de sincronización (CU-30/31).
+        </div>
+      }
+
+      @if (updateReady()) {
+        <div class="system-banner update" role="status">
+          ✨ <strong>Actualización disponible:</strong> Hay una nueva versión del sistema lista para desplegarse.
+          <button type="button" (click)="reload()" class="btn-banner-action">Actualizar Ahora</button>
+        </div>
+      }
+
+      <!-- Contenedor de Vista Enrutada -->
+      <main class="page-viewport">
+        <router-outlet />
+      </main>
+
+      <!-- Pie de Página SaaS -->
+      <footer class="saas-footer">
+        <span>FashionStore SaaS Enterprise • Versión 2.0 (Segundo Parcial)</span>
+        <span>Sistemas de Información II • Grupo 33</span>
+      </footer>
+    </div>
+  </div>
+
+} @else {
+  <!-- ===================================================================== -->
+  <!-- 2. LAYOUT BOUTIQUE STOREFRONT (CLIENTES E INVITADOS E-COMMERCE)       -->
+  <!-- ===================================================================== -->
+  <div class="storefront-shell">
+    <!-- CABECERA ELEGANTE DE BOUTIQUE -->
+    <header class="boutique-topbar">
+      <!-- Marca de Lujo -->
+      <a routerLink="/catalogo" class="boutique-brand">
+        <span class="boutique-logo-icon">⚜</span>
+        <div class="boutique-brand-titles">
+          <span class="brand-name">FASHION STORE</span>
+          <span class="brand-tagline">HAUTE COUTURE & BOUTIQUE</span>
+        </div>
+      </a>
+
+      <!-- Menú de Navegación del Cliente -->
+      <nav class="boutique-nav">
+        <a routerLink="/catalogo" routerLinkActive="active" class="boutique-link">
+          Colecciones
+        </a>
+        <a routerLink="/catalogo" class="boutique-link highlight-link">
+          <span class="pill-sparkle">✨</span> Asesor de Moda IA (CU-38)
+        </a>
+        <a routerLink="/vestidor-virtual" routerLinkActive="active" class="boutique-link">
+          <span class="pill-sparkle">🪞</span> Probador Virtual Decart Lucy
+        </a>
+        <a routerLink="/reservas/nueva" routerLinkActive="active" class="boutique-link">
+          Reservar Probador
+        </a>
+        @if (auth.user()) {
+          <a routerLink="/reservas/mis-reservas" routerLinkActive="active" class="boutique-link">
+            Mis Citas / Reservas
+          </a>
+        }
+      </nav>
+
+      <!-- Acciones de Usuario y Bolsa de Compras -->
+      <div class="boutique-actions">
+        <!-- Bolsa de Compras -->
+        <a routerLink="/checkout" class="btn-boutique-cart" title="Ver bolsa de compras">
+          <span>🛍️</span>
+          <span class="cart-label">Bolsa</span>
+        </a>
+
+        @if (auth.user(); as user) {
+          <a routerLink="/profile" class="boutique-user-pill">
+            <span>👤</span> {{ user.nombre.split(' ')[0] }}
+          </a>
+          <button type="button" (click)="requestLogout()" class="btn-boutique-logout">
+            Salir
+          </button>
+        } @else {
+          <a routerLink="/login" class="btn-boutique-login">Ingresar</a>
+          <a routerLink="/register" class="btn-boutique-register">Registrarse</a>
+        }
+      </div>
+    </header>
+
+    <!-- Banners de Sistema -->
+    @if (!network.online()) {
+      <div class="system-banner offline" role="status">
+        ⚠️ Modo sin conexión a internet. Consultando catálogo guardado localmente.
       </div>
     }
-  }
 
-  @if (!network.online()) {
-    <div class="system-banner offline" role="status">
-      Sin conexion. Puede consultar los datos guardados; las escrituras estan deshabilitadas.
-    </div>
-  }
+    <!-- Vista de Catálogo / Checkout / Vestidor -->
+    <main class="storefront-main">
+      <router-outlet />
+    </main>
 
-  @if (updateReady()) {
-    <div class="system-banner update" role="status">
-      Hay una nueva version disponible.
-      <button type="button" (click)="reload()">Actualizar</button>
-    </div>
-  }
+    <!-- Footer Corporativo de Lujo -->
+    <footer class="boutique-footer">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <h4>FASHION STORE</h4>
+          <p>Moda prêt-à-porter, probador virtual fotorrealista en tiempo real y reserva exclusiva en tiendas físicas.</p>
+        </div>
+        <div class="footer-links">
+          <span>Atención al Cliente: contacto&#64;fashionstore.bo</span>
+          <span>Santa Cruz • La Paz • Cochabamba</span>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        © 2026 FashionStore Bolivia S.A. Todos los derechos reservados.
+      </div>
+    </footer>
+  </div>
+}
 
-  <main>
-    <router-outlet />
-  </main>
-
-  <footer>
-    <span>FashionStore SaaS - Segundo parcial</span>
-    <span>Sistemas de Informacion II - Grupo 33</span>
-  </footer>
-</div>
-
+<!-- DIÁLOGO GLOBAL DE CONFIRMACIÓN DE LOGOUT -->
 <app-logout-dialog
   [open]="showLogout()"
   [pending]="auth.pendingOffline()"
