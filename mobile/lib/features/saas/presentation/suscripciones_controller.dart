@@ -20,8 +20,8 @@ class SuscripcionesController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiClient.get('/saas/suscripcion/actual');
-      _suscripcionActual = res;
+      final res = await _apiClient.get('/mi-suscripcion');
+      _suscripcionActual = Map<String, dynamic>.from(res as Map);
       _loading = false;
     } catch (e) {
       _loading = false;
@@ -36,12 +36,21 @@ class SuscripcionesController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiClient.post('/saas/suscripcion', {
-        'plan_id': planId,
+      final body = <String, dynamic>{
         'payment_method_id': paymentMethodId,
-      });
-      await cargarSuscripcionActual();
-      return res;
+      };
+      final parsedPlanId = int.tryParse(planId);
+      if (parsedPlanId != null) {
+        body['plan_id'] = parsedPlanId;
+      } else {
+        body['plan_codigo'] = planId;
+      }
+
+      final res = await _apiClient.put('/mi-suscripcion', body);
+      _suscripcionActual = Map<String, dynamic>.from(res as Map);
+      _loading = false;
+      notifyListeners();
+      return _suscripcionActual;
     } catch (e) {
       _loading = false;
       _error = e.toString();
@@ -50,14 +59,20 @@ class SuscripcionesController extends ChangeNotifier {
     }
   }
 
-  Future<bool> cancelarSuscripcion() async {
+  Future<bool> cancelarSuscripcion({String? motivo}) async {
     _loading = true;
     _error = null;
     notifyListeners();
 
     try {
-      await _apiClient.post('/saas/suscripcion/cancelar', {});
-      await cargarSuscripcionActual();
+      final res = await _apiClient.post('/mi-suscripcion/cancelar', {
+        'motivo': motivo ?? 'Cancelacion solicitada desde app movil',
+      });
+      if (res is Map) {
+        _suscripcionActual = Map<String, dynamic>.from(res);
+      }
+      _loading = false;
+      notifyListeners();
       return true;
     } catch (e) {
       _loading = false;

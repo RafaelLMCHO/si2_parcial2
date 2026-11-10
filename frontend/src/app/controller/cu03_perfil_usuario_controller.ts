@@ -14,7 +14,7 @@ export class CU03PerfilUsuarioController {
 
   cargarPerfil(): Observable<any> {
     this.cargando.set(true);
-    return this.http.get<any>('/api/v1/usuarios/me').pipe(
+    return this.http.get<any>('/api/v1/users/me').pipe(
       tap({
         next: (data) => {
           this.perfil.set(data);
@@ -28,9 +28,18 @@ export class CU03PerfilUsuarioController {
     );
   }
 
-  cambiarPassword(passwords: { actual: string; nueva: string }): Observable<any> {
+  cambiarPassword(passwords: {
+    actual?: string;
+    nueva?: string;
+    password_actual?: string;
+    password_nueva?: string;
+  }): Observable<any> {
     this.cargando.set(true);
-    return this.http.post<any>('/api/v1/usuarios/me/password', passwords).pipe(
+    const body = {
+      password_actual: passwords.password_actual ?? passwords.actual ?? '',
+      password_nueva: passwords.password_nueva ?? passwords.nueva ?? '',
+    };
+    return this.http.post<any>('/api/v1/users/me/password', body).pipe(
       tap({
         next: () => this.cargando.set(false),
         error: (err) => {

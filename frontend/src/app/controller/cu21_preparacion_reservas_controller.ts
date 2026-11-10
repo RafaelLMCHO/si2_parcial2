@@ -40,10 +40,19 @@ export class CU21PreparacionReservasController {
     );
   }
 
-  reportarIncidencia(id: string, detalle: string): Observable<any> {
-    return this.http.post<any>(`/api/v1/reservas/${id}/incidencia`, { detalle }).pipe(
-      tap(() => this.cargarReservas().subscribe())
-    );
+  reportarIncidencia(
+    id: string,
+    motivo: string,
+    varianteIds: string[] = [],
+    registrarMerma: boolean = false
+  ): Observable<any> {
+    return this.http
+      .post<any>(`/api/v1/reservas/${id}/incidencia`, {
+        variante_ids: varianteIds,
+        motivo,
+        registrar_merma: registrarMerma,
+      })
+      .pipe(tap(() => this.cargarReservas().subscribe()));
   }
 }
 

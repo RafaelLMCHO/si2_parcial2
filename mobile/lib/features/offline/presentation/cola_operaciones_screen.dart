@@ -111,13 +111,13 @@ class _ColaOperacionesScreenState extends State<ColaOperacionesScreen> {
                     ? const Center(child: Text('Todas las operaciones están sincronizadas con el servidor central.'))
                     : ListView.separated(
                         itemCount: _colaCtrl.operaciones.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        separatorBuilder: (_, _) => const Divider(height: 1),
                         itemBuilder: (_, idx) {
                           final op = _colaCtrl.operaciones[idx];
                           final estado = op['estado'] ?? 'pendiente';
                           return ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: _badgeColor(estado).withOpacity(0.2),
+                              backgroundColor: _badgeColor(estado).withValues(alpha: 0.2),
                               child: Icon(Icons.receipt, color: _badgeColor(estado)),
                             ),
                             title: Text('${op['tipo']} • UUID: ${op['id']}'),

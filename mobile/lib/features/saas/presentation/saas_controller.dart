@@ -7,12 +7,16 @@ class SaasController extends ChangeNotifier {
   bool _loading = false;
   String? _error;
   List<dynamic> _empresas = [];
+  List<dynamic> _planes = [];
+  Map<String, dynamic> _metricas = {};
 
   SaasController(this._apiClient);
 
   bool get loading => _loading;
   String? get error => _error;
   List<dynamic> get empresas => _empresas;
+  List<dynamic> get planes => _planes;
+  Map<String, dynamic> get metricas => _metricas;
 
   Future<void> cargarEmpresas() async {
     _loading = true;
@@ -20,12 +24,34 @@ class SaasController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiClient.get('/saas/empresas');
-      _empresas = (res['items'] as List<dynamic>? ?? []);
+      final dynamic res = await _apiClient.get('/saas/empresas');
+      _empresas = res is List ? res : ((res as Map?)?['items'] as List<dynamic>? ?? []);
       _loading = false;
     } catch (e) {
       _loading = false;
       _error = e.toString();
+    }
+    notifyListeners();
+  }
+
+  Future<void> cargarPlanes() async {
+    try {
+      final dynamic res = await _apiClient.get('/saas/planes');
+      _planes = res is List ? res : ((res as Map?)?['items'] as List<dynamic>? ?? []);
+    } catch (e) {
+      _error ??= e.toString();
+    }
+    notifyListeners();
+  }
+
+  Future<void> cargarMetricas() async {
+    try {
+      final dynamic res = await _apiClient.get('/saas/metricas');
+      if (res is Map) {
+        _metricas = Map<String, dynamic>.from(res);
+      }
+    } catch (e) {
+      _error ??= e.toString();
     }
     notifyListeners();
   }

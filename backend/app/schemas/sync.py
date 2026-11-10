@@ -28,6 +28,29 @@ class SoftLockResponse(BaseModel):
     expira_en: datetime
     activo: bool
 
+
+class SoftLockListItem(BaseModel):
+    id: str
+    sucursal_id: str
+    sucursal_nombre: Optional[str] = None
+    variante_id: str
+    sku: Optional[str] = None
+    prenda_nombre: Optional[str] = None
+    talla: Optional[str] = None
+    color: Optional[str] = None
+    dispositivo_id: str
+    cantidad: int
+    expira_en: datetime
+    creado_en: datetime
+    ttl_restante_segundos: int
+    activo: bool
+
+
+class SoftLockReleaseResponse(BaseModel):
+    id: str
+    liberado: bool
+    mensaje: str
+
 # CU-28: Venta Offline
 class LineaVentaOffline(BaseModel):
     variante_id: str

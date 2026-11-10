@@ -50,7 +50,7 @@ class _SucursalesScreenState extends State<SucursalesScreen> {
                       ? const Center(child: Text('No hay sucursales registradas.'))
                       : ListView.separated(
                           itemCount: _controller.sucursales.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final suc = _controller.sucursales[index];
                             return ListTile(

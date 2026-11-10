@@ -68,8 +68,11 @@ class DemandaPrediccionItem(BaseModel):
 class DemandaPrediccionResponse(BaseModel):
     modelo_nombre: str = "Regresion Demanda Textil"
     version: str = "2.0"
-    metricas: Dict[str, Any]
-    predicciones: List[DemandaPrediccionItem]
+    estado: str = "ok"
+    es_demo: bool = False
+    mensaje: Optional[str] = None
+    metricas: Dict[str, Any] = {}
+    predicciones: List[DemandaPrediccionItem] = []
 
 
 class SegmentoClienteItem(BaseModel):
@@ -86,9 +89,12 @@ class SegmentoClienteItem(BaseModel):
 class SegmentacionClientesResponse(BaseModel):
     modelo_nombre: str = "K-Means RFM Segmenter"
     version: str = "2.0"
-    metricas: Dict[str, Any]
-    total_clientes_analizados: int
-    segmentos: List[SegmentoClienteItem]
+    estado: str = "ok"
+    es_demo: bool = False
+    mensaje: Optional[str] = None
+    metricas: Dict[str, Any] = {}
+    total_clientes_analizados: int = 0
+    segmentos: List[SegmentoClienteItem] = []
 
 
 class DashboardMlResponse(BaseModel):

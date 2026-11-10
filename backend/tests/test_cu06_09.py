@@ -288,3 +288,141 @@ async def test_cu09_requiere_superadmin(client: AsyncClient):
     forbidden = await client.get("/api/v1/saas/metricas", headers=headers)
     assert forbidden.status_code == 403, forbidden.text
     assert forbidden.json()["detail"]["code"] == "SUPERADMIN_REQUERIDO"
+
+
+@pytest.mark.asyncio
+async def test_cu06_crud_planes_saas(client: AsyncClient):
+    """CU-06: CRUD completo de planes SaaS y validacion de codigo unico y suscripciones activas."""
+    headers = await _superadmin_headers(client)
+    suffix = uuid4().hex[:6]
+    codigo = f"p{suffix}"
+
+    list_res = await client.get("/api/v1/saas/planes", headers=headers)
+    assert list_res.status_code == 200, list_res.text
+    assert len(list_res.json()) >= 2
+
+    cli_login = await login(client, "admin@demo.test", "Admin123!")
+    cli_headers = {"Authorization": f"Bearer {cli_login.json()['access_token']}"}
+    forb = await client.post(
+        "/api/v1/saas/planes",
+        json={"codigo": f"no{suffix}", "nombre": "No permitido", "precio_mensual": 99},
+        headers=cli_headers,
+    )
+    assert forb.status_code == 403
+
+    create_res = await client.post(
+        "/api/v1/saas/planes",
+        json={
+            "codigo": codigo,
+            "nombre": f"Plan Test {suffix}",
+            "precio_mensual": 299.0,
+            "periodo": "mensual",
+            "moneda": "BOB",
+            "limites": {"sucursales": 4, "usuarios": 15, "productos": 1200, "consultas_ia_mes": 100},
+        },
+        headers=headers,
+    )
+    assert create_res.status_code == 201, create_res.text
+    plan_id = create_res.json()["id"]
+
+    try:
+        dup_res = await client.post(
+            "/api/v1/saas/planes",
+            json={"codigo": codigo, "nombre": "Duplicado", "precio_mensual": 100},
+            headers=headers,
+        )
+        assert dup_res.status_code == 409
+        assert dup_res.json()["detail"]["code"] == "PLAN_DUPLICADO"
+
+        upd_res = await client.put(
+            f"/api/v1/saas/planes/{plan_id}",
+            json={"nombre": f"Plan Actualizado {suffix}", "precio_mensual": 350.0, "periodo": "anual"},
+            headers=headers,
+        )
+        assert upd_res.status_code == 200, upd_res.text
+        assert upd_res.json()["periodo"] == "anual"
+
+        del_in_use = await client.delete("/api/v1/saas/planes/profesional", headers=headers)
+        assert del_in_use.status_code == 409
+        assert del_in_use.json()["detail"]["code"] == "PLAN_CON_SUSCRIPCIONES_ACTIVAS"
+
+        del_res = await client.delete(f"/api/v1/saas/planes/{plan_id}", headers=headers)
+        assert del_res.status_code == 200, del_res.text
+        assert del_res.json()["activo"] is False
+    finally:
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute("DELETE FROM plan WHERE id = $1", plan_id)
+
+
+@pytest.mark.asyncio
+async def test_cu07_mi_suscripcion_cambiar_y_cancelar(client: AsyncClient):
+    """CU-07: Tenant admin cambia de plan con validacion de limites y cancela su suscripcion."""
+    headers = await _superadmin_headers(client)
+    payload = _company_payload()
+    create_res = await client.post("/api/v1/saas/empresas", json=payload, headers=headers)
+    assert create_res.status_code == 201, create_res.text
+    created = create_res.json()
+    company_id = created["empresa_id"]
+
+    try:
+        today = date.today()
+        assign = await client.put(
+            f"/api/v1/saas/empresas/{company_id}/suscripcion",
+            json={
+                "plan_codigo": "basico",
+                "fecha_inicio": today.isoformat(),
+                "fecha_fin": (today + timedelta(days=30)).isoformat(),
+                "estado": "activa",
+                "renovacion_auto": True,
+            },
+            headers=headers,
+        )
+        assert assign.status_code == 200, assign.text
+
+        adm_login = await login(client, payload["correo_admin"], created["password_temporal"], created["slug"])
+        assert adm_login.status_code == 200, adm_login.text
+        adm_headers = {"Authorization": f"Bearer {adm_login.json()['access_token']}"}
+
+        upgrade = await client.put(
+            "/api/v1/mi-suscripcion",
+            json={"plan_codigo": "profesional", "renovacion_auto": False},
+            headers=adm_headers,
+        )
+        assert upgrade.status_code == 200, upgrade.text
+        assert upgrade.json()["suscripcion"]["plan"]["codigo"] == "profesional"
+
+        cancel = await client.post(
+            "/api/v1/mi-suscripcion/cancelar",
+            json={"motivo": "Cierre temporal de temporada"},
+            headers=adm_headers,
+        )
+        assert cancel.status_code == 200, cancel.text
+        assert cancel.json()["estado"] == "cancelada"
+    finally:
+        await _delete_company(company_id)
+
+
+@pytest.mark.asyncio
+async def test_cu08_facturas_listado_y_pdf(client: AsyncClient):
+    """CU-08: Superadmin lista facturas SaaS y descarga PDF; admin de tenant recibe 403."""
+    sa_headers = await _superadmin_headers(client)
+    fac_res = await client.get("/api/v1/saas/facturas", headers=sa_headers)
+    assert fac_res.status_code == 200, fac_res.text
+    facturas = fac_res.json()
+    assert isinstance(facturas, list) and len(facturas) >= 1
+
+    factura_id = facturas[0]["id"]
+    pdf_res = await client.get(f"/api/v1/saas/facturas/{factura_id}/pdf", headers=sa_headers)
+    assert pdf_res.status_code == 200, pdf_res.text
+    assert "application/pdf" in pdf_res.headers.get("content-type", "")
+    assert pdf_res.content.startswith(b"%PDF")
+
+    not_found = await client.get("/api/v1/saas/facturas/FAC-00000000/pdf", headers=sa_headers)
+    assert not_found.status_code == 404
+
+    adm_login = await login(client, "admin@demo.test", "Admin123!")
+    adm_headers = {"Authorization": f"Bearer {adm_login.json()['access_token']}"}
+    forbidden = await client.get(f"/api/v1/saas/facturas/{factura_id}/pdf", headers=adm_headers)
+    assert forbidden.status_code == 403
+    assert forbidden.json()["detail"]["code"] == "SUPERADMIN_REQUERIDO"

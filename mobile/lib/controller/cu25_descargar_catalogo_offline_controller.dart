@@ -31,7 +31,7 @@ class CU25DescargarCatalogoOfflineController extends ChangeNotifier {
       final prendas = (res['prendas'] as List<dynamic>? ?? []);
       final variantes = (res['variantes'] as List<dynamic>? ?? []);
 
-      _articulosDescargados = variantes.length;
+      _articulosDescargados = variantes.isNotEmpty ? variantes.length : prendas.length;
       _ultimaDescarga = DateTime.now();
 
       // Guardar meta fecha en local

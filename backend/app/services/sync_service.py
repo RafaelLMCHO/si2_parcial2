@@ -3,6 +3,7 @@ import hmac
 import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
+from uuid import UUID
 from asyncpg import Pool
 from fastapi import HTTPException
 
@@ -10,6 +11,7 @@ from app.schemas.sync import (
     CatalogoOfflinePackage,
     SoftLockCreate,
     SoftLockResponse,
+    SoftLockListItem,
     NotaCambioCreate,
     SyncBatchRequest,
     SyncBatchResponse,
@@ -169,6 +171,103 @@ class SyncService:
                     expira_en=expira_en,
                     activo=True
                 )
+
+    async def listar_soft_locks(
+        self, empresa_id: str, sucursal_id: Optional[str] = None
+    ) -> List[SoftLockListItem]:
+        now_utc = datetime.now(timezone.utc)
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "DELETE FROM soft_lock WHERE empresa_id = $1 AND expira_en <= NOW()",
+                empresa_id,
+            )
+
+            query = """
+                SELECT sl.id, sl.sucursal_id, s.nombre AS sucursal_nombre,
+                       sl.variante_id, v.sku, p.nombre AS prenda_nombre,
+                       t.nombre AS talla, c.nombre AS color,
+                       sl.dispositivo_id, sl.cantidad, sl.expira_en, sl.creado_en
+                FROM soft_lock sl
+                LEFT JOIN sucursal s ON s.id = sl.sucursal_id
+                LEFT JOIN variante v ON v.id = sl.variante_id
+                LEFT JOIN prenda p ON p.id = v.prenda_id
+                LEFT JOIN talla t ON t.id = v.talla_id
+                LEFT JOIN color c ON c.id = v.color_id
+                WHERE sl.empresa_id = $1 AND sl.expira_en > NOW()
+            """
+            params: List[Any] = [empresa_id]
+            if sucursal_id:
+                query += " AND sl.sucursal_id = $2"
+                params.append(sucursal_id)
+            query += " ORDER BY sl.expira_en ASC"
+
+            rows = await conn.fetch(query, *params)
+            items: List[SoftLockListItem] = []
+            for r in rows:
+                item = dict(r)
+                expira_en = item.get("expira_en")
+                creado_en = item.get("creado_en") or now_utc
+                if isinstance(expira_en, str):
+                    expira_en = datetime.fromisoformat(expira_en.replace("Z", "+00:00"))
+                if expira_en.tzinfo is None:
+                    expira_en = expira_en.replace(tzinfo=timezone.utc)
+                if isinstance(creado_en, str):
+                    creado_en = datetime.fromisoformat(creado_en.replace("Z", "+00:00"))
+                if creado_en.tzinfo is None:
+                    creado_en = creado_en.replace(tzinfo=timezone.utc)
+                ttl_seg = max(0, int((expira_en - now_utc).total_seconds()))
+                items.append(
+                    SoftLockListItem(
+                        id=str(item["id"]),
+                        sucursal_id=str(item["sucursal_id"]),
+                        sucursal_nombre=item.get("sucursal_nombre"),
+                        variante_id=str(item["variante_id"]),
+                        sku=item.get("sku"),
+                        prenda_nombre=item.get("prenda_nombre"),
+                        talla=item.get("talla"),
+                        color=item.get("color"),
+                        dispositivo_id=str(item.get("dispositivo_id") or "DEFAULT_DEVICE"),
+                        cantidad=int(item.get("cantidad") or 0),
+                        expira_en=expira_en,
+                        creado_en=creado_en,
+                        ttl_restante_segundos=ttl_seg,
+                        activo=ttl_seg > 0,
+                    )
+                )
+            return items
+
+    async def liberar_soft_lock(self, empresa_id: str, lock_id: str) -> dict:
+        try:
+            UUID(str(lock_id))
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="Identificador de bloqueo inválido")
+
+        async with self.pool.acquire() as conn:
+            try:
+                row = await conn.fetchrow(
+                    """
+                    DELETE FROM soft_lock
+                    WHERE id = $1 AND empresa_id = $2
+                    RETURNING id
+                    """,
+                    lock_id,
+                    empresa_id,
+                )
+            except Exception as exc:
+                if "uuid" in str(exc).lower() or "DataError" in type(exc).__name__:
+                    raise HTTPException(status_code=400, detail="Identificador de bloqueo inválido")
+                raise
+
+            if not row:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Soft-lock no encontrado o ya expirado",
+                )
+            return {
+                "id": str(row["id"]),
+                "liberado": True,
+                "mensaje": "Bloqueo temporal liberado correctamente",
+            }
 
     # =========================================================================
     # CU-29: Validar comprobante y procesar cambio mediante QR offline

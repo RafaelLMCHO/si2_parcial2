@@ -47,8 +47,8 @@ class CU32ResolverConflictosController extends ChangeNotifier {
       await _apiClient.post('/sync/conflictos/resolver', {
         'operacion_id': operacionId,
         'decision': decision,
-        if (motivo != null) 'motivo': motivo,
-        if (detalle != null) 'detalle': detalle,
+        'motivo': ?motivo,
+        'detalle': ?detalle,
       });
 
       await cargarConflictos();

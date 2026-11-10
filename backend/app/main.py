@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers import (
+    auditoria,
     auth,
     backups,
     carrito,
@@ -90,6 +91,7 @@ app.middleware("http")(audit_middleware)
 app.include_router(auth.router, prefix=settings.api_prefix)
 app.include_router(users.router, prefix=settings.api_prefix)
 app.include_router(saas.router, prefix=settings.api_prefix)
+app.include_router(auditoria.router, prefix=settings.api_prefix)
 app.include_router(suscripciones.router, prefix=settings.api_prefix)
 app.include_router(empleados.router, prefix=settings.api_prefix)
 app.include_router(sucursales.router, prefix=settings.api_prefix)

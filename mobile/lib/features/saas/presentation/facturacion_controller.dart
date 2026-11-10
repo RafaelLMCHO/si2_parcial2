@@ -20,8 +20,8 @@ class FacturacionController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiClient.get('/saas/facturas');
-      _facturas = res is List ? res : (res['items'] ?? []);
+      final dynamic res = await _apiClient.get('/saas/facturas');
+      _facturas = res is List ? res : ((res as Map?)?['items'] as List<dynamic>? ?? []);
       _loading = false;
     } catch (e) {
       _loading = false;
@@ -30,15 +30,26 @@ class FacturacionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String?> descargarFacturaUrl(String facturaId) async {
+  Future<List<int>?> descargarFacturaPdf(String facturaId) async {
     try {
-      final res = await _apiClient.get('/saas/facturas/$facturaId/pdf');
-      return res['pdf_url'];
+      final dynamic res = await _apiClient.get('/saas/facturas/$facturaId/pdf', rawBytes: true);
+      if (res is List<int>) {
+        return res;
+      }
+      if (res is List) {
+        return List<int>.from(res);
+      }
+      return null;
     } catch (e) {
       _error = e.toString();
       notifyListeners();
       return null;
     }
+  }
+
+  Future<String?> descargarFacturaUrl(String facturaId) async {
+    final bytes = await descargarFacturaPdf(facturaId);
+    return bytes != null ? '/saas/facturas/$facturaId/pdf' : null;
   }
 }
 

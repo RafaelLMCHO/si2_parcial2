@@ -70,3 +70,38 @@ async def test_listar_mis_reservas_cliente(client: AsyncClient):
     data = resp.json()
     assert "items" in data
 
+
+@pytest.mark.asyncio
+async def test_listar_mis_reservas_endpoint_canonico(client: AsyncClient):
+    """CU-20: GET /api/v1/reservas/mis-reservas con filtro de estado y aislamiento por usuario."""
+    r = await login(client, "cliente@demo.test", "Cliente123!")
+    assert r.status_code == 200
+    token = r.json()["access_token"]
+    user_id = str(r.json()["usuario"]["id"])
+    headers = {"Authorization": f"Bearer {token}"}
+
+    reserva = await _crear_reserva_helper(client, token)
+    reserva_id = reserva["id"]
+
+    try:
+        resp = await client.get(
+            f"{BASE}/reservas/mis-reservas",
+            params={"estado": "pendiente_preparacion", "page": 1, "page_size": 20},
+            headers=headers,
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["page"] == 1
+        assert any(str(it["id"]) == str(reserva_id) for it in data["items"])
+        assert all(str(it["usuario_id"]) == user_id for it in data["items"])
+
+        other_state = await client.get(
+            f"{BASE}/reservas/mis-reservas",
+            params={"estado": "cancelada"},
+            headers=headers,
+        )
+        assert other_state.status_code == 200
+        assert not any(str(it["id"]) == str(reserva_id) for it in other_state.json()["items"])
+    finally:
+        await client.post(f"{BASE}/reservas/{reserva_id}/cancelar", headers=headers, json={})
+

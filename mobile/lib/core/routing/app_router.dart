@@ -12,11 +12,13 @@ import '../../features/empleados/presentation/empleados_screen.dart';
 import '../../features/inventario/presentation/disponibilidad_screen.dart';
 import '../../features/inventario/presentation/inventario_screen.dart';
 import '../../features/offline/presentation/catalogo_offline_screen.dart';
-import '../../features/offline/presentation/reserva_offline_screen.dart';
-import '../../features/offline/presentation/venta_offline_screen.dart';
 import '../../features/offline/presentation/cambio_qr_screen.dart';
+import '../../features/offline/presentation/bloqueos_activos_screen.dart';
 import '../../features/offline/presentation/cola_operaciones_screen.dart';
 import '../../features/offline/presentation/conflictos_screen.dart';
+import '../../features/offline/presentation/reserva_offline_screen.dart';
+import '../../features/offline/presentation/venta_offline_screen.dart';
+import '../../features/backups/presentation/backups_screen.dart';
 import '../../features/reportes/presentation/reportes_convencionales_screen.dart';
 import '../../features/reportes/presentation/reporte_ia_screen.dart';
 import '../../features/analytics_ml/presentation/dashboard_ml_screen.dart';
@@ -87,8 +89,12 @@ GoRouter createRouter(
       ),
       GoRoute(
         path: '/disponibilidad',
-        builder: (context, state) =>
-            DisponibilidadScreen(apiClient: session.apiClient),
+        builder: (context, state) => DisponibilidadScreen(
+          prendaId: state.uri.queryParameters['prenda_id'] ?? '',
+          prendaNombre: state.uri.queryParameters['nombre'] ?? 'Disponibilidad',
+          apiClient: session.apiClient,
+          localDb: session.database,
+        ),
       ),
       GoRoute(
         path: '/reservas',
@@ -152,8 +158,24 @@ GoRouter createRouter(
       ),
       GoRoute(
         path: '/offline/reserva',
+        builder: (context, state) => ReservaOfflineScreen(
+          database: session.database,
+          apiClient: session.apiClient,
+          initialSucursalId: state.uri.queryParameters['sucursal_id'],
+          initialVarianteId: state.uri.queryParameters['variante_id'],
+        ),
+      ),
+      GoRoute(
+        path: '/offline/bloqueos',
+        builder: (context, state) => BloqueosActivosScreen(
+          database: session.database,
+          apiClient: session.apiClient,
+        ),
+      ),
+      GoRoute(
+        path: '/backups',
         builder: (context, state) =>
-            ReservaOfflineScreen(database: session.database),
+            BackupsScreen(apiClient: session.apiClient),
       ),
       GoRoute(
         path: '/offline/venta',

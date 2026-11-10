@@ -94,4 +94,84 @@ class ApiClient {
     _refreshFuture = future;
     return future;
   }
+
+  Future<dynamic> get(
+    String path, {
+    Map<String, dynamic>? query,
+    Map<String, dynamic>? queryParameters,
+    Map<String, dynamic>? headers,
+    bool rawBytes = false,
+  }) async {
+    final response = await dio.get<dynamic>(
+      path,
+      queryParameters: queryParameters ?? query,
+      options: (headers != null || rawBytes)
+          ? Options(
+              headers: headers,
+              responseType: rawBytes ? ResponseType.bytes : null,
+            )
+          : null,
+    );
+    return response.data;
+  }
+
+  Future<dynamic> post(
+    String path, [
+    dynamic data,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? query,
+  ]) async {
+    final response = await dio.post<dynamic>(
+      path,
+      data: data,
+      queryParameters: query,
+      options: headers != null ? Options(headers: headers) : null,
+    );
+    return response.data;
+  }
+
+  Future<dynamic> put(
+    String path, [
+    dynamic data,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? query,
+  ]) async {
+    final response = await dio.put<dynamic>(
+      path,
+      data: data,
+      queryParameters: query,
+      options: headers != null ? Options(headers: headers) : null,
+    );
+    return response.data;
+  }
+
+  Future<dynamic> patch(
+    String path, [
+    dynamic data,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? query,
+  ]) async {
+    final response = await dio.patch<dynamic>(
+      path,
+      data: data,
+      queryParameters: query,
+      options: headers != null ? Options(headers: headers) : null,
+    );
+    return response.data;
+  }
+
+  Future<dynamic> delete(
+    String path, [
+    dynamic data,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? query,
+  ]) async {
+    final response = await dio.delete<dynamic>(
+      path,
+      data: data,
+      queryParameters: query,
+      options: headers != null ? Options(headers: headers) : null,
+    );
+    return response.data;
+  }
 }

@@ -262,7 +262,7 @@ async def obtener_dashboard_convencional(
     # 3. Stock total
     stock_total = await conn.fetchval(
         """
-        SELECT COALESCE(SUM(stock_actual), 0)::int
+        SELECT COALESCE(SUM(stock_disponible), 0)::int
         FROM inventario
         WHERE empresa_id = $1
         """,
@@ -274,7 +274,7 @@ async def obtener_dashboard_convencional(
         """
         SELECT COUNT(id)::int
         FROM reserva
-        WHERE empresa_id = $1 AND estado IN ('confirmada', 'en_preparacion', 'lista_para_retiro')
+        WHERE empresa_id = $1 AND estado IN ('pendiente_preparacion', 'preparada', 'activa', 'confirmada')
         """,
         empresa_id,
     )

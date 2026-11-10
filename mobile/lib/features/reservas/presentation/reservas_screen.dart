@@ -27,18 +27,23 @@ class _ReservasScreenState extends State<ReservasScreen> {
   }
 
   Future<void> _cargarReservas() async {
-    setState(() => _cargando = true);
+    setState(() {
+      _cargando = true;
+      _mensaje = null;
+    });
     try {
-      final endpoint = widget.esEncargado ? '/reservas/por-preparar' : '/reservas';
+      final endpoint = widget.esEncargado ? '/reservas/por-preparar' : '/reservas/mis-reservas';
       final res = await widget.apiClient.get(endpoint);
+      if (!mounted) return;
       setState(() {
         _reservas = (res['items'] as List<dynamic>? ?? []);
         _cargando = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _cargando = false;
-        _mensaje = 'Error al cargar reservas';
+        _mensaje = 'Error al cargar reservas: $e';
       });
     }
   }
@@ -60,11 +65,13 @@ class _ReservasScreenState extends State<ReservasScreen> {
 
     try {
       await widget.apiClient.post('/reservas/$reservaId/cancelar', {});
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Reserva cancelada con éxito')),
       );
       _cargarReservas();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al cancelar: $e')),
       );
@@ -94,11 +101,13 @@ class _ReservasScreenState extends State<ReservasScreen> {
       await widget.apiClient.post('/reservas/$reservaId/preparar', {
         'probador': probadorCtrl.text.trim(),
       });
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Reserva preparada. Cliente notificado.')),
       );
       _cargarReservas();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al preparar: $e')),
       );
@@ -113,27 +122,29 @@ class _ReservasScreenState extends State<ReservasScreen> {
       ),
       body: _cargando
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _cargarReservas,
-              child: _reservas.isEmpty
-                  ? const Center(child: Text('No hay reservas activas.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _reservas.length,
-                      itemBuilder: (ctx, index) {
-                        final r = _reservas[index];
-                        final items = (r['items'] as List<dynamic>? ?? []);
-                        final estado = r['estado'] ?? 'pendiente';
+          : _mensaje != null
+              ? Center(child: Text(_mensaje!, style: const TextStyle(color: Colors.red)))
+              : RefreshIndicator(
+                  onRefresh: _cargarReservas,
+                  child: _reservas.isEmpty
+                      ? const Center(child: Text('No hay reservas activas.'))
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: _reservas.length,
+                          itemBuilder: (ctx, index) {
+                            final r = _reservas[index];
+                            final items = (r['items'] as List<dynamic>? ?? []);
+                            final estado = r['estado'] ?? 'pendiente';
 
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.between,
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
                                       r['codigo'] ?? '',
@@ -151,30 +162,30 @@ class _ReservasScreenState extends State<ReservasScreen> {
                                 const Divider(),
                                 ...items.map((it) => Text('• ${it['prenda_nombre']} (${it['talla']}/${it['color']}) x${it['cantidad']}')),
                                 const SizedBox(height: 10),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    if (estado == 'pendiente_preparacion' && !widget.esEncargado)
-                                      OutlinedButton(
-                                        onPressed: () => _cancelarReserva(r['id']),
-                                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                                        child: const Text('Cancelar'),
-                                      ),
-                                    if (widget.esEncargado && estado == 'pendiente_preparacion')
-                                      ElevatedButton(
-                                        onPressed: () => _prepararReserva(r['id']),
-                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                                        child: const Text('✓ Preparada'),
-                                      ),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        if (estado == 'pendiente_preparacion' && !widget.esEncargado)
+                                          OutlinedButton(
+                                            onPressed: () => _cancelarReserva(r['id']),
+                                            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                                            child: const Text('Cancelar'),
+                                          ),
+                                        if (widget.esEncargado && estado == 'pendiente_preparacion')
+                                          ElevatedButton(
+                                            onPressed: () => _prepararReserva(r['id']),
+                                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                            child: const Text('✓ Preparada'),
+                                          ),
+                                      ],
+                                    )
                                   ],
-                                )
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                  ),
     );
   }
 }

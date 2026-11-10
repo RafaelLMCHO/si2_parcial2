@@ -67,8 +67,8 @@ export class AuditoriaComponent implements OnInit {
   constructor(private readonly http: HttpClient) {}
 
   ngOnInit(): void {
-    this.http.get<any>(`${environment.apiUrl}/saas/auditoria`).subscribe({
-      next: (resp) => (this.eventos = resp.items || []),
+    this.http.get<any>(`${environment.apiUrl}/auditoria/logs`).subscribe({
+      next: (resp) => (this.eventos = Array.isArray(resp) ? resp : (resp.items || [])),
       error: () => (this.eventos = []),
     });
   }

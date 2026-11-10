@@ -38,20 +38,40 @@ class _DisponibilidadScreenState extends State<DisponibilidadScreen> {
       _error = null;
     });
 
+    if (widget.prendaId.trim().isEmpty) {
+      setState(() {
+        _cargando = false;
+        _error = 'Seleccione una prenda del catalogo para consultar su disponibilidad por tienda.';
+        _datos = null;
+      });
+      return;
+    }
+
     try {
-      final response = await widget.apiClient.get('/prendas/${widget.prendaId}/disponibilidad');
-      final datos = DisponibilidadPrenda.fromJson(response);
+      final dynamic response = await widget.apiClient.get(
+        '/inventario/prendas/${widget.prendaId}/disponibilidad',
+      );
+      final datos = DisponibilidadPrenda.fromJson(
+        Map<String, dynamic>.from(response as Map),
+      );
+      if (!mounted) return;
       setState(() {
         _datos = datos;
         _cargando = false;
       });
     } catch (e) {
       // Fallback a SQLite local (CU-18)
+      final locales = await widget.localDb.listarExistenciasLocales();
+      final actualizadoEn = locales.isNotEmpty
+          ? (locales.first['actualizado_en']?.toString() ?? DateTime.now().toIso8601String())
+          : DateTime.now().toIso8601String();
+      if (!mounted) return;
       setState(() {
+        _error = 'No se pudo contactar al servidor; usando respaldo local ($e).';
         _datos = DisponibilidadPrenda(
           prendaId: widget.prendaId,
-          agotadoEnTodas: false,
-          actualizadoEn: DateTime.now().toIso8601String(),
+          agotadoEnTodas: locales.isEmpty,
+          actualizadoEn: actualizadoEn,
           sucursales: [],
           esLocal: true,
         );
@@ -73,6 +93,21 @@ class _DisponibilidadScreenState extends State<DisponibilidadScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  if (_error != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        border: Border.all(color: Colors.red.shade200),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _error!,
+                        style: TextStyle(color: Colors.red.shade800, fontSize: 12),
+                      ),
+                    ),
+                  ],
                   // Alerta Offline con texto exacto de la especificación CU-18
                   if (_datos?.esLocal == true) ...[
                     Container(

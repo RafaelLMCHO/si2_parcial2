@@ -12,7 +12,7 @@ from app.core.security import (
     new_verification_token,
     verify_password,
 )
-from app.db import admin_connection, audit_event, tenant_connection
+from app.db import admin_connection, audit_event, get_pool, tenant_connection
 from app.schemas.auth import (
     LoginRequest,
     LoginResponse,
@@ -20,6 +20,8 @@ from app.schemas.auth import (
     RefreshResponse,
     RegisterRequest,
     RegisterResponse,
+    TenantRegisterRequest,
+    TenantRegisterResponse,
     UserOut,
     VerifyEmailRequest,
     VerifyEmailResponse,
@@ -464,6 +466,60 @@ async def register(data: RegisterRequest, ip: str | None) -> RegisterResponse:
         mensaje="Usuario registrado. Revise su correo para verificar la cuenta.",
         usuario_id=usuario_id,
         empresa_id=empresa_id,
+        verification_token=token if settings.expose_verification_token else None,
+    )
+
+
+async def register_tenant(data: TenantRegisterRequest, ip: str | None) -> TenantRegisterResponse:
+    from app.controller.cu01_registro_inquilino_controller import CU01RegistroInquilinoController
+
+    settings = get_settings()
+    pool = get_pool()
+    created = await CU01RegistroInquilinoController.registrar_inquilino(
+        pool=pool,
+        nombre_empresa=data.nombre_empresa,
+        slug=data.slug,
+        admin_email=str(data.email_admin),
+        password_hash=hash_password(data.password),
+        nombre_admin=data.nombre_admin,
+        nit=data.nit,
+        telefono=data.telefono,
+        direccion=data.direccion,
+        plan_codigo=data.plan_codigo,
+        verification_token_minutes=settings.verification_token_minutes,
+    )
+
+    token = created["verification_token"]
+    _send_verification_email(str(data.email_admin), token, created["slug"])
+
+    await _safe_audit(
+        empresa_id=created["empresa_id"],
+        usuario_id=created["usuario_id"],
+        actor_tipo="usuario",
+        accion="insert",
+        entidad="empresa",
+        entidad_id=created["empresa_id"],
+        datos_despues={
+            "nombre_empresa": data.nombre_empresa,
+            "slug": created["slug"],
+            "nit": created["nit"],
+            "plan_codigo": created["plan_codigo"],
+            "email_admin": str(data.email_admin).strip().lower(),
+        },
+        ip=ip,
+        metodo="POST",
+        endpoint="/api/v1/auth/register-tenant",
+        parametros={"slug": created["slug"], "plan_codigo": created["plan_codigo"]},
+    )
+
+    return TenantRegisterResponse(
+        mensaje="Empresa registrada con exito. Revise el correo de verificacion del administrador.",
+        empresa_id=created["empresa_id"],
+        usuario_id=created["usuario_id"],
+        slug=created["slug"],
+        nit=created["nit"],
+        plan_codigo=created["plan_codigo"],
+        email_verificado=False,
         verification_token=token if settings.expose_verification_token else None,
     )
 

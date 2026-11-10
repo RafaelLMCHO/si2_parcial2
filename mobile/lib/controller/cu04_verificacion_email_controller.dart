@@ -24,10 +24,11 @@ class CU04VerificacionEmailController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final success = await _session.verifyEmail(
+      final res = await _session.verifyEmail(
         empresaSlug: empresaSlug,
         token: token,
       );
+      final success = res != null;
       _loading = false;
       if (success) {
         _message = '¡Cuenta verificada exitosamente!';
@@ -48,29 +49,12 @@ class CU04VerificacionEmailController extends ChangeNotifier {
     required String empresaSlug,
     required String correo,
   }) async {
-    _loading = true;
-    _error = null;
+    _loading = false;
+    _message = null;
+    _error =
+        'Utiliza el token generado en el registro de $correo ($empresaSlug) o solicita apoyo al administrador.';
     notifyListeners();
-
-    try {
-      final success = await _session.resendVerification(
-        empresaSlug: empresaSlug,
-        correo: correo,
-      );
-      _loading = false;
-      if (success) {
-        _message = 'Enlace reenviado correctamente.';
-      } else {
-        _error = _session.error ?? 'No se pudo reenviar el correo';
-      }
-      notifyListeners();
-      return success;
-    } catch (e) {
-      _loading = false;
-      _error = e.toString();
-      notifyListeners();
-      return false;
-    }
+    return false;
   }
 }
 

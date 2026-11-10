@@ -23,15 +23,20 @@ class DisponibilidadController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiClient.get('/prendas/$prendaId/disponibilidad');
-      _datos = DisponibilidadPrenda.fromJson(res);
+      final dynamic res = await _apiClient.get('/inventario/prendas/$prendaId/disponibilidad');
+      _datos = DisponibilidadPrenda.fromJson(Map<String, dynamic>.from(res as Map));
       _loading = false;
     } catch (e) {
       // Fallback a almacenamiento local SQLite (CU-18)
+      final locales = await _localDb.listarExistenciasLocales();
+      final actualizadoEn = locales.isNotEmpty
+          ? (locales.first['actualizado_en']?.toString() ?? DateTime.now().toIso8601String())
+          : DateTime.now().toIso8601String();
+      _error = 'Modo offline: $e';
       _datos = DisponibilidadPrenda(
         prendaId: prendaId,
-        agotadoEnTodas: false,
-        actualizadoEn: DateTime.now().toIso8601String(),
+        agotadoEnTodas: locales.isEmpty,
+        actualizadoEn: actualizadoEn,
         sucursales: [],
         esLocal: true,
       );

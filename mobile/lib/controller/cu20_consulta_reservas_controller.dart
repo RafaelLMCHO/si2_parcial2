@@ -37,7 +37,7 @@ class CU20ConsultaReservasController extends ChangeNotifier {
 
     try {
       await _apiClient.post('/reservas/$reservaId/cancelar', {
-        if (motivo != null) 'motivo': motivo,
+        'motivo': ?motivo,
       });
       await cargarMisReservas();
       return true;

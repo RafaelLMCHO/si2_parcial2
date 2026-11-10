@@ -16,17 +16,23 @@ class TemporadasController extends ChangeNotifier {
   List<dynamic> get colecciones => _colecciones;
   List<dynamic> get temporadas => _temporadas;
 
+  Future<void> cargarTemporadas() => cargar();
+
   Future<void> cargar() async {
     _loading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final colRes = await _apiClient.get('/colecciones');
-      _colecciones = (colRes['items'] as List<dynamic>? ?? []);
+      final dynamic colRes = await _apiClient.get('/temporadas-colecciones/colecciones');
+      _colecciones = colRes is List
+          ? colRes
+          : ((colRes as Map?)?['items'] as List<dynamic>? ?? []);
 
-      final tempRes = await _apiClient.get('/colecciones/temporadas');
-      _temporadas = (tempRes['items'] as List<dynamic>? ?? []);
+      final dynamic tempRes = await _apiClient.get('/temporadas-colecciones/temporadas');
+      _temporadas = tempRes is List
+          ? tempRes
+          : ((tempRes as Map?)?['items'] as List<dynamic>? ?? []);
 
       _loading = false;
     } catch (e) {

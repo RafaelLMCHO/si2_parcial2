@@ -20,8 +20,8 @@ class EmpleadosController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiClient.get('/empleados');
-      _empleados = (res['items'] as List<dynamic>? ?? []);
+      final dynamic res = await _apiClient.get('/empleados');
+      _empleados = res is List ? res : ((res as Map?)?['items'] as List<dynamic>? ?? []);
       _loading = false;
     } catch (e) {
       _loading = false;

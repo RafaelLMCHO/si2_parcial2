@@ -52,6 +52,7 @@ class _PosScreenState extends State<PosScreen> {
         _barcodeCtrl.clear();
       });
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Artículo no encontrado: $e')),
       );
@@ -97,6 +98,7 @@ class _PosScreenState extends State<PosScreen> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() => _procesando = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al cobrar: $e')),
@@ -187,7 +189,7 @@ class _PosScreenState extends State<PosScreen> {
             child: Column(
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.between,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('TOTAL (IVA Inc.):', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     Text(

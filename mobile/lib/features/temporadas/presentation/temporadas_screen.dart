@@ -50,7 +50,7 @@ class _TemporadasScreenState extends State<TemporadasScreen> {
                       ? const Center(child: Text('No hay temporadas registradas.'))
                       : ListView.separated(
                           itemCount: _controller.temporadas.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final temp = _controller.temporadas[index];
                             return ListTile(

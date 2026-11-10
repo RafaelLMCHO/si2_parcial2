@@ -14,14 +14,18 @@ class CU18DisponibilidadTiendasController extends ChangeNotifier {
   String? get error => _error;
   List<dynamic> get tiendas => _tiendas;
 
-  Future<void> consultarDisponibilidad(String varianteId) async {
+  Future<void> consultarDisponibilidad(String prendaId) async {
     _loading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final res = await _apiClient.get('/inventario/disponibilidad/variante/$varianteId');
-      _tiendas = (res['tiendas'] as List<dynamic>? ?? []);
+      final dynamic res = await _apiClient.get('/inventario/prendas/$prendaId/disponibilidad');
+      if (res is Map) {
+        _tiendas = (res['sucursales'] as List<dynamic>? ?? res['tiendas'] as List<dynamic>? ?? []);
+      } else {
+        _tiendas = [];
+      }
       _loading = false;
     } catch (e) {
       _loading = false;

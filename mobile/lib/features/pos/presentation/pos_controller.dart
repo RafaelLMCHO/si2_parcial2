@@ -112,16 +112,23 @@ class PosController extends ChangeNotifier {
 
     try {
       final body = {
+        'idempotency_key': 'pos-${DateTime.now().millisecondsSinceEpoch}',
         'sucursal_id': sucursalId,
-        'metodo_pago': _metodoPago,
-        'monto_recibido': _metodoPago == 'efectivo' ? _montoRecibido : total,
-        'cliente_nombre': clienteNombre,
-        'cliente_documento': clienteDocumento,
-        'lineas': _lineas.map((l) => {
+        'items': _lineas.map((l) => {
           'variante_id': l['variante_id'],
           'cantidad': l['cantidad'],
-          'precio_unitario': l['precio_unitario'],
         }).toList(),
+        'cliente': (clienteNombre != null || clienteDocumento != null)
+            ? {
+                'tipo': 'identificado',
+                'nombre': ?clienteNombre,
+                'documento': ?clienteDocumento,
+              }
+            : {'tipo': 'consumidor_final'},
+        'pago': {
+          'metodo': _metodoPago,
+          'monto_recibido': _metodoPago == 'efectivo' ? _montoRecibido : total,
+        },
       };
 
       final venta = await _apiClient.post('/pos/ventas', body);

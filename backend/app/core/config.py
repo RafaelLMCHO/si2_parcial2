@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     decart_api_key: str = ""
     decart_model: str = "lucy-vton-3.6"
     decart_api_url: str = "https://api.decart.ai/v1"
+    stripe_secret_key: str = ""
+    stripe_publishable_key: str = ""
+    stripe_webhook_secret: str = ""
+    payment_currency: str = "usd"
+    llm_api_key: str = ""
+    llm_model: str = "gpt-4o-mini"
+    llm_api_url: str = "https://api.openai.com/v1/chat/completions"
 
 
 @lru_cache

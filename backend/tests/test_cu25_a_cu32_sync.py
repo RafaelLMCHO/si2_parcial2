@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 import pytest
 import uuid
 import json
@@ -30,6 +31,12 @@ class FakeConn:
 
     async def fetchrow(self, sql, *args):
         self.executed.append((sql, args))
+        if "DELETE FROM soft_lock" in sql:
+            if args and str(args[0]) == "invalid-uuid":
+                raise ValueError("invalid input syntax for type uuid")
+            if self.fetchrow_results.get("delete_soft_lock") is not None:
+                return self.fetchrow_results["delete_soft_lock"]
+            return {"id": args[0]} if args else {"id": str(uuid.uuid4())}
         if "inventario" in sql:
             return {"stock_disponible": 10, "bloqueado": 0}
         if "sync_registro_idempotencia" in sql:
@@ -47,6 +54,23 @@ class FakeConn:
 
     async def fetch(self, sql, *args):
         self.executed.append((sql, args))
+        if "FROM soft_lock sl" in sql:
+            return [
+                {
+                    "id": uuid.uuid4(),
+                    "sucursal_id": uuid.uuid4(),
+                    "sucursal_nombre": "Sucursal Centro",
+                    "variante_id": uuid.uuid4(),
+                    "sku": "FS-VES-001-NEG-M",
+                    "prenda_nombre": "Vestido midi",
+                    "talla": "M",
+                    "color": "Negro",
+                    "dispositivo_id": "DEV-001",
+                    "cantidad": 2,
+                    "expira_en": datetime.now(timezone.utc) + timedelta(minutes=30),
+                    "creado_en": datetime.now(timezone.utc),
+                }
+            ]
         if "prenda" in sql:
             return [{"id": uuid.uuid4(), "codigo": "PR-01", "nombre": "Camisa Oxford", "precio_base": 120.0, "categoria_id": uuid.uuid4()}]
         if "variante_prenda" in sql:
@@ -181,4 +205,41 @@ async def test_cu32_resolver_conflicto():
         )
     )
     assert res["nuevo_estado"] == "resuelta"
+
+
+async def test_cu27_listar_y_liberar_soft_locks():
+    """CU-27: Listado con TTL restante y liberación manual de bloqueos activos."""
+    pool = FakePool()
+    service = SyncService(pool)
+    empresa_id = str(uuid.uuid4())
+    sucursal_id = str(uuid.uuid4())
+
+    locks = await service.listar_soft_locks(empresa_id=empresa_id, sucursal_id=sucursal_id)
+    assert len(locks) == 1
+    assert locks[0].activo is True
+    assert locks[0].ttl_restante_segundos > 0
+    assert locks[0].sku == "FS-VES-001-NEG-M"
+    assert any("DELETE FROM soft_lock" in sql for sql, _ in pool.conn.executed)
+
+    lock_id = str(uuid.uuid4())
+    liberado = await service.liberar_soft_lock(empresa_id=empresa_id, lock_id=lock_id)
+    assert liberado["liberado"] is True
+    assert liberado["id"] == lock_id
+
+    pool.conn.fetchrow_results["delete_soft_lock"] = False
+
+    class NotFoundConn(FakeConn):
+        async def fetchrow(self, sql, *args):
+            if "DELETE FROM soft_lock" in sql:
+                return None
+            return await super().fetchrow(sql, *args)
+
+    pool.conn = NotFoundConn()
+    with pytest.raises(HTTPException) as exc_404:
+        await service.liberar_soft_lock(empresa_id=empresa_id, lock_id=str(uuid.uuid4()))
+    assert exc_404.value.status_code == 404
+
+    with pytest.raises(HTTPException) as exc_400:
+        await service.liberar_soft_lock(empresa_id=empresa_id, lock_id="invalid-uuid")
+    assert exc_400.value.status_code == 400
 

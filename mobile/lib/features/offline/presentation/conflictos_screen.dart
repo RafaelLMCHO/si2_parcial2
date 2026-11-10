@@ -59,7 +59,7 @@ class _ConflictosScreenState extends State<ConflictosScreen> {
                   : ListView.separated(
                       padding: const EdgeInsets.all(12),
                       itemCount: _controller.conflictos.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
                       itemBuilder: (_, idx) {
                         final c = _controller.conflictos[idx];
                         return Card(

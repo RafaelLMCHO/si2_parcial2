@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, Header, Query, Request, status
+from fastapi import APIRouter, Body, Depends, Header, Query, Request, status
 
 from app.api.deps import CurrentUser, get_current_user
 from app.core.errors import api_error
 from app.schemas.reserva import (
     CancelarReservaRequest,
+    CompletarReservaRequest,
     CrearReservaRequest,
     IncidenciaReservaOut,
     IncidenciaReservaRequest,
@@ -99,6 +100,34 @@ async def listar_reservas(
     return ReservaListResponse(**res)
 
 
+@router.get("/mis-reservas", response_model=ReservaListResponse)
+async def listar_mis_reservas(
+    estado: Optional[str] = Query(None),
+    desde: Optional[datetime] = Query(None),
+    hasta: Optional[datetime] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    empresa_id: Optional[str] = Query(None, description="Para Superadmin"),
+    current: CurrentUser = Depends(get_current_user),
+) -> ReservaListResponse:
+    """CU-20: Listar unicamente las reservas propias del usuario autenticado."""
+    empresa = _resolver_empresa(current, empresa_id)
+
+    res = await reserva_service.listar_reservas(
+        empresa_id=empresa,
+        user_id=current.user_id,
+        rol="cliente",
+        sucursal_id_usuario=None,
+        estado=estado,
+        sucursal_id_filtro=None,
+        desde=desde,
+        hasta=hasta,
+        page=page,
+        page_size=page_size,
+    )
+    return ReservaListResponse(**res)
+
+
 @router.get("/por-preparar", response_model=ReservaListResponse)
 async def listar_por_preparar(
     sucursal_id: Optional[str] = Query(None),
@@ -182,6 +211,30 @@ async def preparar_reserva(
         user_id=current.user_id,
         reserva_id=reserva_id,
         probador=data.probador,
+        ip=request.client.host if request.client else None,
+    )
+    return ReservaOut(**res)
+
+
+@router.post("/{reserva_id}/completar", response_model=ReservaOut)
+async def completar_reserva(
+    request: Request,
+    reserva_id: str,
+    data: CompletarReservaRequest = Body(default_factory=CompletarReservaRequest),
+    empresa_id: Optional[str] = Query(None, description="Para Superadmin"),
+    current: CurrentUser = Depends(get_current_user),
+) -> ReservaOut:
+    """CU-21: Completar reserva tras atención en probador/tienda y liberar stock reservado."""
+    if current.rol not in {"encargado", "administrador", "superadmin"}:
+        raise api_error(403, "PERMISO_DENEGADO", "Solo el personal autorizado puede completar reservas")
+
+    empresa = _resolver_empresa(current, empresa_id)
+
+    res = await reserva_service.completar_reserva(
+        empresa_id=empresa,
+        user_id=current.user_id,
+        reserva_id=reserva_id,
+        motivo=data.motivo,
         ip=request.client.host if request.client else None,
     )
     return ReservaOut(**res)

@@ -93,7 +93,7 @@ export class InventarioService {
 
     if (isOnline) {
       return this.http
-        .get<DisponibilidadPrendaResponse>(`${environment.apiUrl}/prendas/${prendaId}/disponibilidad`)
+        .get<DisponibilidadPrendaResponse>(`${environment.apiUrl}/inventario/prendas/${prendaId}/disponibilidad`)
         .pipe(
           tap((resp) => this.guardarEnIndexedDB(prendaId, resp)),
           catchError((err) => {

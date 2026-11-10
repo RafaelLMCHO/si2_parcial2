@@ -35,7 +35,7 @@ class CU22CheckoutCarritoController extends ChangeNotifier {
   }
 
   void setTipoEntrega(String tipo, {String? sucursalId}) {
-    _tipoEntrega = tipo;
+    _tipoEntrega = tipo == 'retiro' ? 'recojo' : tipo;
     _sucursalRetiroId = sucursalId;
     notifyListeners();
   }
@@ -49,18 +49,25 @@ class CU22CheckoutCarritoController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final tipoNormalizado = _tipoEntrega == 'retiro' ? 'recojo' : _tipoEntrega;
       final body = <String, dynamic>{
-        'tipo_entrega': _tipoEntrega,
-        if (_tipoEntrega == 'retiro' && _sucursalRetiroId != null)
+        'tipo_entrega': tipoNormalizado,
+        if (tipoNormalizado == 'recojo' && _sucursalRetiroId != null)
           'sucursal_id': _sucursalRetiroId,
-        if (direccionEnvio != null) 'direccion_envio': direccionEnvio,
-        if (notas != null) 'notas': notas,
+        'direccion_envio': ?direccionEnvio,
+        'notas': ?notas,
       };
 
-      final orden = await _apiClient.post('/checkout/ordenes', body);
+      final orden = await _apiClient.post(
+        '/checkout/ordenes',
+        body,
+        {
+          'Idempotency-Key': 'mob-chk-${DateTime.now().millisecondsSinceEpoch}',
+        },
+      );
       _loading = false;
       notifyListeners();
-      return orden;
+      return Map<String, dynamic>.from(orden as Map);
     } catch (e) {
       _loading = false;
       _error = e.toString();

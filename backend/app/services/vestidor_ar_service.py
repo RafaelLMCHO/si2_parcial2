@@ -1,10 +1,14 @@
 import logging
+import os
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
+import httpx
 from asyncpg import Connection
 from fastapi import HTTPException, status
 
+from app.core.config import get_settings
 from app.schemas.inteligencia import (
     AvatarClienteDto,
     FinalizarSesionArRequest,
@@ -20,7 +24,7 @@ async def listar_prendas_ar(
     conn: Connection,
     empresa_id: UUID,
 ) -> List[PrendaArResponse]:
-    """CU-36: Obtiene el catálogo de prendas habilitadas con modelos 3D y texturas para Realidad Aumentada."""
+    """CU-36: Obtiene el catálogo de prendas habilitadas con modelos 3D reales en prenda_ar."""
     rows = await conn.fetch(
         """
         SELECT
@@ -44,42 +48,8 @@ async def listar_prendas_ar(
         empresa_id,
     )
 
-    # Si aún no hay registros específicos, generar modelos dinámicos para las primeras prendas
     if not rows:
-        prendas = await conn.fetch(
-            """
-            SELECT p.id, p.codigo, p.nombre, p.marca, cat.nombre AS categoria
-            FROM prenda p
-            LEFT JOIN categoria cat ON cat.id = p.categoria_id AND cat.empresa_id = p.empresa_id
-            WHERE p.empresa_id = $1
-            LIMIT 6
-            """,
-            empresa_id,
-        )
-        items = []
-        for p in prendas:
-            items.append(
-                PrendaArResponse(
-                    id=uuid4(),
-                    prenda_id=p["id"],
-                    codigo_prenda=p["codigo"],
-                    nombre_prenda=p["nombre"],
-                    marca=p["marca"],
-                    categoria=p["categoria"],
-                    modelo_url="/assets/models/ar/casual_tshirt.glb",
-                    textura_url="/assets/textures/ar/cotton_blue.png",
-                    puntos_ajuste={
-                        "hombro_izq": [-0.25, 0.40, 0],
-                        "hombro_der": [0.25, 0.40, 0],
-                        "cuello": [0, 0.45, 0],
-                        "pecho": [0, 0.25, 0.05],
-                        "escala_base": 1.0,
-                    },
-                    talla_referencia="M",
-                    activo=True,
-                )
-            )
-        return items
+        return []
 
     return [
         PrendaArResponse(
@@ -128,39 +98,9 @@ async def obtener_prenda_ar_por_id(
         prenda_id,
     )
     if not row:
-        # Fallback dinámico sobre prenda existente
-        p_row = await conn.fetchrow(
-            """
-            SELECT p.id, p.codigo, p.nombre, p.marca, cat.nombre AS categoria
-            FROM prenda p
-            LEFT JOIN categoria cat ON cat.id = p.categoria_id AND cat.empresa_id = p.empresa_id
-            WHERE p.empresa_id = $1 AND p.id = $2
-            """,
-            empresa_id,
-            prenda_id,
-        )
-        if not p_row:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Prenda no encontrada en la empresa",
-            )
-        return PrendaArResponse(
-            id=uuid4(),
-            prenda_id=p_row["id"],
-            codigo_prenda=p_row["codigo"],
-            nombre_prenda=p_row["nombre"],
-            marca=p_row["marca"],
-            categoria=p_row["categoria"],
-            modelo_url="/assets/models/ar/casual_tshirt.glb",
-            textura_url="/assets/textures/ar/cotton_blue.png",
-            puntos_ajuste={
-                "hombro_izq": [-0.25, 0.40, 0],
-                "hombro_der": [0.25, 0.40, 0],
-                "cuello": [0, 0.45, 0],
-                "escala_base": 1.0,
-            },
-            talla_referencia="M",
-            activo=True,
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Prenda no configurada para Realidad Aumentada en la empresa",
         )
 
     return PrendaArResponse(
@@ -327,37 +267,42 @@ async def obtener_sesion_decart_lucy(
     usuario_id: UUID,
 ) -> Dict[str, Any]:
     """CU-36: Genera o autoriza la sesión WebRTC / WebSocket de Decart Lucy VTON en tiempo real."""
-    import httpx
-    from app.core.config import get_settings
-
     settings = get_settings()
-    api_key = settings.decart_api_key
+    api_key = (os.environ.get("DECART_API_KEY") or settings.decart_api_key or "").strip()
     if not api_key:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="La API Key de Decart Lucy (DECART_API_KEY) no está configurada en el servidor.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="El vestidor virtual Decart Lucy VTON no está disponible: DECART_API_KEY no configurada en el servidor.",
         )
 
-    model = settings.decart_model or "lucy-vton-3.6"
+    model = (os.environ.get("DECART_MODEL") or settings.decart_model or "lucy-vton-3.6").strip()
+    api_url = (os.environ.get("DECART_API_URL") or settings.decart_api_url or "https://api.decart.ai/v1").rstrip("/")
     stream_url = f"wss://api.decart.ai/v1/stream?model={model}"
 
     token = api_key
     try:
         async with httpx.AsyncClient(timeout=4.0) as client:
             resp = await client.post(
-                f"{settings.decart_api_url}/realtime/sessions",
+                f"{api_url}/realtime/sessions",
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                 },
                 json={"model": model, "ttl_seconds": 900},
             )
+            if resp.status_code in (401, 403):
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Credenciales DECART_API_KEY rechazadas por el proveedor Decart.",
+                )
             if resp.status_code == 200:
                 data = resp.json()
                 token = data.get("client_token", token)
                 stream_url = data.get("webrtc_url", stream_url)
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.info(f"Usando token directo de Decart Lucy: {e}")
+        logger.warning(f"No se pudo contactar /realtime/sessions de Decart, entregando stream directo: {e}")
 
     return {
         "motor": "decart-lucy-vton",
@@ -380,9 +325,19 @@ async def preparar_prompt_lucy_vton(
     talla: Optional[str] = None,
 ) -> Dict[str, Any]:
     """CU-36: Construye la instrucción y referencia fotográfica para el modelo Decart Lucy VTON."""
+    settings = get_settings()
+    model = (os.environ.get("DECART_MODEL") or settings.decart_model or "lucy-vton-3.6").strip()
+
     prenda = await conn.fetchrow(
         """
-        SELECT p.nombre, p.descripcion, p.marca, p.imagen_url, cat.nombre AS categoria
+        SELECT p.nombre, p.descripcion, p.marca,
+               COALESCE(
+                   (SELECT pr.url FROM prenda_recurso pr
+                     WHERE pr.empresa_id = p.empresa_id AND pr.prenda_id = p.id
+                     ORDER BY pr.es_principal DESC, pr.orden ASC LIMIT 1),
+                   p.imagen_url
+               ) AS imagen_url,
+               cat.nombre AS categoria
         FROM prenda p
         LEFT JOIN categoria cat ON cat.id = p.categoria_id AND cat.empresa_id = p.empresa_id
         WHERE p.id = $1 AND p.empresa_id = $2
@@ -408,9 +363,9 @@ async def preparar_prompt_lucy_vton(
         f"photorealistic studio lighting, smooth 30fps integration"
     )
 
-    imagen_url = prenda["imagen_url"] or "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80"
-    if "cdn.fashionstore.test" in imagen_url:
-        imagen_url = "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80"
+    imagen_url = prenda["imagen_url"]
+    if not imagen_url or "cdn.fashionstore.test" in str(imagen_url):
+        imagen_url = f"/api/v1/catalogo/prendas/{prenda_id}"
 
     return {
         "prenda_id": str(prenda_id),
@@ -419,7 +374,7 @@ async def preparar_prompt_lucy_vton(
         "image_url": imagen_url,
         "color_hex": color_hex or "#1E3A8A",
         "speed": "fast",
-        "model": "lucy-vton-3.6",
+        "model": model,
     }
 
 

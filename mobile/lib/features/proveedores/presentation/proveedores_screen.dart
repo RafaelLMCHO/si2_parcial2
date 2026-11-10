@@ -50,7 +50,7 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                       ? const Center(child: Text('No hay proveedores registrados.'))
                       : ListView.separated(
                           itemCount: _controller.proveedores.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final prov = _controller.proveedores[index];
                             return ListTile(

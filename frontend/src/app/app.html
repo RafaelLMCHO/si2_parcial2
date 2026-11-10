@@ -47,7 +47,8 @@
             <button type="button" class="nav-group-btn">Offline ▾</button>
             <div class="nav-dropdown">
               <a routerLink="/offline/catalogo"><strong>CU-25:</strong> Catálogo Offline</a>
-              <a routerLink="/offline/reserva"><strong>CU-26/27:</strong> Reserva y Soft-Lock</a>
+              <a routerLink="/offline/reserva"><strong>CU-26/27:</strong> Reserva Offline</a>
+              <a routerLink="/offline/bloqueos"><strong>CU-27:</strong> Bloqueos Activos (Soft-Lock)</a>
               <a routerLink="/offline/venta"><strong>CU-28:</strong> Venta Contado Offline</a>
               <a routerLink="/offline/cambio"><strong>CU-29:</strong> Validar QR de Cambio</a>
               <a routerLink="/offline/cola"><strong>CU-30/31:</strong> Cola y Sincronización</a>
@@ -55,6 +56,7 @@
             </div>
           </div>
 
+          <a routerLink="/auditoria">Auditoría (CU-05)</a>
           <a routerLink="/vestidor-virtual">Vestidor RA (CU-36)</a>
           <a routerLink="/backups">Backups (CU-37)</a>
         }
@@ -62,6 +64,7 @@
           <a routerLink="/inventario">Inventario (CU-17)</a>
           <a routerLink="/pos">POS (CU-23)</a>
           <a routerLink="/reservas/staff">CU-21 Preparación Staff</a>
+          <a routerLink="/offline/bloqueos">CU-27 Bloqueos</a>
           <a routerLink="/offline/cola">Offline (CU-25..32)</a>
         }
         @if (user.rol === 'cliente') {
@@ -96,7 +99,8 @@
           <a routerLink="/analytics-ml" class="sub-chip">CU-35 ML Demanda</a>
           <span class="sub-sep">|</span>
           <a routerLink="/offline/catalogo" class="sub-chip">CU-25 Off-Cat</a>
-          <a routerLink="/offline/reserva" class="sub-chip">CU-26/27 Off-Reserva</a>
+          <a routerLink="/offline/reserva" class="sub-chip">CU-26 Off-Reserva</a>
+          <a routerLink="/offline/bloqueos" class="sub-chip">CU-27 Bloqueos Activos</a>
           <a routerLink="/offline/venta" class="sub-chip">CU-28 Off-Venta</a>
           <a routerLink="/offline/cambio" class="sub-chip">CU-29 Off-QR</a>
           <a routerLink="/offline/cola" class="sub-chip">CU-30/31 Sincronización</a>

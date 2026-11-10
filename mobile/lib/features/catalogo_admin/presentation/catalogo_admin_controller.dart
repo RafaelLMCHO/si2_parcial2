@@ -20,8 +20,8 @@ class CatalogoAdminController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiClient.get('/catalogo/admin/prendas');
-      _prendas = (res['items'] as List<dynamic>? ?? []);
+      final dynamic res = await _apiClient.get('/catalogo/admin/prendas');
+      _prendas = res is List ? res : ((res as Map?)?['items'] as List<dynamic>? ?? []);
       _loading = false;
     } catch (e) {
       _loading = false;

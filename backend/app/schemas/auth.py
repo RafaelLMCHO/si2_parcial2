@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -61,6 +61,33 @@ class RegisterResponse(BaseModel):
     mensaje: str
     usuario_id: UUID
     empresa_id: UUID
+    email_verificado: bool = False
+    verification_token: str | None = None
+
+
+class TenantRegisterRequest(BaseModel):
+    nombre_empresa: str = Field(min_length=2, max_length=120)
+    slug: str | None = Field(default=None, max_length=120)
+    nit: str | None = Field(default=None, max_length=20)
+    telefono: str | None = Field(default=None, max_length=20)
+    direccion: str | None = Field(default=None, max_length=200)
+    nombre_admin: str = Field(min_length=2, max_length=120)
+    email_admin: str = Field(
+        min_length=3,
+        max_length=254,
+        pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+    )
+    password: str = Field(min_length=8, max_length=128)
+    plan_codigo: str = Field(default="basico", max_length=20)
+
+
+class TenantRegisterResponse(BaseModel):
+    mensaje: str
+    empresa_id: UUID
+    usuario_id: UUID
+    slug: str
+    nit: str
+    plan_codigo: str
     email_verificado: bool = False
     verification_token: str | None = None
 

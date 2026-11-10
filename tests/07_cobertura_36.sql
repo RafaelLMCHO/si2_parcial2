@@ -270,6 +270,97 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'CU-36: no se registró la sesión de prueba virtual';
     END IF;
+
+    -- Validaciones de esquema y RLS para ajustes CU-01..CU-37 (db/27_ajustes_36cu.sql + CU-37)
+    IF NOT EXISTS (
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_schema = current_schema()
+           AND table_name = 'plan'
+           AND column_name = 'periodo'
+    ) THEN
+        RAISE EXCEPTION 'CU-06: falta la columna plan.periodo';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+          FROM pg_constraint
+         WHERE conname = 'reserva_estado_check'
+           AND pg_get_constraintdef(oid) LIKE '%completada%'
+    ) THEN
+        RAISE EXCEPTION 'CU-21: reserva_estado_check no incluye el estado completada';
+    END IF;
+
+    IF (
+        SELECT count(*)
+          FROM pg_indexes
+         WHERE schemaname = current_schema()
+           AND tablename = 'bitacora_auditoria'
+           AND indexname IN ('ix_bitacora_auditoria_empresa_fecha', 'ix_bitacora_auditoria_accion_fecha')
+    ) <> 2 THEN
+        RAISE EXCEPTION 'CU-05: faltan indices paginados en bitacora_auditoria';
+    END IF;
+
+    IF (
+        SELECT count(*)
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = current_schema()
+           AND c.relname IN ('soft_lock', 'nota_cambio', 'sync_registro_idempotencia')
+           AND c.relrowsecurity = true
+           AND c.relforcerowsecurity = true
+    ) <> 3 THEN
+        RAISE EXCEPTION 'CU-27/CU-29/CU-31: RLS no esta habilitado y forzado en tablas offline';
+    END IF;
+
+    IF to_regclass('backup_registro') IS NULL OR to_regclass('backup_configuracion') IS NULL THEN
+        RAISE EXCEPTION 'CU-37: faltan tablas de backups (backup_registro/backup_configuracion)';
+    END IF;
 END $$;
 
 ROLLBACK;
+
+/*
+================================================================================
+MATRIZ DE COBERTURA FUNCIONAL (CU-01 a CU-37)
+CU | backend | web | móvil | test | estado
+--------------------------------------------------------------------------------
+CU-01 | routers/auth.py (/auth/login, /auth/register-tenant) | features/auth/login, features/saas/empresa-form | features/auth/presentation/login_screen.dart | test_cu01_05.py, test_e2e_36_cu.py | completo
+CU-02 | routers/auth.py (/auth/register, /auth/verify-email) | features/auth/register, verify-email | features/auth/presentation/{register,verify_email}_screen.dart | test_cu01_05.py, 07_cobertura_36.sql, test_e2e_36_cu.py | completo
+CU-03 | routers/users.py (/users/me, /users/me/password) | features/profile/profile.component.ts | features/profile/presentation/profile_screen.dart | test_cu01_05.py, test_e2e_36_cu.py | completo
+CU-04 | routers/auth.py (/auth/refresh, /auth/logout) | core/auth.service.ts, core/auth.interceptor.ts | features/auth/data/auth_repository.dart | test_cu01_05.py, test_e2e_36_cu.py | completo
+CU-05 | middleware/audit.py + routers/auditoria.py (/auditoria/logs) | features/auditoria/auditoria.component.ts | features/auditoria/presentation/auditoria_screen.dart | test_cu01_05.py, 05_rls_auditoria.sql, test_e2e_36_cu.py | completo
+CU-06 | routers/saas.py (/saas/planes CRUD) | features/saas/planes/planes.component.ts | features/saas/presentation/planes_controller.dart | test_cu06_09.py, 08_cu06_cu09.sql, test_e2e_36_cu.py | completo
+CU-07 | routers/suscripciones.py (/mi-suscripcion*) | features/mi-suscripcion/mi-suscripcion.component.ts | features/saas/presentation/suscripciones_controller.dart | test_cu06_09.py, 06_limites_planes.sql, test_e2e_36_cu.py | completo
+CU-08 | routers/saas.py (/saas/facturas, /saas/facturas/{id}/pdf) | features/saas/facturacion/facturacion.component.ts | features/saas/presentation/facturacion_controller.dart | test_cu06_09.py, 08_cu06_cu09.sql, test_e2e_36_cu.py | completo
+CU-09 | routers/saas.py (/saas/metricas, /saas/empresas*) | features/saas/{panel,metricas,empresa-detail} | features/saas/presentation/{saas_screen,metricas_controller}.dart | test_cu06_09.py, 01_aislamiento_tenant.sql, test_e2e_36_cu.py | completo
+CU-10 | routers/empleados.py (/empleados*) | features/empleados/empleados.component.ts | features/empleados/presentation/empleados_screen.dart | test_cu10_16.py, test_e2e_36_cu.py | completo
+CU-11 | routers/sucursales.py (/sucursales*) | features/sucursales/sucursales.component.ts | features/sucursales/presentation/sucursales_screen.dart | test_cu10_16.py, 06_limites_planes.sql, test_e2e_36_cu.py | completo
+CU-12 | routers/catalogo.py (/catalogo/admin/prendas*) | features/catalogo-admin/catalogo-admin.component.ts | features/catalogo_admin/presentation/catalogo_admin_screen.dart | test_cu10_16.py, test_e2e_36_cu.py | completo
+CU-13 | routers/catalogo.py (/catalogo/prendas, /catalogo/prendas/{id}) | features/catalogo-cliente | features/catalogo/presentation/{catalogo,detalle_producto}_screen.dart | test_cu10_16.py, test_e2e_36_cu.py | completo
+CU-14 | routers/catalogo.py (/catalogo/auxiliares + filtros) | features/catalogo-cliente | features/catalogo/presentation/widgets/filtros_catalogo_sheet.dart | test_e2e_36_cu.py | completo
+CU-15 | routers/proveedores.py (/proveedores*) | features/proveedores/proveedores.component.ts | features/proveedores/presentation/proveedores_screen.dart | test_cu10_16.py, test_e2e_36_cu.py | completo
+CU-16 | routers/colecciones.py (/temporadas-colecciones*) | features/temporadas/temporadas.component.ts | features/temporadas/presentation/temporadas_screen.dart | test_cu10_16.py, test_e2e_36_cu.py | completo
+CU-17 | routers/inventario.py (/inventario*) | features/inventario/inventario.component.ts | features/inventario/presentation/inventario_screen.dart | test_cu17_inventario.py, 02_stock_concurrente.sql, test_e2e_36_cu.py | completo
+CU-18 | routers/inventario.py (/inventario/prendas/{prenda_id}/disponibilidad) | features/disponibilidad-tiendas | features/inventario/presentation/disponibilidad_screen.dart | test_cu18_disponibilidad.py, test_e2e_36_cu.py | completo
+CU-19 | routers/reservas.py (/reservas/validar, /reservas) | features/reservas/reserva-creacion | features/reservas/presentation/reserva_creacion_controller.dart | test_cu19_reservas.py, 02_stock_concurrente.sql, test_e2e_36_cu.py | completo
+CU-20 | routers/reservas.py (/reservas/mis-reservas, /reservas/{id}/cancelar) | features/reservas/reserva-cliente | features/reservas/presentation/reserva_cliente_controller.dart | test_cu20_cancelar_reservas.py, 07_cobertura_36.sql, test_e2e_36_cu.py | completo
+CU-21 | routers/reservas.py (/reservas/por-preparar, /preparar, /completar, /incidencia) | features/reservas/reserva-staff | features/reservas/presentation/reserva_staff_controller.dart | test_cu21_preparar_reservas.py, test_e2e_36_cu.py | completo
+CU-22 | routers/carrito.py + routers/checkout.py | features/checkout/checkout.component.ts | features/checkout/presentation/checkout_screen.dart | test_cu22_checkout.py, test_e2e_36_cu.py | completo
+CU-23 | routers/pos.py (/pos/*) | features/pos/pos.component.ts | features/pos/presentation/pos_screen.dart | test_cu23_pos.py, test_e2e_36_cu.py | completo
+CU-24 | routers/pagos.py + StripeGateway (PaymentIntent, Webhook HMAC, Reembolso) | features/pagos/pagos.component.ts | features/pagos/presentation/pagos_screen.dart | test_cu24_pagos.py, 04_pagos_devoluciones.sql, test_e2e_36_cu.py | completo
+CU-25 | routers/sync.py (/sync/catalogo-offline) | features/offline/catalogo-offline | features/offline/presentation/catalogo_offline_screen.dart | test_cu25_a_cu32_sync.py, 07_cobertura_36.sql, test_e2e_36_cu.py | completo
+CU-26 | routers/sync.py (/sync) | features/offline/reserva-offline | features/offline/presentation/reserva_offline_screen.dart | test_cu25_a_cu32_sync.py, test_e2e_36_cu.py | completo
+CU-27 | routers/sync.py (/sync/soft-locks*) + fn_expirar_reservas() | features/offline/bloqueos-activos | features/offline/presentation/bloqueos_activos_screen.dart | test_cu25_a_cu32_sync.py, 07_cobertura_36.sql, test_e2e_36_cu.py | completo
+CU-28 | routers/sync.py (/sync tipo venta_offline) | features/offline/venta-offline | features/offline/presentation/venta_offline_screen.dart | test_cu25_a_cu32_sync.py, 03_offline_idempotencia.sql, test_e2e_36_cu.py | completo
+CU-29 | routers/sync.py (/sync/validar-qr, /sync/nota-cambio) | features/offline/cambio-qr | features/offline/presentation/cambio_qr_screen.dart | test_cu25_a_cu32_sync.py, test_e2e_36_cu.py | completo
+CU-30 | routers/sync.py (/sync + operacion_pendiente) | features/offline/cola-operaciones | features/offline/presentation/cola_operaciones_screen.dart | test_cu25_a_cu32_sync.py, test_e2e_36_cu.py | completo
+CU-31 | routers/sync.py (/sync + sync_registro_idempotencia) | features/offline/cola-operaciones | features/offline/presentation/cola_operaciones_screen.dart | test_cu25_a_cu32_sync.py, 03_offline_idempotencia.sql, test_e2e_36_cu.py | completo
+CU-32 | routers/sync.py (/sync/conflictos, /conflictos/resolver) | features/offline/conflictos | features/offline/presentation/conflictos_screen.dart | test_cu25_a_cu32_sync.py, test_e2e_36_cu.py | completo
+CU-33 | routers/reportes.py (/reportes/convencionales/*) | features/reportes/reportes-convencionales.component.ts | features/reportes/presentation/reportes_convencionales_screen.dart | test_cu33_a_cu36.py, test_e2e_36_cu.py | completo
+CU-34 | routers/reportes.py (/reportes/ia/*) + LLM Adapter/Whitelist BR-08 + XLSX/PDF | features/reportes/reporte-ia.component.ts | features/reportes/presentation/reporte_ia_screen.dart | test_cu33_a_cu36.py, 07_cobertura_36.sql, test_e2e_36_cu.py | completo
+CU-35 | routers/inteligencia.py (/inteligencia/ml/*) + LinearRegression/KMeans/WAV | features/analytics-ml/dashboard-ml.component.ts | features/analytics_ml/presentation/dashboard_ml_screen.dart | test_cu33_a_cu36.py, test_e2e_36_cu.py | completo
+CU-36 | routers/vestidor.py (/vestidor/*) + db/17_ar.sql + Decart Lucy VTON | features/vestidor-virtual/vestidor-virtual.component.ts | features/vestidor_virtual/presentation/vestidor_virtual_screen.dart | test_cu33_a_cu36.py, 07_cobertura_36.sql, test_e2e_36_cu.py | completo
+CU-37 | routers/backups.py (/backups*) | features/backups/backups.component.ts | features/backups/presentation/backups_screen.dart | test_cu37_backups.py, 07_cobertura_36.sql, test_e2e_36_cu.py | completo
+================================================================================
+*/

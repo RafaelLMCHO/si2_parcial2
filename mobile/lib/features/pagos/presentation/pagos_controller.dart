@@ -70,7 +70,7 @@ class PagosController extends ChangeNotifier {
     try {
       await _apiClient.post('/pagos/$pagoId/reembolsar', {
         'motivo': motivo,
-        if (montoParcial != null) 'monto': montoParcial,
+        'monto': ?montoParcial,
       });
       _loading = false;
       await consultarEstadoPago(pagoId);

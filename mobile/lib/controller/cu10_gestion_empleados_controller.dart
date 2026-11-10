@@ -20,8 +20,8 @@ class CU10GestionEmpleadosController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiClient.get('/empleados');
-      _empleados = res is List ? res : (res['items'] ?? []);
+      final dynamic res = await _apiClient.get('/empleados');
+      _empleados = res is List ? res : ((res as Map?)?['items'] as List<dynamic>? ?? []);
       _loading = false;
     } catch (e) {
       _loading = false;

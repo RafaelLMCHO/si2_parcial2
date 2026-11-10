@@ -28,7 +28,7 @@ class CU03PerfilUsuarioController extends ChangeNotifier {
     try {
       await _profileRepo.changePassword(
         passwordActual: passwordActual,
-        passwordNuevo: passwordNuevo,
+        passwordNueva: passwordNuevo,
       );
       _loading = false;
       _message = 'Contraseña actualizada con éxito.';

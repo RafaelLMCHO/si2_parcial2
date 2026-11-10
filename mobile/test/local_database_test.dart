@@ -125,4 +125,34 @@ void main() {
 
     await database.close();
   });
+
+  test('crea, lista, purga expirados y libera soft-locks CU-27', () async {
+    final database = LocalDatabase();
+    await database.open(path: inMemoryDatabasePath);
+
+    await database.crearSoftLockLocal(
+      id: 'lock-activo',
+      varianteId: 'v-1',
+      sucursalId: 's-1',
+      cantidad: 2,
+      ttlMinutos: 45,
+    );
+    await database.crearSoftLockLocal(
+      id: 'lock-expirado',
+      varianteId: 'v-2',
+      sucursalId: 's-1',
+      cantidad: 1,
+      ttlMinutos: -5,
+    );
+
+    final activos = await database.listarSoftLocksActivos();
+    expect(activos.length, 1);
+    expect(activos.single['id'], 'lock-activo');
+    expect(activos.single['cantidad'], 2);
+
+    await database.eliminarSoftLockLocal('lock-activo');
+    expect(await database.listarSoftLocksActivos(), isEmpty);
+
+    await database.close();
+  });
 }

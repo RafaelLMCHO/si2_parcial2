@@ -72,7 +72,15 @@ export class ReservaService {
     page?: number;
     page_size?: number;
   }): Observable<{ total: number; items: Reserva[] }> {
-    return this.listarReservas(params);
+    let httpParams = new HttpParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) httpParams = httpParams.set(k, String(v));
+      });
+    }
+    return this.http.get<{ total: number; items: Reserva[] }>(`${this.baseUrl}/mis-reservas`, {
+      params: httpParams,
+    });
   }
 
   completarReserva(id: string): Observable<Reserva> {

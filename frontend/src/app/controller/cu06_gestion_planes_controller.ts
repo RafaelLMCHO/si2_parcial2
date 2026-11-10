@@ -40,5 +40,31 @@ export class CU06GestionPlanesController {
       })
     );
   }
+
+  actualizarPlan(planId: string | number, plan: any): Observable<any> {
+    this.cargando.set(true);
+    return this.http.put<any>(`/api/v1/saas/planes/${planId}`, plan).pipe(
+      tap({
+        next: () => this.cargarPlanes().subscribe(),
+        error: (err) => {
+          this.error.set(err.message);
+          this.cargando.set(false);
+        }
+      })
+    );
+  }
+
+  eliminarPlan(planId: string | number): Observable<any> {
+    this.cargando.set(true);
+    return this.http.delete<any>(`/api/v1/saas/planes/${planId}`).pipe(
+      tap({
+        next: () => this.cargarPlanes().subscribe(),
+        error: (err) => {
+          this.error.set(err.message);
+          this.cargando.set(false);
+        }
+      })
+    );
+  }
 }
 

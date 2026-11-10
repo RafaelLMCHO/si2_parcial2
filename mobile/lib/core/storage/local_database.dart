@@ -392,16 +392,54 @@ class LocalDatabase {
     int ttlMinutos = 45,
   }) async {
     final db = await database;
-    final expiraEn = DateTime.now().add(Duration(minutes: ttlMinutos)).toIso8601String();
+    final ahoraUtc = DateTime.now().toUtc();
+    final expiraEn = ahoraUtc
+        .add(Duration(minutes: ttlMinutos))
+        .toIso8601String();
     await db.insert('soft_locks', {
       'id': id,
       'variante_id': varianteId,
       'sucursal_id': sucursalId,
       'cantidad': cantidad,
       'expira_en': expiraEn,
-      'creado_en': DateTime.now().toIso8601String(),
+      'creado_en': ahoraUtc.toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
     return true;
+  }
+
+  Future<List<Map<String, dynamic>>> listarSoftLocksActivos() async {
+    final db = await database;
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    await db.delete(
+      'soft_locks',
+      where: 'expira_en <= ?',
+      whereArgs: [nowIso],
+    );
+    final rows = await db.query(
+      'soft_locks',
+      where: 'expira_en > ?',
+      whereArgs: [nowIso],
+      orderBy: 'creado_en DESC',
+    );
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<void> eliminarSoftLockLocal(String id) async {
+    final db = await database;
+    await db.delete(
+      'soft_locks',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> listarExistenciasLocales() async {
+    final db = await database;
+    final rows = await db.query(
+      'existencias_local',
+      orderBy: 'actualizado_en DESC',
+    );
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
   }
 
   Future<void> close() async {

@@ -115,7 +115,7 @@ class _VestidorVirtualScreenState extends State<VestidorVirtualScreen> {
                           decoration: BoxDecoration(
                             gradient: RadialGradient(
                               colors: [
-                                _colorSeleccionado.withOpacity(0.4),
+                                _colorSeleccionado.withValues(alpha: 0.4),
                                 Colors.black87,
                               ],
                             ),

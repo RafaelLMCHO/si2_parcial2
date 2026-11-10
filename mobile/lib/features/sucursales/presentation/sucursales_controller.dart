@@ -22,9 +22,11 @@ class SucursalesController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiClient.get('/sucursales');
-      _sucursales = (res['items'] as List<dynamic>? ?? []);
-      _limitePlan = res['limite_plan'];
+      final dynamic res = await _apiClient.get('/sucursales');
+      _sucursales = res is List ? res : ((res as Map?)?['items'] as List<dynamic>? ?? []);
+      if (res is Map) {
+        _limitePlan = res['limite_plan'] as Map<String, dynamic>?;
+      }
       _loading = false;
     } catch (e) {
       _loading = false;

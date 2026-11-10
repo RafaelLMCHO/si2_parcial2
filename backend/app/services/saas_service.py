@@ -1,8 +1,9 @@
+import io
 import logging
 import re
 import secrets
 import unicodedata
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -16,8 +17,14 @@ from app.schemas.saas import (
     EmpresaResumen,
     EstadoEmpresaResponse,
     MetricasSaaSOut,
+    MiSuscripcionCancelRequest,
+    MiSuscripcionCancelResponse,
+    MiSuscripcionChangeRequest,
     MiSuscripcionOut,
+    PlanCreateRequest,
+    PlanDeleteResponse,
     PlanOut,
+    PlanUpdateRequest,
     SuscripcionOut,
     SuscripcionUpsertRequest,
 )
@@ -43,7 +50,9 @@ _EMPRESA_COLUMNS = """
        p.codigo AS plan_codigo,
        p.nombre AS plan_nombre,
        p.precio_mensual,
+       COALESCE(p.periodo, 'mensual') AS plan_periodo,
        p.moneda,
+       p.activo AS plan_activo,
        (
            SELECT count(*)::integer
              FROM sucursal su
@@ -141,10 +150,13 @@ def _suscripcion_out(
     por_vencer = dias_restantes is not None and 0 <= dias_restantes <= 7
 
     plan = PlanOut(
+        id=int(_value(row, "plan_id")) if _value(row, "plan_id") is not None else None,
         codigo=_value(row, "plan_codigo", ""),
         nombre=_value(row, "plan_nombre", ""),
         precio_mensual=Decimal(str(_value(row, "precio_mensual", 0))),
+        periodo=_value(row, "plan_periodo", "mensual") or "mensual",
         moneda=_value(row, "moneda", "BOB"),
+        activo=bool(_value(row, "plan_activo", True)),
         limites=limites,
     )
     return SuscripcionOut(
@@ -200,10 +212,13 @@ def _mi_suscripcion_out(
 
 def _plan_out(plan: Any, limites: dict[str, int | None]) -> PlanOut:
     return PlanOut(
+        id=int(plan["id"]) if _value(plan, "id") is not None else None,
         codigo=plan["codigo"],
         nombre=plan["nombre"],
         precio_mensual=plan["precio_mensual"],
+        periodo=_value(plan, "periodo", "mensual") or "mensual",
         moneda=plan["moneda"],
+        activo=bool(_value(plan, "activo", True)),
         limites=limites,
     )
 
@@ -227,14 +242,250 @@ async def _revoke_sessions(conn: Any, empresa_id: Any) -> None:
     )
 
 
-async def list_planes() -> list[PlanOut]:
+async def _find_plan_row(conn: Any, plan_ref: str) -> Any:
+    ref = str(plan_ref).strip()
+    if ref.isdigit():
+        row = await conn.fetchrow(
+            "SELECT id, codigo, nombre, precio_mensual, COALESCE(periodo, 'mensual') AS periodo, moneda, activo FROM plan WHERE id = $1",
+            int(ref),
+        )
+    else:
+        row = await conn.fetchrow(
+            "SELECT id, codigo, nombre, precio_mensual, COALESCE(periodo, 'mensual') AS periodo, moneda, activo FROM plan WHERE lower(codigo) = $1",
+            ref.lower(),
+        )
+    if row is None:
+        raise api_error(404, "PLAN_NO_ENCONTRADO", "Plan SaaS no encontrado")
+    return row
+
+
+async def list_planes(incluir_inactivos: bool = False) -> list[PlanOut]:
     async with admin_connection() as conn:
+        where = "" if incluir_inactivos else "WHERE activo"
         planes = await conn.fetch(
-            "SELECT id, codigo, nombre, precio_mensual, moneda FROM plan WHERE activo ORDER BY precio_mensual"
+            f"SELECT id, codigo, nombre, precio_mensual, COALESCE(periodo, 'mensual') AS periodo, moneda, activo FROM plan {where} ORDER BY precio_mensual, id"
         )
         limits = await _limits_by_plan(conn)
 
     return [_plan_out(plan, limits.get(int(plan["id"]), {})) for plan in planes]
+
+
+async def create_plan(
+    data: PlanCreateRequest,
+    *,
+    actor_id: str,
+    ip: str | None,
+) -> PlanOut:
+    precio = data.precio_mensual if data.precio_mensual is not None else Decimal("0.00")
+    async with admin_connection() as conn:
+        exists = await conn.fetchval(
+            "SELECT 1 FROM plan WHERE lower(codigo) = $1",
+            data.codigo,
+        )
+        if exists:
+            raise api_error(409, "PLAN_DUPLICADO", f"Ya existe un plan con el codigo '{data.codigo}'")
+
+        plan = await conn.fetchrow(
+            """
+            INSERT INTO plan (codigo, nombre, precio_mensual, periodo, moneda, activo)
+            VALUES ($1, $2, $3, $4, $5, true)
+            RETURNING id, codigo, nombre, precio_mensual, COALESCE(periodo, 'mensual') AS periodo, moneda, activo
+            """,
+            data.codigo,
+            data.nombre,
+            precio,
+            data.periodo,
+            data.moneda,
+        )
+        for recurso, limite in data.limites.items():
+            await conn.execute(
+                """
+                INSERT INTO plan_limite (plan_id, recurso, limite)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (plan_id, recurso)
+                DO UPDATE SET limite = EXCLUDED.limite
+                """,
+                plan["id"],
+                recurso,
+                limite,
+            )
+
+    await _safe_audit(
+        empresa_id=None,
+        usuario_id=actor_id,
+        actor_tipo="superadmin",
+        accion="insert",
+        entidad="plan",
+        datos_despues={
+            "id": int(plan["id"]),
+            "codigo": data.codigo,
+            "nombre": data.nombre,
+            "precio_mensual": str(precio),
+            "periodo": data.periodo,
+            "moneda": data.moneda,
+            "limites": data.limites,
+        },
+        ip=ip,
+        es_accion_superadmin=True,
+        metodo="POST",
+        endpoint="/api/v1/saas/planes",
+        parametros={"codigo": data.codigo},
+    )
+    return _plan_out(plan, dict(data.limites))
+
+
+async def update_plan(
+    plan_ref: str,
+    data: PlanUpdateRequest,
+    *,
+    actor_id: str,
+    ip: str | None,
+) -> PlanOut:
+    async with admin_connection() as conn:
+        current = await _find_plan_row(conn, plan_ref)
+        limits = await _limits_by_plan(conn)
+        old_limits = limits.get(int(current["id"]), {})
+
+        new_codigo = data.codigo if data.codigo is not None else current["codigo"]
+        if new_codigo != current["codigo"]:
+            conflict = await conn.fetchval(
+                "SELECT 1 FROM plan WHERE lower(codigo) = $1 AND id <> $2",
+                new_codigo,
+                current["id"],
+            )
+            if conflict:
+                raise api_error(409, "PLAN_DUPLICADO", f"Ya existe otro plan con el codigo '{new_codigo}'")
+
+        new_nombre = data.nombre if data.nombre is not None else current["nombre"]
+        new_precio = data.precio_mensual if data.precio_mensual is not None else current["precio_mensual"]
+        new_periodo = data.periodo if data.periodo is not None else current["periodo"]
+        new_moneda = data.moneda if data.moneda is not None else current["moneda"]
+        new_activo = data.activo if data.activo is not None else current["activo"]
+
+        updated = await conn.fetchrow(
+            """
+            UPDATE plan
+               SET codigo = $2,
+                   nombre = $3,
+                   precio_mensual = $4,
+                   periodo = $5,
+                   moneda = $6,
+                   activo = $7
+             WHERE id = $1
+            RETURNING id, codigo, nombre, precio_mensual, COALESCE(periodo, 'mensual') AS periodo, moneda, activo
+            """,
+            current["id"],
+            new_codigo,
+            new_nombre,
+            new_precio,
+            new_periodo,
+            new_moneda,
+            new_activo,
+        )
+
+        if data.limites is not None:
+            await conn.execute("DELETE FROM plan_limite WHERE plan_id = $1", current["id"])
+            for recurso, limite in data.limites.items():
+                await conn.execute(
+                    """
+                    INSERT INTO plan_limite (plan_id, recurso, limite)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (plan_id, recurso)
+                    DO UPDATE SET limite = EXCLUDED.limite
+                    """,
+                    current["id"],
+                    recurso,
+                    limite,
+                )
+            final_limits = dict(data.limites)
+        else:
+            final_limits = old_limits
+
+    await _safe_audit(
+        empresa_id=None,
+        usuario_id=actor_id,
+        actor_tipo="superadmin",
+        accion="update",
+        entidad="plan",
+        datos_antes={
+            "id": int(current["id"]),
+            "codigo": current["codigo"],
+            "nombre": current["nombre"],
+            "precio_mensual": str(current["precio_mensual"]),
+            "periodo": current["periodo"],
+            "activo": bool(current["activo"]),
+            "limites": old_limits,
+        },
+        datos_despues={
+            "id": int(updated["id"]),
+            "codigo": updated["codigo"],
+            "nombre": updated["nombre"],
+            "precio_mensual": str(updated["precio_mensual"]),
+            "periodo": updated["periodo"],
+            "activo": bool(updated["activo"]),
+            "limites": final_limits,
+        },
+        ip=ip,
+        es_accion_superadmin=True,
+        metodo="PUT",
+        endpoint=f"/api/v1/saas/planes/{plan_ref}",
+        parametros={"plan_id": plan_ref},
+    )
+    return _plan_out(updated, final_limits)
+
+
+async def delete_plan(
+    plan_ref: str,
+    *,
+    actor_id: str,
+    ip: str | None,
+) -> PlanDeleteResponse:
+    async with admin_connection() as conn:
+        plan = await _find_plan_row(conn, plan_ref)
+        activas = int(
+            await conn.fetchval(
+                """
+                SELECT count(*)
+                  FROM suscripcion
+                 WHERE plan_id = $1
+                   AND estado IN ('prueba', 'activa', 'mora', 'suspendida')
+                """,
+                plan["id"],
+            )
+            or 0
+        )
+        if activas > 0:
+            raise api_error(
+                409,
+                "PLAN_CON_SUSCRIPCIONES_ACTIVAS",
+                f"No se puede desactivar el plan '{plan['codigo']}' porque tiene {activas} suscripcion(es) activa(s).",
+            )
+
+        await conn.execute(
+            "UPDATE plan SET activo = false WHERE id = $1",
+            plan["id"],
+        )
+
+    await _safe_audit(
+        empresa_id=None,
+        usuario_id=actor_id,
+        actor_tipo="superadmin",
+        accion="delete",
+        entidad="plan",
+        datos_antes={"id": int(plan["id"]), "codigo": plan["codigo"], "activo": bool(plan["activo"])},
+        datos_despues={"id": int(plan["id"]), "codigo": plan["codigo"], "activo": False},
+        ip=ip,
+        es_accion_superadmin=True,
+        metodo="DELETE",
+        endpoint=f"/api/v1/saas/planes/{plan_ref}",
+        parametros={"plan_id": plan_ref},
+    )
+    return PlanDeleteResponse(
+        mensaje=f"Plan '{plan['codigo']}' desactivado correctamente.",
+        id=int(plan["id"]),
+        codigo=plan["codigo"],
+        activo=False,
+    )
 
 
 async def list_empresas(
@@ -327,6 +578,226 @@ async def get_mi_suscripcion(empresa_id: str, usuario_id: str) -> MiSuscripcionO
     if row is None:
         raise api_error(404, "EMPRESA_NO_ENCONTRADA", "Empresa no encontrada")
     return _mi_suscripcion_out(row, limits)
+
+
+async def change_mi_suscripcion(
+    empresa_id: str,
+    usuario_id: str,
+    data: MiSuscripcionChangeRequest,
+    *,
+    ip: str | None = None,
+) -> MiSuscripcionOut:
+    async with admin_connection() as conn:
+        empresa = await conn.fetchrow(
+            "SELECT id, nombre, estado FROM empresa WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+            empresa_id,
+        )
+        if empresa is None:
+            raise api_error(404, "EMPRESA_NO_ENCONTRADA", "Empresa no encontrada")
+        if empresa["estado"] != "activa":
+            raise api_error(409, "EMPRESA_NO_ACTIVA", "La empresa debe estar activa para cambiar de plan")
+
+        if data.plan_id is not None:
+            plan = await conn.fetchrow(
+                "SELECT id, codigo, nombre, COALESCE(periodo, 'mensual') AS periodo FROM plan WHERE id = $1 AND activo",
+                data.plan_id,
+            )
+        else:
+            plan = await conn.fetchrow(
+                "SELECT id, codigo, nombre, COALESCE(periodo, 'mensual') AS periodo FROM plan WHERE lower(codigo) = $1 AND activo",
+                str(data.plan_codigo).strip().lower(),
+            )
+        if plan is None:
+            raise api_error(404, "PLAN_NO_DISPONIBLE", "El plan solicitado no esta disponible")
+
+        limits = await _limits_by_plan(conn)
+        plan_limits = limits.get(int(plan["id"]), {})
+
+        sucursales_activas = int(
+            await conn.fetchval(
+                "SELECT count(*) FROM sucursal WHERE empresa_id = $1 AND estado = 'activa' AND deleted_at IS NULL",
+                empresa_id,
+            )
+            or 0
+        )
+        lim_suc = plan_limits.get("sucursales")
+        if lim_suc is not None and sucursales_activas > lim_suc:
+            raise api_error(
+                409,
+                "LIMITE_SUCURSALES_EXCEDIDO",
+                f"El plan {plan['codigo']} permite maximo {lim_suc} sucursal(es) y tiene {sucursales_activas} activas.",
+            )
+
+        usuarios_activos = int(
+            await conn.fetchval(
+                "SELECT count(*) FROM usuario WHERE empresa_id = $1 AND deleted_at IS NULL",
+                empresa_id,
+            )
+            or 0
+        )
+        lim_usr = plan_limits.get("usuarios")
+        if lim_usr is not None and usuarios_activos > lim_usr:
+            raise api_error(
+                409,
+                "LIMITE_USUARIOS_EXCEDIDO",
+                f"El plan {plan['codigo']} permite maximo {lim_usr} usuario(s) y tiene {usuarios_activos} registrados.",
+            )
+
+        productos_activos = int(
+            await conn.fetchval(
+                "SELECT count(*) FROM prenda WHERE empresa_id = $1 AND deleted_at IS NULL",
+                empresa_id,
+            )
+            or 0
+        )
+        lim_prod = plan_limits.get("productos")
+        if lim_prod is not None and productos_activos > lim_prod:
+            raise api_error(
+                409,
+                "LIMITE_PRODUCTOS_EXCEDIDO",
+                f"El plan {plan['codigo']} permite maximo {lim_prod} producto(s) y tiene {productos_activos} registrados.",
+            )
+
+        current = await conn.fetchrow(
+            """
+            SELECT id, plan_id, estado, fecha_inicio, fecha_fin, renovacion_auto
+              FROM suscripcion
+             WHERE empresa_id = $1
+               AND estado IN ('prueba', 'activa', 'mora')
+             ORDER BY fecha_inicio DESC, created_at DESC
+             LIMIT 1
+             FOR UPDATE
+            """,
+            empresa_id,
+        )
+        if current is None:
+            raise api_error(409, "SUSCRIPCION_INACTIVA", "No existe una suscripcion vigente para actualizar")
+
+        before = _suscripcion_data(current)
+        await conn.execute(
+            """
+            UPDATE suscripcion
+               SET estado = 'cancelada',
+                   updated_at = now()
+             WHERE empresa_id = $1
+               AND estado IN ('prueba', 'activa', 'mora')
+            """,
+            empresa_id,
+        )
+
+        hoy = date.today()
+        dias_periodo = 365 if plan["periodo"] == "anual" else 30
+        nueva_fecha_fin = (
+            current["fecha_fin"]
+            if current["fecha_fin"] is not None and current["fecha_fin"] > hoy
+            else hoy + timedelta(days=dias_periodo)
+        )
+        renovacion = (
+            data.renovacion_auto
+            if data.renovacion_auto is not None
+            else bool(current["renovacion_auto"])
+        )
+
+        nueva_id = await conn.fetchval(
+            """
+            INSERT INTO suscripcion (
+                empresa_id, plan_id, estado, fecha_inicio, fecha_fin, renovacion_auto
+            )
+            VALUES ($1, $2, 'activa', $3, $4, $5)
+            RETURNING id
+            """,
+            empresa_id,
+            plan["id"],
+            hoy,
+            nueva_fecha_fin,
+            renovacion,
+        )
+
+    await _safe_audit(
+        empresa_id=empresa_id,
+        usuario_id=usuario_id,
+        actor_tipo="usuario",
+        accion="update",
+        entidad="suscripcion",
+        entidad_id=nueva_id,
+        datos_antes=before,
+        datos_despues={
+            "plan_codigo": plan["codigo"],
+            "estado": "activa",
+            "fecha_inicio": str(hoy),
+            "fecha_fin": str(nueva_fecha_fin),
+            "renovacion_auto": renovacion,
+        },
+        ip=ip,
+        metodo="PUT",
+        endpoint="/api/v1/mi-suscripcion",
+        parametros={"plan_codigo": plan["codigo"]},
+    )
+    return await get_mi_suscripcion(empresa_id, usuario_id)
+
+
+async def cancel_mi_suscripcion(
+    empresa_id: str,
+    usuario_id: str,
+    data: MiSuscripcionCancelRequest,
+    *,
+    ip: str | None = None,
+) -> MiSuscripcionCancelResponse:
+    async with admin_connection() as conn:
+        current = await conn.fetchrow(
+            """
+            SELECT id, plan_id, estado, fecha_inicio, fecha_fin, renovacion_auto
+              FROM suscripcion
+             WHERE empresa_id = $1
+               AND estado IN ('prueba', 'activa', 'mora')
+             ORDER BY fecha_inicio DESC, created_at DESC
+             LIMIT 1
+             FOR UPDATE
+            """,
+            empresa_id,
+        )
+        if current is None:
+            raise api_error(409, "SUSCRIPCION_NO_ACTIVA", "La empresa no tiene una suscripcion activa para cancelar")
+
+        before = _suscripcion_data(current)
+        await conn.execute(
+            """
+            UPDATE suscripcion
+               SET estado = 'cancelada',
+                   renovacion_auto = false,
+                   updated_at = now()
+             WHERE id = $1
+            """,
+            current["id"],
+        )
+
+    await _safe_audit(
+        empresa_id=empresa_id,
+        usuario_id=usuario_id,
+        actor_tipo="usuario",
+        accion="update",
+        entidad="suscripcion",
+        entidad_id=current["id"],
+        datos_antes=before,
+        datos_despues={
+            "estado": "cancelada",
+            "renovacion_auto": False,
+            "motivo": data.motivo,
+        },
+        ip=ip,
+        metodo="POST",
+        endpoint="/api/v1/mi-suscripcion/cancelar",
+        parametros={"motivo": data.motivo},
+    )
+
+    return MiSuscripcionCancelResponse(
+        mensaje="Suscripcion cancelada correctamente.",
+        empresa_id=empresa_id,
+        suscripcion_id=current["id"],
+        estado="cancelada",
+        renovacion_auto=False,
+        motivo=data.motivo,
+    )
 
 
 async def get_empresa_suscripcion(empresa_id: str) -> MiSuscripcionOut:
@@ -905,3 +1376,222 @@ async def list_facturas() -> list[dict[str, Any]]:
             }
             for r in rows
         ]
+
+
+async def get_factura_pdf(
+    factura_id: str,
+    *,
+    actor_id: str,
+    ip: str | None = None,
+) -> tuple[bytes, str]:
+    from uuid import UUID as _UUID
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    clean_id = factura_id.strip()
+    row = None
+    synth_empresa = None
+
+    async with admin_connection() as conn:
+        try:
+            parsed_uuid = _UUID(clean_id)
+        except ValueError:
+            parsed_uuid = None
+
+        if parsed_uuid is not None:
+            row = await conn.fetchrow(
+                """
+                SELECT p.id,
+                       p.empresa_id,
+                       e.nombre AS empresa_nombre,
+                       e.nit AS empresa_nit,
+                       e.correo AS empresa_correo,
+                       e.direccion AS empresa_direccion,
+                       p.monto,
+                       p.moneda,
+                       p.metodo,
+                       p.referencia,
+                       p.estado,
+                       p.pagado_en,
+                       p.periodo_inicio,
+                       p.periodo_fin,
+                       p.created_at,
+                       pl.nombre AS plan_nombre,
+                       pl.codigo AS plan_codigo
+                  FROM pago_suscripcion p
+                  JOIN empresa e ON e.id = p.empresa_id
+                  LEFT JOIN suscripcion s ON s.id = p.suscripcion_id
+                  LEFT JOIN plan pl ON pl.id = s.plan_id
+                 WHERE p.id = $1
+                """,
+                parsed_uuid,
+            )
+        elif clean_id.upper().startswith("FAC-"):
+            prefix = clean_id[4:].strip().lower()
+            row = await conn.fetchrow(
+                """
+                SELECT p.id,
+                       p.empresa_id,
+                       e.nombre AS empresa_nombre,
+                       e.nit AS empresa_nit,
+                       e.correo AS empresa_correo,
+                       e.direccion AS empresa_direccion,
+                       p.monto,
+                       p.moneda,
+                       p.metodo,
+                       p.referencia,
+                       p.estado,
+                       p.pagado_en,
+                       p.periodo_inicio,
+                       p.periodo_fin,
+                       p.created_at,
+                       pl.nombre AS plan_nombre,
+                       pl.codigo AS plan_codigo
+                  FROM pago_suscripcion p
+                  JOIN empresa e ON e.id = p.empresa_id
+                  LEFT JOIN suscripcion s ON s.id = p.suscripcion_id
+                  LEFT JOIN plan pl ON pl.id = s.plan_id
+                 WHERE lower(substring(p.id::text, 1, 8)) = $1
+                 LIMIT 1
+                """,
+                prefix,
+            )
+            if row is None:
+                synth_empresa = await conn.fetchrow(
+                    """
+                    SELECT e.id AS empresa_id,
+                           e.nombre AS empresa_nombre,
+                           e.nit AS empresa_nit,
+                           e.correo AS empresa_correo,
+                           e.direccion AS empresa_direccion,
+                           pl.nombre AS plan_nombre,
+                           pl.codigo AS plan_codigo,
+                           COALESCE(pl.precio_mensual, 499.00) AS monto,
+                           COALESCE(pl.moneda, 'BOB') AS moneda
+                      FROM empresa e
+                      LEFT JOIN LATERAL (
+                          SELECT s2.plan_id
+                            FROM suscripcion s2
+                           WHERE s2.empresa_id = e.id
+                           ORDER BY s2.fecha_inicio DESC, s2.created_at DESC
+                           LIMIT 1
+                      ) s ON true
+                      LEFT JOIN plan pl ON pl.id = s.plan_id
+                     WHERE e.deleted_at IS NULL
+                       AND lower(substring(e.id::text, 1, 8)) = $1
+                     LIMIT 1
+                    """,
+                    prefix,
+                )
+
+    if row is not None:
+        empresa_id = row["empresa_id"]
+        factura_uuid = row["id"]
+        numero = f"FAC-{str(row['id'])[:8].upper()}"
+        empresa_nombre = row["empresa_nombre"]
+        empresa_nit = row["empresa_nit"]
+        empresa_correo = str(row["empresa_correo"])
+        plan_label = f"{row['plan_nombre'] or 'Plan SaaS'} ({row['plan_codigo'] or '-'})"
+        monto_str = f"{float(row['monto']):.2f} {row['moneda']}"
+        metodo = row["metodo"]
+        estado = row["estado"]
+        periodo_str = f"{row['periodo_inicio']} al {row['periodo_fin']}"
+        fecha_emision = (row["pagado_en"] or row["created_at"]).strftime("%d/%m/%Y %H:%M")
+    elif synth_empresa is not None:
+        empresa_id = synth_empresa["empresa_id"]
+        factura_uuid = None
+        numero = clean_id.upper()
+        empresa_nombre = synth_empresa["empresa_nombre"]
+        empresa_nit = synth_empresa["empresa_nit"]
+        empresa_correo = str(synth_empresa["empresa_correo"])
+        plan_label = f"{synth_empresa['plan_nombre'] or 'Profesional'} ({synth_empresa['plan_codigo'] or 'profesional'})"
+        monto_str = f"{float(synth_empresa['monto']):.2f} {synth_empresa['moneda']}"
+        metodo = "tarjeta"
+        estado = "pagada"
+        hoy = date.today()
+        periodo_str = f"{hoy.replace(day=1)} al {hoy}"
+        fecha_emision = datetime.now().strftime("%d/%m/%Y %H:%M")
+    else:
+        raise api_error(404, "FACTURA_NO_ENCONTRADA", f"Factura '{factura_id}' no encontrada")
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=letter,
+        rightMargin=40,
+        leftMargin=40,
+        topMargin=40,
+        bottomMargin=40,
+    )
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "FacturaTitle",
+        parent=styles["Heading1"],
+        fontName="Helvetica-Bold",
+        fontSize=16,
+        textColor=colors.HexColor("#1E3A8A"),
+        spaceAfter=8,
+    )
+    meta_style = ParagraphStyle(
+        "FacturaMeta",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=10,
+        textColor=colors.HexColor("#374151"),
+        spaceAfter=4,
+    )
+
+    elements = [
+        Paragraph(f"FashionStore SaaS - Factura {numero}", title_style),
+        Paragraph(f"Fecha de emision: {fecha_emision}", meta_style),
+        Paragraph(f"Razon Social / Tenant: {empresa_nombre} (NIT: {empresa_nit})", meta_style),
+        Paragraph(f"Correo facturacion: {empresa_correo}", meta_style),
+        Spacer(1, 12),
+    ]
+
+    table_data = [
+        ["Concepto", "Periodo", "Metodo", "Estado", "Monto"],
+        [f"Suscripcion {plan_label}", periodo_str, metodo, estado.upper(), monto_str],
+    ]
+    t = Table(table_data, colWidths=[170, 130, 70, 75, 85], repeatRows=1)
+    t.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A8A")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 9),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#F9FAFB")),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D1D5DB")),
+                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 1), (-1, -1), 9),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ]
+        )
+    )
+    elements.append(t)
+    doc.build(elements)
+    pdf_bytes = buf.getvalue()
+
+    await _safe_audit(
+        empresa_id=None,
+        empresa_afectada_id=empresa_id,
+        usuario_id=actor_id,
+        actor_tipo="superadmin",
+        accion="export",
+        entidad="pago_suscripcion",
+        entidad_id=factura_uuid,
+        datos_despues={"factura_id": factura_id, "numero": numero, "monto": monto_str},
+        ip=ip,
+        es_accion_superadmin=True,
+        metodo="GET",
+        endpoint=f"/api/v1/saas/facturas/{factura_id}/pdf",
+        parametros={"factura_id": factura_id},
+    )
+
+    filename = f"factura-{clean_id}.pdf"
+    return pdf_bytes, filename

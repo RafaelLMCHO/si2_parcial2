@@ -146,7 +146,7 @@ class _VentaOfflineScreenState extends State<VentaOfflineScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _metodoPago,
+              initialValue: _metodoPago,
               decoration: const InputDecoration(labelText: 'Forma de Pago', border: OutlineInputBorder()),
               items: const [
                 DropdownMenuItem(value: 'efectivo', child: Text('Efectivo / Contado (Permitido)')),

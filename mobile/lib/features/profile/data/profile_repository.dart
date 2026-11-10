@@ -16,8 +16,8 @@ class ProfileRepository {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/users/me',
       data: {
-        if (nombre != null) 'nombre': nombre,
-        if (telefono != null) 'telefono': telefono,
+        'nombre': ?nombre,
+        'telefono': ?telefono,
       },
     );
     return AppUser.fromJson(response.data!);

@@ -154,7 +154,7 @@ export const routes: Routes = [
   },
   {
     path: 'auditoria',
-    canActivate: [superadminGuard],
+    canActivate: [adminOrSuperadminGuard],
     loadComponent: () =>
       import('./features/auditoria/auditoria.component').then((m) => m.AuditoriaComponent),
   },
@@ -206,6 +206,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/offline/reserva-offline/reserva-offline.component').then(
         (m) => m.ReservaOfflineComponent,
+      ),
+  },
+  {
+    path: 'offline/bloqueos',
+    loadComponent: () =>
+      import('./features/offline/bloqueos-activos/bloqueos-activos.component').then(
+        (m) => m.BloqueosActivosComponent,
       ),
   },
   {

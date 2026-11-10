@@ -50,19 +50,28 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
                       ? const Center(child: Text('No hay registros de auditoría.'))
                       : ListView.separated(
                           itemCount: _controller.logs.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final log = _controller.logs[index];
+                            final actor =
+                                log['usuario_email'] ??
+                                log['actor_tipo'] ??
+                                log['usuario_id'] ??
+                                'Sistema';
+                            final ip = log['ip'] ?? log['ip_origen'] ?? '-';
+                            final fecha =
+                                log['created_at'] ?? log['ocurrido_en'] ?? '-';
+                            final modulo = log['modulo'] ?? log['entidad'] ?? '';
                             return ListTile(
                               leading: const CircleAvatar(
                                 child: Icon(Icons.security, size: 20),
                               ),
-                              title: Text(log['accion'] ?? 'Acción'),
+                              title: Text(log['accion']?.toString() ?? 'Acción'),
                               subtitle: Text(
-                                'Usuario: ${log['usuario_email'] ?? 'Sistema'}\nIP: ${log['ip'] ?? '-'} | Fecha: ${log['created_at'] ?? '-'}',
+                                'Actor: $actor\nIP: $ip | Fecha: $fecha',
                               ),
                               trailing: Text(
-                                log['modulo'] ?? '',
+                                modulo.toString(),
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                               ),
                             );

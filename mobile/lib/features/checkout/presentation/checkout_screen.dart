@@ -39,17 +39,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _procesandoPago = true);
     try {
       // 1. Crear orden
-      final orden = await widget.apiClient.post('/checkout/ordenes', {
-        'tipo_entrega': _tipoEntrega,
-        'sucursal_id': '11111111-1111-1111-1111-111111111101',
-      });
+      final orden = await widget.apiClient.post(
+        '/checkout/ordenes',
+        {
+          'tipo_entrega': _tipoEntrega,
+          'sucursal_id': '11111111-1111-1111-1111-111111111101',
+        },
+        {
+          'Idempotency-Key': 'mob-chk-${DateTime.now().millisecondsSinceEpoch}',
+        },
+      );
 
       // 2. Crear intención en Stripe (CU-24)
       final ventaId = orden['venta_id'];
       await widget.apiClient.post('/pagos/intencion', {'venta_id': ventaId});
 
-      setState(() => _procesandoPago = false);
       if (!mounted) return;
+      setState(() => _procesandoPago = false);
 
       showDialog(
         context: context,
@@ -68,6 +74,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() => _procesandoPago = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Fallo en la compra: $e')),
@@ -105,21 +112,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text('Opciones de Entrega', style: TextStyle(fontWeight: FontWeight.bold)),
-                            RadioListTile<String>(
-                              title: const Text('Envío a domicilio (+20 BOB)'),
-                              value: 'envio',
+                            RadioGroup<String>(
                               groupValue: _tipoEntrega,
-                              onChanged: (val) => setState(() => _tipoEntrega = val!),
-                            ),
-                            RadioListTile<String>(
-                              title: const Text('Recojo en sucursal física (Gratis)'),
-                              value: 'recojo',
-                              groupValue: _tipoEntrega,
-                              onChanged: (val) => setState(() => _tipoEntrega = val!),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => _tipoEntrega = val);
+                                }
+                              },
+                              child: const Column(
+                                children: [
+                                  RadioListTile<String>(
+                                    title: Text('Envío a domicilio (+20 BOB)'),
+                                    value: 'envio',
+                                  ),
+                                  RadioListTile<String>(
+                                    title: Text('Recojo en sucursal física (Gratis)'),
+                                    value: 'recojo',
+                                  ),
+                                ],
+                              ),
                             ),
                             const Divider(),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.between,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text('Total Estimado:', style: TextStyle(fontSize: 16)),
                                 Text(

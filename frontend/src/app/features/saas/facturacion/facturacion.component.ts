@@ -49,7 +49,7 @@ import { RouterModule } from '@angular/router';
                     </span>
                   </td>
                   <td class="px-6 py-4 text-right">
-                    <button class="text-indigo-600 hover:text-indigo-900 text-xs font-semibold">Descargar PDF</button>
+                    <button (click)="descargarPdf(f.id)" class="text-indigo-600 hover:text-indigo-900 text-xs font-semibold">Descargar PDF</button>
                   </td>
                 </tr>
               } @empty {
@@ -79,6 +79,19 @@ export class FacturacionComponent implements OnInit {
         this.cargando.set(false);
       },
       error: () => this.cargando.set(false)
+    });
+  }
+
+  descargarPdf(facturaId: string) {
+    this.http.get(`/api/v1/saas/facturas/${facturaId}/pdf`, { responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `factura-${facturaId}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
     });
   }
 }

@@ -14,7 +14,7 @@ export class CU16GestionTemporadasController {
 
   cargarTemporadas(): Observable<any> {
     this.cargando.set(true);
-    return this.http.get<any>('/api/v1/temporadas').pipe(
+    return this.http.get<any>('/api/v1/temporadas-colecciones/temporadas').pipe(
       tap({
         next: (res) => {
           this.temporadas.set(Array.isArray(res) ? res : (res.items || []));

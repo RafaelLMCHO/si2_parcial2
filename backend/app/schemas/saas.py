@@ -53,11 +53,172 @@ class EmpresaCreateResponse(BaseModel):
 
 
 class PlanOut(BaseModel):
+    id: int | None = None
     codigo: str
     nombre: str
     precio_mensual: Decimal
+    periodo: str = "mensual"
     moneda: str
+    activo: bool = True
     limites: dict[str, int | None]
+
+
+class PlanCreateRequest(BaseModel):
+    codigo: str = Field(min_length=2, max_length=20)
+    nombre: str = Field(min_length=2, max_length=60)
+    precio_mensual: Decimal | None = Field(default=None, ge=0)
+    precio: Decimal | None = Field(default=None, ge=0)
+    periodo: Literal["mensual", "anual"] = "mensual"
+    moneda: str = Field(default="BOB", min_length=3, max_length=3)
+    limites: dict[str, int | None] = Field(default_factory=dict)
+
+    @field_validator("codigo")
+    @classmethod
+    def _clean_codigo(cls, value: str) -> str:
+        clean = value.strip().lower()
+        if not clean:
+            raise ValueError("El codigo del plan no puede estar vacio")
+        return clean
+
+    @field_validator("nombre")
+    @classmethod
+    def _clean_nombre(cls, value: str) -> str:
+        clean = value.strip()
+        if not clean:
+            raise ValueError("El nombre del plan no puede estar vacio")
+        return clean
+
+    @field_validator("moneda")
+    @classmethod
+    def _clean_moneda(cls, value: str) -> str:
+        return value.strip().upper()
+
+    @field_validator("limites")
+    @classmethod
+    def _validate_limites(cls, value: dict[str, int | None]) -> dict[str, int | None]:
+        cleaned: dict[str, int | None] = {}
+        for k, v in value.items():
+            key = str(k).strip()
+            if not key:
+                continue
+            if v is not None and v < 0:
+                raise ValueError(f"El limite '{key}' debe ser mayor o igual a 0")
+            cleaned[key] = v
+        return cleaned
+
+    @model_validator(mode="after")
+    def _resolve_precio(self) -> "PlanCreateRequest":
+        if self.precio_mensual is None and self.precio is None:
+            self.precio_mensual = Decimal("0.00")
+        elif self.precio_mensual is None and self.precio is not None:
+            self.precio_mensual = self.precio
+        return self
+
+
+class PlanUpdateRequest(BaseModel):
+    codigo: str | None = Field(default=None, min_length=2, max_length=20)
+    nombre: str | None = Field(default=None, min_length=2, max_length=60)
+    precio_mensual: Decimal | None = Field(default=None, ge=0)
+    precio: Decimal | None = Field(default=None, ge=0)
+    periodo: Literal["mensual", "anual"] | None = None
+    moneda: str | None = Field(default=None, min_length=3, max_length=3)
+    activo: bool | None = None
+    limites: dict[str, int | None] | None = None
+
+    @field_validator("codigo")
+    @classmethod
+    def _clean_codigo(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        clean = value.strip().lower()
+        if not clean:
+            raise ValueError("El codigo no puede estar vacio")
+        return clean
+
+    @field_validator("nombre")
+    @classmethod
+    def _clean_nombre(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        clean = value.strip()
+        if not clean:
+            raise ValueError("El nombre no puede estar vacio")
+        return clean
+
+    @field_validator("moneda")
+    @classmethod
+    def _clean_moneda(cls, value: str | None) -> str | None:
+        return value.strip().upper() if value is not None else None
+
+    @field_validator("limites")
+    @classmethod
+    def _validate_limites(cls, value: dict[str, int | None] | None) -> dict[str, int | None] | None:
+        if value is None:
+            return None
+        cleaned: dict[str, int | None] = {}
+        for k, v in value.items():
+            key = str(k).strip()
+            if not key:
+                continue
+            if v is not None and v < 0:
+                raise ValueError(f"El limite '{key}' debe ser mayor o igual a 0")
+            cleaned[key] = v
+        return cleaned
+
+    @model_validator(mode="after")
+    def _resolve_precio(self) -> "PlanUpdateRequest":
+        if self.precio_mensual is None and self.precio is not None:
+            self.precio_mensual = self.precio
+        return self
+
+
+class PlanDeleteResponse(BaseModel):
+    mensaje: str
+    id: int
+    codigo: str
+    activo: bool
+
+
+class MiSuscripcionChangeRequest(BaseModel):
+    plan_codigo: str | None = Field(default=None, min_length=1, max_length=20)
+    plan_id: int | None = Field(default=None, gt=0)
+    renovacion_auto: bool | None = None
+
+    @field_validator("plan_codigo")
+    @classmethod
+    def _clean_plan(cls, value: str | None) -> str | None:
+        return value.strip().lower() if value is not None else None
+
+    @model_validator(mode="after")
+    def _validate_target(self) -> "MiSuscripcionChangeRequest":
+        if not self.plan_codigo and self.plan_id is None:
+            raise ValueError("Debe especificar plan_codigo o plan_id")
+        return self
+
+
+class MiSuscripcionCancelRequest(BaseModel):
+    motivo: str = Field(
+        default="Cancelacion solicitada por el administrador de empresa",
+        min_length=3,
+        max_length=300,
+    )
+
+    @field_validator("motivo")
+    @classmethod
+    def _clean_motivo(cls, value: str) -> str:
+        clean = value.strip()
+        if len(clean) < 3:
+            raise ValueError("El motivo debe tener al menos 3 caracteres")
+        return clean
+
+
+class MiSuscripcionCancelResponse(BaseModel):
+    mensaje: str
+    empresa_id: UUID
+    suscripcion_id: UUID
+    estado: str
+    renovacion_auto: bool
+    motivo: str
 
 
 class SuscripcionOut(BaseModel):

@@ -27,7 +27,7 @@ class CU35DashboardAnaliticoMlController extends ChangeNotifier {
 
     try {
       final res = await apiClient.get('/inteligencia/ml/dashboard');
-      _dashboardMl = Map<String, dynamic>.from(res.data);
+      _dashboardMl = Map<String, dynamic>.from(res as Map);
       _isLoading = false;
       notifyListeners();
       return _dashboardMl;
@@ -42,7 +42,7 @@ class CU35DashboardAnaliticoMlController extends ChangeNotifier {
   Future<Map<String, dynamic>?> predecirDemanda() async {
     try {
       final res = await apiClient.get('/inteligencia/ml/demanda');
-      return Map<String, dynamic>.from(res.data);
+      return Map<String, dynamic>.from(res as Map);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -53,7 +53,7 @@ class CU35DashboardAnaliticoMlController extends ChangeNotifier {
   Future<Map<String, dynamic>?> segmentarClientes() async {
     try {
       final res = await apiClient.get('/inteligencia/ml/segmentacion');
-      return Map<String, dynamic>.from(res.data);
+      return Map<String, dynamic>.from(res as Map);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -65,9 +65,9 @@ class CU35DashboardAnaliticoMlController extends ChangeNotifier {
     try {
       final res = await apiClient.post(
         '/inteligencia/ml/sintesis-audio',
-        data: {'texto': texto},
+        {'texto': texto},
       );
-      return Map<String, dynamic>.from(res.data);
+      return Map<String, dynamic>.from(res as Map);
     } catch (e) {
       _error = e.toString();
       notifyListeners();

@@ -42,7 +42,7 @@ class ReservasController extends ChangeNotifier {
       await _apiClient.post(
         '/reservas',
         payload,
-        headers: {'Idempotency-Key': idempotencyKey},
+        {'Idempotency-Key': idempotencyKey},
       );
       _loading = false;
       await cargarReservas();
@@ -60,7 +60,7 @@ class ReservasController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _apiClient.post('/reservas/$reservaId/cancelar', {'motivo': motivo});
+      await _apiClient.post('/reservas/$reservaId/cancelar', {'motivo': ?motivo});
       _loading = false;
       await cargarReservas();
       return true;

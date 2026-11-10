@@ -309,6 +309,114 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    _SectionCard(
+                      title: 'Modulos disponibles',
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ActionChip(
+                            avatar: const Icon(Icons.checkroom, size: 16),
+                            label: const Text('Catalogo'),
+                            onPressed: () => context.push('/catalogo'),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.inventory_2, size: 16),
+                            label: const Text('Inventario'),
+                            onPressed: () => context.push('/inventario'),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.event_available, size: 16),
+                            label: const Text('Reservas'),
+                            onPressed: () => context.push('/reservas'),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.point_of_sale, size: 16),
+                            label: const Text('POS'),
+                            onPressed: () => context.push('/pos'),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.shopping_bag, size: 16),
+                            label: const Text('Checkout'),
+                            onPressed: () => context.push('/checkout'),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.lock_clock, size: 16),
+                            label: const Text('Bloqueos activos'),
+                            onPressed: () => context.push('/offline/bloqueos'),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.cloud_off, size: 16),
+                            label: const Text('Reserva Offline'),
+                            onPressed: () => context.push('/offline/reserva'),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.sync, size: 16),
+                            label: const Text('Cola Offline'),
+                            onPressed: () => context.push('/offline/cola'),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.bar_chart, size: 16),
+                            label: const Text('Reportes'),
+                            onPressed: () =>
+                                context.push('/reportes/convencionales'),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.auto_awesome, size: 16),
+                            label: const Text('Reporte IA'),
+                            onPressed: () => context.push('/reportes/ia'),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.analytics, size: 16),
+                            label: const Text('Analytics ML'),
+                            onPressed: () => context.push('/analytics-ml'),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.view_in_ar, size: 16),
+                            label: const Text('Vestidor RA'),
+                            onPressed: () => context.push('/vestidor-virtual'),
+                          ),
+                          if (user.rol == 'administrador' ||
+                              user.rol == 'superadmin') ...[
+                            ActionChip(
+                              avatar: const Icon(Icons.backup, size: 16),
+                              label: const Text('Backups'),
+                              onPressed: () => context.push('/backups'),
+                            ),
+                            ActionChip(
+                              avatar: const Icon(Icons.security, size: 16),
+                              label: const Text('Auditoria'),
+                              onPressed: () => context.push('/auditoria'),
+                            ),
+                            ActionChip(
+                              avatar: const Icon(Icons.calendar_today, size: 16),
+                              label: const Text('Temporadas'),
+                              onPressed: () => context.push('/temporadas'),
+                            ),
+                            ActionChip(
+                              avatar: const Icon(Icons.badge, size: 16),
+                              label: const Text('Empleados'),
+                              onPressed: () => context.push('/empleados'),
+                            ),
+                            ActionChip(
+                              avatar: const Icon(Icons.store, size: 16),
+                              label: const Text('Sucursales'),
+                              onPressed: () => context.push('/sucursales'),
+                            ),
+                          ],
+                          if (user.rol == 'superadmin')
+                            ActionChip(
+                              avatar: const Icon(
+                                Icons.admin_panel_settings,
+                                size: 16,
+                              ),
+                              label: const Text('SaaS'),
+                              onPressed: () => context.push('/saas'),
+                            ),
+                        ],
+                      ),
+                    ),
                   ],
                 ],
               ),

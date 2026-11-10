@@ -1,14 +1,18 @@
 import base64
 import io
+import json
 import logging
+import os
 import re
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 
+import httpx
 from asyncpg import Connection
 from fastapi import HTTPException, status
 
+from app.core.config import get_settings
 from app.schemas.inteligencia import (
     ExportarReporteRequest,
     ExportarReporteResponse,
@@ -17,6 +21,18 @@ from app.schemas.inteligencia import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _get_llm_config() -> Tuple[str, str, str]:
+    settings = get_settings()
+    api_key = (os.environ.get("LLM_API_KEY") or settings.llm_api_key or "").strip()
+    model = (os.environ.get("LLM_MODEL") or settings.llm_model or "gpt-4o-mini").strip()
+    api_url = (
+        os.environ.get("LLM_API_URL")
+        or settings.llm_api_url
+        or "https://api.openai.com/v1/chat/completions"
+    ).strip()
+    return api_key, model, api_url
 
 
 # ---------------------------------------------------------------------------
@@ -60,37 +76,195 @@ WHITELIST_INTENTS = {
 
 
 async def validar_plan_profesional(conn: Connection, empresa_id: UUID) -> None:
-    """Valida que la empresa tenga plan Profesional habilitado para IA (BR-03)."""
+    """Valida que la empresa tenga plan Profesional o cuota IA habilitada (BR-03)."""
     row = await conn.fetchrow(
         """
-        SELECT p.codigo, s.estado
-        FROM suscripcion s
-        JOIN plan p ON p.id = s.plan_id
-        WHERE s.empresa_id = $1 AND s.estado IN ('activa', 'periodo_gracia')
-        ORDER BY s.created_at DESC
-        LIMIT 1
+        SELECT p.codigo,
+               s.estado,
+               (
+                   SELECT pl.limite
+                     FROM plan_limite pl
+                    WHERE pl.plan_id = p.id
+                      AND pl.recurso = 'consultas_ia_mes'
+                    LIMIT 1
+               ) AS limite_ia
+          FROM suscripcion s
+          JOIN plan p ON p.id = s.plan_id
+         WHERE s.empresa_id = $1
+           AND s.estado IN ('activa', 'prueba', 'mora')
+         ORDER BY s.fecha_inicio DESC, s.created_at DESC
+         LIMIT 1
         """,
         empresa_id,
     )
-    if not row or str(row["codigo"]).lower() not in ["profesional", "enterprise", "pro"]:
-        # Si la empresa no tiene suscripción profesional registrada, comprobar flag en empresa
-        empresa_row = await conn.fetchrow(
-            "SELECT plan_tipo FROM empresa WHERE id = $1", empresa_id
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Los reportes generativos con Inteligencia Artificial requieren una suscripción activa en plan 'Profesional' (BR-03).",
         )
-        plan_tipo = (
-            str(empresa_row["plan_tipo"]).lower()
-            if empresa_row and "plan_tipo" in empresa_row
-            else ""
+
+    codigo = str(row["codigo"] or "").lower()
+    limite_ia = row.get("limite_ia") if hasattr(row, "get") else row["limite_ia"]
+    habilitado_por_codigo = codigo in ("profesional", "enterprise", "pro")
+    habilitado_por_limite = limite_ia is None or int(limite_ia) > 0
+    if not habilitado_por_codigo and not (limite_ia is not None and habilitado_por_limite):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Los reportes generativos con Inteligencia Artificial requieren el plan 'Profesional' (BR-03 y Sección 9.4).",
         )
-        if plan_tipo not in ["profesional", "pro", "enterprise"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Los reportes generativos con Inteligencia Artificial requieren el plan 'Profesional' (BR-03 y Sección 9.4).",
+
+
+def _strip_json_fences(raw: str) -> str:
+    txt = raw.strip()
+    if txt.startswith("```"):
+        txt = re.sub(r"^```(?:json)?\s*", "", txt)
+        txt = re.sub(r"\s*```$", "", txt)
+    return txt.strip()
+
+
+def _extract_common_params(prompt: str) -> Dict[str, Any]:
+    p_lower = prompt.lower().strip()
+    parametros: Dict[str, Any] = {"limite": 10}
+    meses_map = {
+        "enero": 1, "febrero": 2, "marzo": 3, "abril": 4,
+        "mayo": 5, "junio": 6, "julio": 7, "agosto": 8,
+        "septiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12,
+    }
+    for mes_nombre, mes_num in meses_map.items():
+        if mes_nombre in p_lower:
+            year = datetime.now().year
+            parametros["mes"] = mes_num
+            parametros["mes_nombre"] = mes_nombre.capitalize()
+            parametros["fecha_inicio"] = date(year, mes_num, 1)
+            next_month = mes_num + 1 if mes_num < 12 else 1
+            next_year = year if mes_num < 12 else year + 1
+            parametros["fecha_fin"] = date(next_year, next_month, 1) - timedelta(days=1)
+            break
+
+    if "diez" in p_lower or "10" in p_lower:
+        parametros["limite"] = 10
+    elif "cinco" in p_lower or "5" in p_lower:
+        parametros["limite"] = 5
+    elif "veinte" in p_lower or "20" in p_lower:
+        parametros["limite"] = 20
+    return parametros
+
+
+_BLOCKED_SQL_PATTERNS = re.compile(
+    r"(?:"
+    r"\bdrop\s+(?:table|database|schema|view)\b"
+    r"|\btruncate\s+(?:table\s+)?\w+"
+    r"|\bdelete\s+from\s+\w+"
+    r"|\binsert\s+into\s+\w+"
+    r"|\bupdate\s+\w+\s+set\b"
+    r"|\balter\s+table\s+\w+"
+    r"|\bunion\s+(?:all\s+)?select\b"
+    r"|\bselect\b.{1,80}\bfrom\s+\w+"
+    r"|;\s*--"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _reject_disallowed_prompt() -> None:
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=(
+            "La consulta formulada no coincide con los reportes analíticos de la whitelist autorizada (BR-08). "
+            "Nunca se ejecuta SQL libre generado por el usuario o LLM. "
+            "Ejemplos permitidos: 'Ventas de septiembre agrupadas por sucursal', "
+            "'¿Cuáles fueron los 10 productos más vendidos?', "
+            "'Generá un gráfico de ventas por semana', "
+            "'Rotación y stock crítico por categoría'."
+        ),
+    )
+
+
+async def clasificar_intencion_con_llm(prompt: str) -> Tuple[str, Dict[str, Any], str]:
+    """
+    Adaptador LLM OpenAI-compatible (BR-08): traduce lenguaje natural exclusivamente
+    a una de las intenciones fijas de WHITELIST_INTENTS (nunca SQL libre).
+    Si LLM_API_KEY no está configurada o el proveedor falla, usa el clasificador regex local.
+    """
+    if _BLOCKED_SQL_PATTERNS.search(prompt or ""):
+        _reject_disallowed_prompt()
+
+    api_key, model, api_url = _get_llm_config()
+    if not api_key:
+        intent, params = clasificar_intencion_whitelist(prompt)
+        return intent, params, "whitelist-regex-fallback"
+
+    intents_permitidos = sorted(WHITELIST_INTENTS.keys())
+    system_prompt = (
+        "Eres un enrutador estricto de reportes BI bajo whitelist BR-08. "
+        "NUNCA generes SQL ni código ejecutable. "
+        f"Debes responder ÚNICAMENTE un JSON válido con las claves: "
+        f'{{"intent": <uno de {intents_permitidos} o "rechazado">, "mes": <1..12 o null>, "limite": <int 1..50 o 10>}}. '
+        "Si el usuario pide modificar datos, volcar tablas arbitrarias, SQL o algo fuera de los intents permitidos, "
+        'responde {"intent": "rechazado", "mes": null, "limite": 10}.'
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(
+                api_url,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "temperature": 0.0,
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt[:1000]},
+                    ],
+                },
             )
+        if resp.status_code != 200:
+            raise RuntimeError(f"LLM HTTP {resp.status_code}: {resp.text[:200]}")
+
+        body = resp.json()
+        raw_content = body["choices"][0]["message"]["content"]
+        parsed = json.loads(_strip_json_fences(raw_content))
+        if not isinstance(parsed, dict):
+            raise ValueError("Respuesta LLM no es objeto JSON")
+
+        intent = str(parsed.get("intent") or "").strip()
+        if intent == "rechazado":
+            _reject_disallowed_prompt()
+        if intent not in WHITELIST_INTENTS:
+            raise ValueError(f"Intent '{intent}' fuera de whitelist")
+
+        params = _extract_common_params(prompt)
+        mes_llm = parsed.get("mes")
+        if isinstance(mes_llm, int) and 1 <= mes_llm <= 12 and "mes" not in params:
+            year = datetime.now().year
+            params["mes"] = mes_llm
+            params["fecha_inicio"] = date(year, mes_llm, 1)
+            next_m = mes_llm + 1 if mes_llm < 12 else 1
+            next_y = year if mes_llm < 12 else year + 1
+            params["fecha_fin"] = date(next_y, next_m, 1) - timedelta(days=1)
+
+        lim_llm = parsed.get("limite")
+        if isinstance(lim_llm, int) and 1 <= lim_llm <= 50:
+            params["limite"] = lim_llm
+
+        return intent, params, model
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("Fallo adaptador LLM (%s), aplicando fallback regex BR-08", exc)
+        intent, params = clasificar_intencion_whitelist(prompt)
+        return intent, params, "whitelist-regex-fallback"
 
 
 def clasificar_intencion_whitelist(prompt: str) -> Tuple[str, Dict[str, Any]]:
     """Clasifica la consulta en lenguaje natural contra la whitelist de reportes autorizados (BR-08)."""
+    if _BLOCKED_SQL_PATTERNS.search(prompt or ""):
+        _reject_disallowed_prompt()
+
     p_lower = prompt.lower().strip()
 
     # Extracción de parámetros comunes
@@ -136,16 +310,7 @@ def clasificar_intencion_whitelist(prompt: str) -> Tuple[str, Dict[str, Any]]:
     if "stock" in p_lower or "inventario" in p_lower:
         return "rotacion_stock_critico", parametros
 
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=(
-            "La consulta formulada no coincide con los reportes analíticos de la whitelist autorizada (BR-08). "
-            "Ejemplos permitidos: 'Ventas de septiembre agrupadas por sucursal', "
-            "'¿Cuáles fueron los 10 productos más vendidos?', "
-            "'Generá un gráfico de ventas por semana', "
-            "'Rotación y stock crítico por categoría'."
-        ),
-    )
+    _reject_disallowed_prompt()
 
 
 async def procesar_reporte_ia(
@@ -154,12 +319,35 @@ async def procesar_reporte_ia(
     usuario_id: UUID,
     payload: ReporteIaRequest,
 ) -> ReporteIaResponse:
-    """CU-34: Procesa solicitud en lenguaje natural con whitelist y aislamiento por empresa_id."""
+    """CU-34: Procesa solicitud en lenguaje natural con LLM + whitelist y aislamiento por empresa_id."""
     await validar_plan_profesional(conn, empresa_id)
 
-    tipo_reporte, params = clasificar_intencion_whitelist(payload.prompt)
     consulta_id = uuid4()
     tiempo_inicio = datetime.now()
+
+    try:
+        tipo_reporte, params, modelo_usado = await clasificar_intencion_con_llm(payload.prompt)
+    except HTTPException as exc:
+        try:
+            await conn.execute(
+                """
+                INSERT INTO consulta_ia_log (
+                    id, empresa_id, usuario_id, prompt, respuesta, modelo_llm,
+                    canal, reporte_tipo, parametros_json, latencia_ms, estado, ocurrido_en
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'rechazado_whitelist', '{}'::jsonb, 0, 'rechazado', now())
+                """,
+                consulta_id,
+                empresa_id,
+                usuario_id,
+                payload.prompt,
+                str(exc.detail),
+                "whitelist-guard-br08",
+                payload.canal,
+            )
+        except Exception as log_exc:
+            logger.warning(f"No se pudo registrar rechazo en consulta_ia_log: {log_exc}")
+        raise
 
     fecha_inicio = params.get("fecha_inicio", date.today() - timedelta(days=90))
     fecha_fin = params.get("fecha_fin", date.today())
@@ -322,6 +510,55 @@ async def procesar_reporte_ia(
             ),
         }
 
+    elif tipo_reporte == "analisis_canales_pago":
+        titulo = "Análisis de Ventas por Canal y Método de Pago"
+        rows = await conn.fetch(
+            """
+            SELECT
+                v.canal,
+                COALESCE(p.metodo, 'sin_pago') AS metodo,
+                COUNT(DISTINCT v.id)::int AS operaciones,
+                COALESCE(SUM(COALESCE(p.monto, v.total)), 0)::float AS monto_total
+            FROM venta v
+            LEFT JOIN pago p ON p.venta_id = v.id AND p.empresa_id = v.empresa_id AND p.estado = 'completado'
+            WHERE v.empresa_id = $1
+              AND v.fecha_hora::date >= $2
+              AND v.fecha_hora::date <= $3
+              AND v.estado IN ('pagada', 'completada', 'entregada', 'enviada')
+            GROUP BY v.canal, COALESCE(p.metodo, 'sin_pago')
+            ORDER BY monto_total DESC
+            """,
+            empresa_id,
+            fecha_inicio,
+            fecha_fin,
+        )
+        columnas = ["Canal", "Método de Pago", "Operaciones", "Monto Total (Bs.)"]
+        filas = [
+            {
+                "canal": r["canal"],
+                "metodo": r["metodo"],
+                "operaciones": r["operaciones"],
+                "monto_total": round(float(r["monto_total"]), 2),
+            }
+            for r in rows
+        ]
+        tipo_grafico = "torta"
+        datos_grafico = {
+            "labels": [f"{f['canal']} - {f['metodo']}" for f in filas],
+            "datasets": [
+                {"label": "Recaudación por Canal/Método", "data": [f["monto_total"] for f in filas]}
+            ],
+        }
+        total_canal = sum(f["monto_total"] for f in filas)
+        resumen_ejecutivo = (
+            f"Se consolidaron Bs. {total_canal:,.2f} a través de {len(filas)} combinaciones de canal y método de pago "
+            f"en el período seleccionado."
+        )
+        kpis = {
+            "total_recaudado_bs": round(total_canal, 2),
+            "combinaciones_activas": len(filas),
+        }
+
     else:  # rotacion_stock_critico
         titulo = "Alertas de Stock Crítico y Rotación de Prendas"
         rows = await conn.fetch(
@@ -330,7 +567,7 @@ async def procesar_reporte_ia(
                 p.codigo,
                 p.nombre AS prenda,
                 COALESCE(cat.nombre, 'Sin categoría') AS categoria,
-                COALESCE(SUM(i.stock_actual), 0)::int AS stock_disponible,
+                COALESCE(SUM(i.stock_disponible), 0)::int AS stock_disponible,
                 COALESCE(SUM(vd.cantidad), 0)::int AS salidas_acumuladas
             FROM prenda p
             LEFT JOIN categoria cat ON cat.id = p.categoria_id AND cat.empresa_id = p.empresa_id
@@ -339,7 +576,7 @@ async def procesar_reporte_ia(
             LEFT JOIN venta_detalle vd ON vd.variante_id = var.id AND vd.empresa_id = p.empresa_id
             WHERE p.empresa_id = $1
             GROUP BY p.codigo, p.nombre, cat.nombre
-            HAVING COALESCE(SUM(i.stock_actual), 0) < 10
+            HAVING COALESCE(SUM(i.stock_disponible), 0) < 10
             ORDER BY stock_disponible ASC, salidas_acumuladas DESC
             LIMIT 15
             """,
@@ -360,7 +597,7 @@ async def procesar_reporte_ia(
         datos_grafico = {
             "labels": [f["prenda"][:15] for f in filas],
             "datasets": [
-                {"label": "Stock Actual", "data": [f["stock_disponible"] for f in filas]}
+                {"label": "Stock Disponible", "data": [f["stock_disponible"] for f in filas]}
             ],
         }
         resumen_ejecutivo = (
@@ -382,17 +619,17 @@ async def procesar_reporte_ia(
                 id, empresa_id, usuario_id, prompt, respuesta, modelo_llm,
                 canal, reporte_tipo, parametros_json, latencia_ms, estado, ocurrido_en
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'exitoso', now())
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, 'exitoso', now())
             """,
             consulta_id,
             empresa_id,
             usuario_id,
             payload.prompt,
             resumen_ejecutivo,
-            "gpt-4o-mini-textile-v1",
+            modelo_usado,
             payload.canal,
             tipo_reporte,
-            params,
+            json.dumps(params, default=str),
             latencia_ms,
         )
     except Exception as e:

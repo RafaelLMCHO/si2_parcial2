@@ -9,6 +9,35 @@ from app.core.config import get_settings
 _pool: asyncpg.Pool | None = None
 
 
+async def _ensure_runtime_schema(pool: asyncpg.Pool) -> None:
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                ALTER TABLE plan
+                    ADD COLUMN IF NOT EXISTS periodo varchar(20) NOT NULL DEFAULT 'mensual';
+                ALTER TABLE reserva DROP CONSTRAINT IF EXISTS reserva_estado_check;
+                ALTER TABLE reserva ADD CONSTRAINT reserva_estado_check
+                    CHECK (estado IN (
+                        'pendiente_preparacion',
+                        'preparada',
+                        'incidencia_stock',
+                        'activa',
+                        'confirmada',
+                        'expirada',
+                        'cancelada',
+                        'convertida',
+                        'completada'
+                    ));
+                GRANT SELECT, INSERT, UPDATE, DELETE
+                   ON soft_lock, nota_cambio, sync_registro_idempotencia
+                   TO fashion_app, fashion_superadmin;
+                """
+            )
+    except Exception:
+        pass
+
+
 async def init_pool() -> None:
     global _pool
     if _pool is None:
@@ -19,6 +48,7 @@ async def init_pool() -> None:
             max_size=10,
             command_timeout=30,
         )
+        await _ensure_runtime_schema(_pool)
 
 
 async def close_pool() -> None:

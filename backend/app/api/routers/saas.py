@@ -1,4 +1,7 @@
+import io
+
 from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import StreamingResponse
 
 from app.api.deps import CurrentUser
 from app.api.permissions import require_superadmin
@@ -11,7 +14,10 @@ from app.schemas.saas import (
     EstadoEmpresaResponse,
     MetricasSaaSOut,
     MiSuscripcionOut,
+    PlanCreateRequest,
+    PlanDeleteResponse,
     PlanOut,
+    PlanUpdateRequest,
     SuscripcionUpsertRequest,
 )
 from app.services import saas_service
@@ -32,9 +38,54 @@ async def get_metricas(
 
 @router.get("/planes", response_model=list[PlanOut])
 async def list_planes(
+    incluir_inactivos: bool = Query(default=False),
     _: CurrentUser = Depends(require_superadmin),
 ) -> list[PlanOut]:
-    return await saas_service.list_planes()
+    return await saas_service.list_planes(incluir_inactivos=incluir_inactivos)
+
+
+@router.post("/planes", response_model=PlanOut, status_code=status.HTTP_201_CREATED)
+async def create_plan(
+    data: PlanCreateRequest,
+    request: Request,
+    current: CurrentUser = Depends(require_superadmin),
+) -> PlanOut:
+    """CU-06: Crear un nuevo plan SaaS con sus limites por recurso."""
+    return await saas_service.create_plan(
+        data,
+        actor_id=current.user_id,
+        ip=_client_ip(request),
+    )
+
+
+@router.put("/planes/{plan_id}", response_model=PlanOut)
+async def update_plan(
+    plan_id: str,
+    data: PlanUpdateRequest,
+    request: Request,
+    current: CurrentUser = Depends(require_superadmin),
+) -> PlanOut:
+    """CU-06: Actualizar un plan SaaS existente (por id numerico o codigo)."""
+    return await saas_service.update_plan(
+        plan_id,
+        data,
+        actor_id=current.user_id,
+        ip=_client_ip(request),
+    )
+
+
+@router.delete("/planes/{plan_id}", response_model=PlanDeleteResponse)
+async def delete_plan(
+    plan_id: str,
+    request: Request,
+    current: CurrentUser = Depends(require_superadmin),
+) -> PlanDeleteResponse:
+    """CU-06: Desactivar un plan SaaS si no tiene suscripciones activas."""
+    return await saas_service.delete_plan(
+        plan_id,
+        actor_id=current.user_id,
+        ip=_client_ip(request),
+    )
 
 
 @router.get("/facturas")
@@ -42,6 +93,25 @@ async def list_facturas(
     _: CurrentUser = Depends(require_superadmin),
 ):
     return await saas_service.list_facturas()
+
+
+@router.get("/facturas/{factura_id}/pdf")
+async def get_factura_pdf(
+    factura_id: str,
+    request: Request,
+    current: CurrentUser = Depends(require_superadmin),
+) -> StreamingResponse:
+    """CU-08: Descargar PDF de una factura SaaS."""
+    pdf_bytes, filename = await saas_service.get_factura_pdf(
+        factura_id,
+        actor_id=current.user_id,
+        ip=_client_ip(request),
+    )
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/empresas", response_model=EmpresaListResponse)

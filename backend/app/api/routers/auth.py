@@ -8,6 +8,8 @@ from app.schemas.auth import (
     RefreshResponse,
     RegisterRequest,
     RegisterResponse,
+    TenantRegisterRequest,
+    TenantRegisterResponse,
     VerifyEmailRequest,
     VerifyEmailResponse,
 )
@@ -41,6 +43,12 @@ async def refresh(data: RefreshRequest, request: Request) -> RefreshResponse:
 @router.post("/register", response_model=RegisterResponse, status_code=201)
 async def register(data: RegisterRequest, request: Request) -> RegisterResponse:
     return await auth_service.register(data, ip=_client_ip(request))
+
+
+@router.post("/register-tenant", response_model=TenantRegisterResponse, status_code=201)
+async def register_tenant(data: TenantRegisterRequest, request: Request) -> TenantRegisterResponse:
+    """CU-01: Alta publica de empresa/inquilino con usuario administrador y periodo de prueba."""
+    return await auth_service.register_tenant(data, ip=_client_ip(request))
 
 
 @router.post("/verify-email", response_model=VerifyEmailResponse)

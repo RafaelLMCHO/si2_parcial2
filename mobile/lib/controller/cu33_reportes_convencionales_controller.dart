@@ -27,7 +27,7 @@ class CU33ReportesConvencionalesController extends ChangeNotifier {
 
     try {
       final res = await apiClient.get('/reportes/convencionales/dashboard');
-      _dashboard = Map<String, dynamic>.from(res.data);
+      _dashboard = Map<String, dynamic>.from(res as Map);
       _isLoading = false;
       notifyListeners();
       return _dashboard;
@@ -51,7 +51,7 @@ class CU33ReportesConvencionalesController extends ChangeNotifier {
       if (sucursalId != null) params['sucursal_id'] = sucursalId;
 
       final res = await apiClient.get('/reportes/convencionales/ventas', queryParameters: params);
-      return Map<String, dynamic>.from(res.data);
+      return Map<String, dynamic>.from(res as Map);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -62,7 +62,7 @@ class CU33ReportesConvencionalesController extends ChangeNotifier {
   Future<Map<String, dynamic>?> consultarRotacionStock() async {
     try {
       final res = await apiClient.get('/reportes/convencionales/rotacion');
-      return Map<String, dynamic>.from(res.data);
+      return Map<String, dynamic>.from(res as Map);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -76,7 +76,7 @@ class CU33ReportesConvencionalesController extends ChangeNotifier {
         '/reportes/convencionales/top-prendas',
         queryParameters: {'limite': limite},
       );
-      return Map<String, dynamic>.from(res.data);
+      return Map<String, dynamic>.from(res as Map);
     } catch (e) {
       _error = e.toString();
       notifyListeners();

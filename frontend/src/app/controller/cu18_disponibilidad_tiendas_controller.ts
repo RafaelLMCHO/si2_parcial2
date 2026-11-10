@@ -12,12 +12,12 @@ export class CU18DisponibilidadTiendasController {
   error = signal<string | null>(null);
   disponibilidad = signal<any[]>([]);
 
-  consultarDisponibilidad(varianteId: string): Observable<any> {
+  consultarDisponibilidad(prendaId: string): Observable<any> {
     this.cargando.set(true);
-    return this.http.get<any>(`/api/v1/inventario/disponibilidad/variante/${varianteId}`).pipe(
+    return this.http.get<any>(`/api/v1/inventario/prendas/${prendaId}/disponibilidad`).pipe(
       tap({
         next: (res) => {
-          this.disponibilidad.set(res.tiendas || []);
+          this.disponibilidad.set(res.sucursales || res.tiendas || []);
           this.cargando.set(false);
         },
         error: (err) => {

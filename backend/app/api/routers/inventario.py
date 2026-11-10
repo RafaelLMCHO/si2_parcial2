@@ -200,17 +200,21 @@ async def get_disponibilidad_prenda(
     return DisponibilidadPrendaOut(**res)
 
 
-# Router adicional para la ruta exacta del spec: /api/v1/prendas/{prenda_id}/disponibilidad
-prendas_router = APIRouter(prefix="/prendas", tags=["Disponibilidad en Tiendas (CU-18)"])
+# Router alias deprecado: el contrato canónico CU-18 es GET /api/v1/inventario/prendas/{prenda_id}/disponibilidad
+prendas_router = APIRouter(
+    prefix="/prendas",
+    tags=["Disponibilidad en Tiendas (CU-18 - Deprecado)"],
+    deprecated=True,
+)
 
 
-@prendas_router.get("/{prenda_id}/disponibilidad", response_model=DisponibilidadPrendaOut)
+@prendas_router.get("/{prenda_id}/disponibilidad", response_model=DisponibilidadPrendaOut, deprecated=True)
 async def get_disponibilidad_directa(
     prenda_id: str,
     empresa_id: Optional[str] = Query(None, description="Para Superadmin"),
     current: CurrentUser = Depends(get_current_user),
 ) -> DisponibilidadPrendaOut:
-    """CU-18: Consultar disponibilidad directa por prenda."""
+    """CU-18 (deprecado): usar GET /api/v1/inventario/prendas/{prenda_id}/disponibilidad."""
     empresa = _resolver_empresa(current, empresa_id)
     res = await inventario_service.get_disponibilidad_prenda(
         empresa_id=empresa,

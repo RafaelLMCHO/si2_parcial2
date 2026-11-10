@@ -1,5 +1,5 @@
 from decimal import Decimal
-from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from uuid import UUID
 
 from app.api.deps import CurrentUser, bearer_scheme, get_current_user
@@ -22,8 +22,8 @@ router = APIRouter(prefix="/catalogo", tags=["Catalogo de productos (CU-12, CU-1
 
 async def resolve_empresa_id(
     request: Request,
-    empresa_slug: str | None = Query(None, description="Slug del tenant (para clientes/publico)"),
-    x_empresa_slug: str | None = Header(None, alias="X-Empresa-Slug"),
+    empresa_slug: str | None = None,
+    x_empresa_slug: str | None = None,
 ) -> tuple[str, str | None]:
     """Resuelve empresa_id a partir del token JWT si esta presente, o del slug en query/header."""
     auth_header = request.headers.get("authorization")
@@ -35,7 +35,8 @@ async def resolve_empresa_id(
         except Exception:
             pass
 
-    slug = (empresa_slug or x_empresa_slug or "").strip().lower()
+    header_slug = x_empresa_slug or request.headers.get("x-empresa-slug")
+    slug = (empresa_slug or header_slug or "").strip().lower()
     if not slug:
         raise api_error(400, "EMPRESA_REQUERIDA", "Debe especificar empresa_slug o iniciar sesion")
 

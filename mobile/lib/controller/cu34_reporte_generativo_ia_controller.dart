@@ -32,13 +32,13 @@ class CU34ReporteGenerativoIaController extends ChangeNotifier {
     try {
       final res = await apiClient.post(
         '/reportes/ia/consultar',
-        data: {
+        {
           'prompt': prompt,
           'canal': canal,
-          if (audioBase64 != null) 'audio_base64': audioBase64,
+          'audio_base64': ?audioBase64,
         },
       );
-      _reporte = Map<String, dynamic>.from(res.data);
+      _reporte = Map<String, dynamic>.from(res as Map);
       _isLoading = false;
       notifyListeners();
       return _reporte;
@@ -61,7 +61,7 @@ class CU34ReporteGenerativoIaController extends ChangeNotifier {
     try {
       final res = await apiClient.post(
         '/reportes/ia/exportar',
-        data: {
+        {
           'tipo_reporte': tipoReporte,
           'formato': formato,
           'titulo': titulo,
@@ -70,7 +70,7 @@ class CU34ReporteGenerativoIaController extends ChangeNotifier {
           'filas': filas,
         },
       );
-      return Map<String, dynamic>.from(res.data);
+      return Map<String, dynamic>.from(res as Map);
     } catch (e) {
       _error = e.toString();
       notifyListeners();

@@ -50,7 +50,7 @@ class _EmpleadosScreenState extends State<EmpleadosScreen> {
                       ? const Center(child: Text('No hay empleados registrados.'))
                       : ListView.separated(
                           itemCount: _controller.empleados.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final emp = _controller.empleados[index];
                             return ListTile(

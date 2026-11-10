@@ -71,9 +71,8 @@ export class PagosComponent implements OnInit {
   constructor(private readonly http: HttpClient) {}
 
   ngOnInit(): void {
-    // Carga de pagos demo
-    this.http.get<any>(`${environment.apiUrl}/saas/pagos`).subscribe({
-      next: (resp) => (this.pagos = resp.items || []),
+    this.http.get<any>(`${environment.apiUrl}/pagos`).subscribe({
+      next: (resp) => (this.pagos = Array.isArray(resp) ? resp : (resp.items || [])),
       error: () => (this.pagos = []),
     });
   }

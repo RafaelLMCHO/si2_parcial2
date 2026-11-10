@@ -40,13 +40,23 @@ class CU21PreparacionReservasController extends ChangeNotifier {
     return _ejecutar('/reservas/$reservaId/completar', sucursalId);
   }
 
-  Future<bool> registrarIncidencia(String reservaId, String sucursalId, String detalle) async {
+  Future<bool> registrarIncidencia(
+    String reservaId,
+    String sucursalId,
+    String detalle, {
+    List<String> varianteIds = const [],
+    bool registrarMerma = false,
+  }) async {
     _loading = true;
     _error = null;
     notifyListeners();
 
     try {
-      await _apiClient.post('/reservas/$reservaId/incidencia', {'detalle': detalle});
+      await _apiClient.post('/reservas/$reservaId/incidencia', {
+        'variante_ids': varianteIds,
+        'motivo': detalle,
+        'registrar_merma': registrarMerma,
+      });
       await cargarReservasPorSucursal(sucursalId);
       return true;
     } catch (e) {

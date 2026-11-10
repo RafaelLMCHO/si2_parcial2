@@ -13,6 +13,9 @@ class AuditoriaController extends ChangeNotifier {
   bool get loading => _loading;
   String? get error => _error;
   List<dynamic> get eventos => _eventos;
+  List<dynamic> get logs => _eventos;
+
+  Future<void> cargarLogs() => cargarAuditoria();
 
   Future<void> cargarAuditoria() async {
     _loading = true;
@@ -20,8 +23,8 @@ class AuditoriaController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiClient.get('/saas/auditoria');
-      _eventos = (res['items'] as List<dynamic>? ?? []);
+      final dynamic res = await _apiClient.get('/auditoria/logs');
+      _eventos = res is List ? res : ((res as Map?)?['items'] as List<dynamic>? ?? []);
       _loading = false;
     } catch (e) {
       _loading = false;

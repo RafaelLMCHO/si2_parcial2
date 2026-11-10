@@ -50,7 +50,7 @@ class _CatalogoAdminScreenState extends State<CatalogoAdminScreen> {
                       ? const Center(child: Text('No hay prendas en catálogo admin.'))
                       : ListView.separated(
                           itemCount: _controller.prendas.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final p = _controller.prendas[index];
                             return ListTile(

@@ -133,7 +133,7 @@ class _DashboardMlScreenState extends State<DashboardMlScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.between,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               map['nombre'] ?? 'Segmento',

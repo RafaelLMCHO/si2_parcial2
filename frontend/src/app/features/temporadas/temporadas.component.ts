@@ -99,12 +99,12 @@ export class TemporadasComponent implements OnInit {
   }
 
   cargar(): void {
-    this.http.get<any>(`${environment.apiUrl}/colecciones`).subscribe({
-      next: (resp) => (this.colecciones = resp.items || []),
+    this.http.get<any>(`${environment.apiUrl}/temporadas-colecciones/colecciones`).subscribe({
+      next: (resp) => (this.colecciones = Array.isArray(resp) ? resp : (resp.items || [])),
       error: () => (this.colecciones = []),
     });
-    this.http.get<any>(`${environment.apiUrl}/colecciones/temporadas`).subscribe({
-      next: (resp) => (this.temporadas = resp.items || []),
+    this.http.get<any>(`${environment.apiUrl}/temporadas-colecciones/temporadas`).subscribe({
+      next: (resp) => (this.temporadas = Array.isArray(resp) ? resp : (resp.items || [])),
       error: () => (this.temporadas = []),
     });
   }
@@ -114,7 +114,7 @@ export class TemporadasComponent implements OnInit {
   }
 
   guardar(): void {
-    this.http.post(`${environment.apiUrl}/colecciones`, this.form.value).subscribe({
+    this.http.post(`${environment.apiUrl}/temporadas-colecciones/colecciones`, this.form.value).subscribe({
       next: () => {
         this.mostrarModal = false;
         this.cargar();

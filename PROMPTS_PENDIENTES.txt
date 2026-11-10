@@ -1,0 +1,282 @@
+================================================================================
+FASHIONSTORE SaaS - PROMPTS PARA CERRAR LOS 36 CASOS DE USO
+Repositorio: Segundo-parcial
+Stack: FastAPI + PostgreSQL (backend), Angular (frontend), Flutter (mobile)
+Regla general: antes de codificar, leer los archivos indicados y respetar
+convenciones existentes. No romper CU que ya funcionan. Ejecutar tests al final.
+================================================================================
+
+--------------------------------------------------------------------------------
+CONTEXTO COMÚN (pegar al inicio de cada prompt si se usa fuera de este repo)
+--------------------------------------------------------------------------------
+Actúa como ingeniero full-stack senior. Trabajás en el repo "Segundo-parcial"
+con backend FastAPI (127.0.0.1:8000, prefijo /api/v1), frontend Angular PWA
+(/api/v1 vía proxy) y app Flutter Android (base http://10.0.2.2:8000/api/v1).
+Multitenant por empresa_id con RLS. Autenticación JWT. Auditoría en
+bitacora_auditoria. No inventar endpoints duplicados: primero revisar
+backend/app/api/routers/*.py. Mantener nombres en snake_case, respuestas
+Pydantic, manejo de errores con api_error() y auditoría con audit_event().
+Al terminar: actualizar tests, correr pytest, flutter analyze/flutter test
+y npm run build si aplica.
+
+================================================================================
+BLOQUE 0 - AUDITORÍA DE CONTRATOS (hacer PRIMERO)
+================================================================================
+
+PROMPT 0.1 - Generar inventario de contratos reales vs consumidos
+Actúa como ingeniero de contratos de API. En el repo "Segundo-parcial":
+1. Extrae todas las rutas reales del backend desde backend/app/api/routers/*.py
+   y backend/app/main.py (método + path completo con prefijo /api/v1).
+2. Extrae todas las llamadas HTTP del frontend desde frontend/src/app (buscar
+   http.get/post/put/patch/delete y environment.apiUrl).
+3. Extrae todas las llamadas del móvil desde mobile/lib (buscar apiClient.get/
+   post/put/patch/delete y app_config.dart).
+4. Genera una tabla: CU | endpoint consumido | existe en backend | archivo:línea
+   | corrección propuesta.
+5. NO modifiques código todavía. Solo reporta el diff de contratos.
+Entregable: documento markdown con la tabla y lista priorizada de arreglos.
+
+PROMPT 0.2 - Script de verificación de rutas
+Crea un script PowerShell "scripts/verify_api_contracts.ps1" que:
+1. Lea las rutas declaradas en backend/app/api/routers/*.py.
+2. Lea las rutas usadas en frontend/src/app y mobile/lib.
+3. Reporte rutas consumidas que no existan en backend.
+4. Devuelva exit code 1 si hay faltantes.
+No debe levantar el servidor. Solo análisis estático.
+
+================================================================================
+BLOQUE 1 - BACKEND FALTANTE
+================================================================================
+
+PROMPT 1.1 - CU-05: consulta de auditoría
+Implementa la consulta de auditoría en el backend.
+Contexto: existe middleware de escritura en backend/app/middleware/audit.py que
+escribe en bitacora_auditoria, pero no hay endpoint de lectura. El controlador
+backend/app/controller/cu05_auditoria_logs_controller.py consulta una tabla
+inexistente "auditoria_log".
+Cambios:
+1. Crear backend/app/api/routers/auditoria.py con prefijo "/auditoria".
+2. GET /api/v1/auditoria/logs con filtros: empresa_id (solo superadmin),
+   usuario_id, accion, entidad, fecha_inicio, fecha_fin, page, page_size.
+   Accesible para superadmin y administrador de empresa (RLS por empresa).
+3. Usar la tabla bitacora_auditoria y sus columnas reales (revisar
+   db/04_auditoria.sql). Corregir el controlador CU05 para usar esa tabla.
+4. Registrar en main.py el nuevo router.
+5. Actualizar backend/tests/test_cu01_05.py con un test que valide listado,
+   paginación y aislamiento por empresa.
+Verificación: pytest backend/tests/test_cu01_05.py -q
+
+PROMPT 1.2 - CU-06: CRUD de planes SaaS
+Actualmente backend/app/api/routers/saas.py solo expone GET /saas/planes.
+Implementa:
+1. POST /api/v1/saas/planes (solo superadmin) con nombre, codigo, precio,
+   periodo, limites. Validar código único.
+2. PUT /api/v1/saas/planes/{plan_id} (solo superadmin).
+3. DELETE lógico o desactivación de plan si no tiene suscripciones activas.
+4. Actualizar backend/app/services/saas_service.py y schemas/saas.py.
+5. Añadir auditoría con audit_event.
+6. Tests en backend/tests/test_cu06_09.py.
+Verificación: pytest backend/tests/test_cu06_09.py -q
+
+PROMPT 1.3 - CU-07: suscripción del tenant (cambiar/cancelar)
+Actualmente backend/app/api/routers/suscripciones.py solo tiene GET /mi-suscripcion.
+Implementa:
+1. PUT /api/v1/mi-suscripcion para cambiar de plan (solo administrador de empresa).
+2. POST /api/v1/mi-suscripcion/cancelar con motivo.
+3. Validar límites del plan y estado de suscripción (BR-02/BR-03).
+4. Registrar historial y auditoría.
+5. Tests en backend/tests/test_cu06_09.py.
+Nota: el frontend y móvil llaman también /saas/suscripcion/actual y
+/saas/suscripcion/cambiar; en el Prompt 2.1 se alinean esas rutas a las
+canónicas.
+
+PROMPT 1.4 - CU-08: PDF de facturas SaaS
+Implementa GET /api/v1/saas/facturas/{factura_id}/pdf:
+1. Solo superadmin.
+2. Generar PDF con reportlab (ya usado en CU-34) con datos de pago_suscripcion
+   y empresa.
+3. Devolver StreamingResponse application/pdf con nombre factura-<id>.pdf.
+4. Auditar la descarga.
+5. Test en backend/tests/test_cu06_09.py.
+
+PROMPT 1.5 - CU-20: listado "mis reservas"
+El frontend y móvil llaman GET /api/v1/reservas/mis-reservas, que no existe.
+Implementa:
+1. GET /api/v1/reservas/mis-reservas en backend/app/api/routers/reservas.py.
+2. Devuelve reservas del usuario autenticado con paginación y filtros por estado.
+3. Asegurar que no exponga reservas de otros usuarios/empresas.
+4. Test en backend/tests/test_cu20_cancelar_reservas.py.
+
+PROMPT 1.6 - CU-21: completar reserva
+El frontend llama POST /api/v1/reservas/{id}/completar, inexistente.
+Implementa:
+1. POST /api/v1/reservas/{id}/completar (staff/encargado/admin).
+2. Cambiar estado a completada, liberar/consumir stock según regla del modelo,
+   registrar reserva_estado_historial y auditoría.
+3. Validar reserva activa y pertenencia a la empresa.
+4. Test en backend/tests/test_cu21_preparar_reservas.py.
+
+PROMPT 1.7 - CU-24: reembolso de pagos
+El frontend y móvil llaman POST /api/v1/pagos/{pago_id}/reembolsar, inexistente.
+Implementa:
+1. Endpoint en backend/app/api/routers/pagos.py.
+2. Usar get_gateway().reembolsar(pasarela_id, monto_centavos) del adapter existente.
+3. Validar pago pagado, monto <= monto original, empresa del usuario y rol.
+4. Actualizar estado del pago y venta, registrar auditoría.
+5. Test en backend/tests/test_cu24_pagos.py.
+
+PROMPT 1.8 - CU-01: alta pública de empresa/tenant
+El controlador web llama POST /api/v1/auth/register-tenant, inexistente.
+Implementa una de estas dos opciones y documentala:
+A) Añadir POST /api/v1/auth/register-tenant que cree empresa + usuario admin
+   usando CU01RegistroInquilinoController, con slug único y auditoría, o
+B) Eliminar ese endpoint del controlador y usar el registro estándar existente.
+Preferir la opción que no rompa el flujo de onboarding del superadmin.
+Tests en backend/tests/test_cu01_05.py.
+
+================================================================================
+BLOQUE 2 - CORRECCIÓN DE RUTAS EN CLIENTES
+================================================================================
+
+PROMPT 2.1 - Alinear frontend y móvil con rutas canónicas del backend
+Corrige todas las rutas consumidas que no existen:
+1. CU-05: reemplazar /saas/auditoria por /auditoria/logs en
+   frontend/src/app/features/auditoria/auditoria.component.ts:70 y en
+   mobile/lib/features/auditoria/presentation/auditoria_controller.dart.
+2. CU-24: reemplazar /saas/pagos por un endpoint real de listado de pagos
+   (crear GET /api/v1/pagos si no existe) en
+   frontend/src/app/features/pagos/pagos.component.ts:75.
+3. CU-16: reemplazar /colecciones y /colecciones/temporadas por
+   /temporadas-colecciones y /temporadas-colecciones/temporadas en
+   frontend/src/app/features/temporadas/temporadas.component.ts:102,106,117,
+   frontend/src/app/controller/cu16_gestion_temporadas_controller.ts:17 y
+   mobile/lib/features/temporadas/presentation/temporadas_controller.dart.
+4. CU-18: reemplazar /prendas/{id}/disponibilidad por
+   /inventario/prendas/{id}/disponibilidad en
+   frontend/src/app/core/inventario.service.ts:96 y
+   mobile/lib/features/inventario/presentation/disponibilidad_screen.dart:42.
+5. CU-03: reemplazar /usuarios/me por /users/me en
+   frontend/src/app/controller/cu03_perfil_usuario_controller.ts:17,33.
+6. CU-07: reemplazar /saas/suscripcion/actual, /saas/suscripcion/cambiar y
+   /saas/suscripcion/cancelar por /mi-suscripcion (GET/PUT/POST cancelar) en
+   frontend/src/app/controller/cu07_suscripciones_saas_controller.ts y
+   mobile/lib/features/saas/presentation/suscripciones_controller.dart.
+7. CU-06: alinear POST/PUT /saas/planes con el nuevo CRUD del Prompt 1.2.
+8. Eliminar o corregir controladores "espejo" no usados que tengan rutas falsas.
+Verificación: script del Prompt 0.2 sin faltantes + npm run build + flutter analyze.
+
+PROMPT 2.2 - Unificar disponibilidad por prenda/variante (CU-18)
+Revisar el contrato de CU-18. El backend expone
+GET /api/v1/inventario/prendas/{prenda_id}/disponibilidad, pero existen
+referencias a /inventario/disponibilidad/variante/{variante_id}.
+Decide el contrato canónico, documentalo en README y actualiza backend,
+frontend y móvil. Añadir test de integración que valide la ruta elegida.
+
+================================================================================
+BLOQUE 3 - INTEGRACIONES REALES (dejar de simular)
+================================================================================
+
+PROMPT 3.1 - CU-24: Stripe real (sandbox)
+En backend/app/services/pago_service.py existe MockGateway como fallback.
+Objetivo: integración real con Stripe Sandbox.
+1. Añadir dependencia stripe en requirements si falta.
+2. Validar firma del webhook en /api/v1/pagos/webhook/stripe con
+   STRIPE_WEBHOOK_SECRET.
+3. Cubrir crear PaymentIntent, confirmación, conciliación y reembolso.
+4. Dejar MockGateway solo para tests, nunca para runtime con claves configuradas.
+5. Tests con mocks de Stripe y documentación en README.
+Criterio de aceptación: con claves sk_test_ configuradas, el flujo de checkout
+genera PaymentIntent real y el webhook actualiza el pago.
+
+PROMPT 3.2 - CU-34: IA generativa real (o híbrida)
+En backend/app/services/ia_reporte_service.py la clasificación es por regex.
+Objetivo: integrar un LLM real manteniendo la whitelist BR-08.
+1. Añadir configuración LLM_API_KEY / LLM_MODEL en core/config.py.
+2. Implementar un adaptador que traduzca lenguaje natural a una de las consultas
+   whitelist, con fallback al clasificador regex si no hay clave o falla.
+3. Nunca permitir SQL libre generado por el modelo.
+4. Registrar prompt/respuesta en consulta_ia_log.
+5. Tests unitarios del adaptador y del fallback.
+
+PROMPT 3.3 - CU-35: datos reales de ML
+En backend/app/services/ml_analytics_service.py hay un dataset sintético cuando
+hay <6 meses de histórico. Objetivo:
+1. Eliminar el dataset sintético en producción o marcarlo explícitamente como
+   "demo" en la respuesta.
+2. Si no hay datos suficientes, devolver estado "datos_insuficientes" con mensaje.
+3. Añadir métricas reales (r2, mse) y tests con datos controlados.
+4. Documentar limitaciones en README.
+
+PROMPT 3.4 - CU-36: vestidor virtual real
+En backend/app/services/vestidor_ar_service.py:
+1. La sesión Decart requiere DECART_API_KEY; documentar variables en .env.example.
+2. Eliminar URLs placeholder "/assets/models/ar/casual_tshirt.glb" en producción
+   o sembrar assets reales en db/17_ar.sql.
+3. Implementar manejo de error claro cuando no hay API key (503, no 500).
+4. Añadir tests del fallback y del contrato lucy-session/lucy-prompt.
+
+================================================================================
+BLOQUE 4 - PRUEBAS Y CALIDAD
+================================================================================
+
+PROMPT 4.1 - Reforzar tests de CU-33 a CU-36
+backend/tests/test_cu33_a_cu36.py hoy solo verifica que existan métodos.
+Añade pruebas de comportamiento:
+1. CU-33: dashboard, ventas por periodo, rotación y top prendas con datos fake.
+2. CU-34: exportación xlsx/pdf con contenido y whitelist rechazando consultas.
+3. CU-35: predicción, segmentación y TTS con datos controlados.
+4. CU-36: listar prendas, avatar, iniciar/finalizar sesión y errores.
+Verificación: pytest backend/tests/test_cu33_a_cu36.py -q
+
+PROMPT 4.2 - Test end-to-end de los 36 CU
+Crear backend/tests/test_e2e_36_cu.py que recorra un flujo mínimo por CU con
+usuarios demo:
+- superadmin: CU-06, CU-07, CU-08, CU-09.
+- admin: CU-10 a CU-17, CU-33.
+- cliente: CU-13, CU-14, CU-19, CU-20, CU-22, CU-36.
+- cajero/encargado: CU-21, CU-23, CU-24.
+- offline: CU-25 a CU-32.
+Cada test debe fallar si el endpoint no existe o devuelve 5xx.
+
+PROMPT 4.3 - Actualizar documentación de cobertura
+Actualizar README.md y tests/07_cobertura_36.sql con una matriz:
+CU | backend | web | móvil | test | estado (completo/parcial/simulado).
+Marcar explícitamente CU-24, CU-34, CU-35 y CU-36 como "simulado" hasta
+completar el Bloque 3.
+
+================================================================================
+BLOQUE 5 - EXTRAS OPCIONALES
+================================================================================
+
+PROMPT 5.1 - CU-27: exponer soft-lock en UI
+El backend y sync_service ya implementan soft-lock con TTL, pero no hay pantalla
+dedicada. Añadir en Angular y Flutter una vista "Bloqueos activos" que:
+1. Liste soft locks activos.
+2. Permita liberar un lock manualmente.
+3. Muestre TTL restante.
+4. Se integre en el flujo de reserva offline.
+
+PROMPT 5.2 - CU-37: backups en móvil (opcional)
+La web tiene CU-37 completo, el móvil no. Si se requiere paridad, crear
+mobile/lib/features/backups con listado, creación manual, sincronización
+nube/local y restauración, consumiendo /api/v1/backups.
+
+================================================================================
+ORDEN SUGERIDO DE EJECUCIÓN
+================================================================================
+1. Prompt 0.1 y 0.2 (diagnóstico).
+2. Prompt 1.1 a 1.8 (backend faltante).
+3. Prompt 2.1 y 2.2 (alineación de rutas).
+4. Prompt 4.1 y 4.2 (tests).
+5. Prompt 3.1 a 3.4 (integraciones reales).
+6. Prompt 4.3 (documentación).
+7. Prompt 5.1 y 5.2 (extras).
+
+================================================================================
+CRITERIO DE "36 CU COMPLETOS"
+================================================================================
+- El script de contratos no reporta rutas faltantes.
+- Cada CU tiene al menos un test de integración que pasa.
+- Ningún CU marcado como "simulado" en la matriz de cobertura.
+- Build de Angular y flutter analyze sin errores.
+================================================================================

@@ -24,4 +24,5 @@
 \ir 23_ajustes_cu33_cu36.sql
 \ir 24_empresas_adicionales.sql
 \ir 26_backups.sql
+\ir 27_ajustes_36cu.sql
 \ir 99_verificacion.sql

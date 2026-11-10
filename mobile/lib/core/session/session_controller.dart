@@ -12,18 +12,13 @@ import '../utils/network_status.dart';
 
 class SessionController extends ChangeNotifier {
   SessionController({
-    required AuthRepository authRepository,
-    required ProfileRepository profileRepository,
-    required SecureSessionStore secureStore,
-    required LocalDatabase database,
+    required this._authRepository,
+    required this._profileRepository,
+    required this._secureStore,
+    required this._database,
     required NetworkStatus networkStatus,
-    ApiClient? apiClient,
-  }) : _authRepository = authRepository,
-       _profileRepository = profileRepository,
-       _secureStore = secureStore,
-       _database = database,
-       _networkStatus = networkStatus,
-       _apiClient = apiClient,
+    this._apiClient,
+  }) : _networkStatus = networkStatus,
        _online = networkStatus.value {
     _networkStatus.addListener(_onNetworkChanged);
   }

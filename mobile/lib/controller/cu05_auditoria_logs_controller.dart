@@ -24,8 +24,8 @@ class CU05AuditoriaLogsController extends ChangeNotifier {
       if (usuarioId != null) query['usuario_id'] = usuarioId;
       if (accion != null) query['accion'] = accion;
 
-      final res = await _apiClient.get('/auditoria/logs', query: query);
-      _logs = res is List ? res : (res['items'] ?? []);
+      final dynamic res = await _apiClient.get('/auditoria/logs', query: query);
+      _logs = res is List ? res : ((res as Map?)?['items'] as List<dynamic>? ?? []);
       _loading = false;
     } catch (e) {
       _loading = false;

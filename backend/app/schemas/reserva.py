@@ -77,6 +77,10 @@ class PrepararReservaRequest(BaseModel):
     probador: Optional[str] = None
 
 
+class CompletarReservaRequest(BaseModel):
+    motivo: Optional[str] = None
+
+
 class IncidenciaReservaRequest(BaseModel):
     variante_ids: List[UUID]
     motivo: str = Field(min_length=1, max_length=200)

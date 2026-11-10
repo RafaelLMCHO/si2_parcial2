@@ -26,8 +26,11 @@ class CU36VestidorVirtualRaController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await apiClient.get('/vestidor/prendas');
-      _prendasAr = List<Map<String, dynamic>>.from(res.data);
+      final dynamic res = await apiClient.get('/vestidor/prendas');
+      final list = res is List ? res : ((res as Map?)?['items'] as List? ?? []);
+      _prendasAr = list
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
       _isLoading = false;
       notifyListeners();
       return _prendasAr;
@@ -42,7 +45,7 @@ class CU36VestidorVirtualRaController extends ChangeNotifier {
   Future<Map<String, dynamic>?> obtenerPrendaAr(String prendaId) async {
     try {
       final res = await apiClient.get('/vestidor/prendas/$prendaId');
-      return Map<String, dynamic>.from(res.data);
+      return Map<String, dynamic>.from(res as Map);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -53,7 +56,7 @@ class CU36VestidorVirtualRaController extends ChangeNotifier {
   Future<Map<String, dynamic>?> obtenerAvatarUsuario() async {
     try {
       final res = await apiClient.get('/vestidor/avatar');
-      return Map<String, dynamic>.from(res.data);
+      return Map<String, dynamic>.from(res as Map);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -69,13 +72,13 @@ class CU36VestidorVirtualRaController extends ChangeNotifier {
     try {
       final res = await apiClient.post(
         '/vestidor/sesiones',
-        data: {
+        {
           'prenda_id': prendaId,
-          if (varianteId != null) 'variante_id': varianteId,
-          if (avatarId != null) 'avatar_id': avatarId,
+          'variante_id': ?varianteId,
+          'avatar_id': ?avatarId,
         },
       );
-      return Map<String, dynamic>.from(res.data);
+      return Map<String, dynamic>.from(res as Map);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -91,9 +94,9 @@ class CU36VestidorVirtualRaController extends ChangeNotifier {
     try {
       await apiClient.put(
         '/vestidor/sesiones/$sesionId',
-        data: {
+        {
           'estado': estado,
-          if (resultadoUrl != null) 'resultado_url': resultadoUrl,
+          'resultado_url': ?resultadoUrl,
         },
       );
       return true;

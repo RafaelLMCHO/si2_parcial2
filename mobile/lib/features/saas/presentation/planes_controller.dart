@@ -20,8 +20,8 @@ class PlanesController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiClient.get('/saas/planes');
-      _planes = res is List ? res : (res['items'] ?? []);
+      final dynamic res = await _apiClient.get('/saas/planes');
+      _planes = res is List ? res : ((res as Map?)?['items'] as List<dynamic>? ?? []);
       _loading = false;
     } catch (e) {
       _loading = false;
@@ -41,6 +41,23 @@ class PlanesController extends ChangeNotifier {
       } else {
         await _apiClient.post('/saas/planes', data);
       }
+      await cargarPlanes();
+      return true;
+    } catch (e) {
+      _loading = false;
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> eliminarPlan(String planId) async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _apiClient.delete('/saas/planes/$planId');
       await cargarPlanes();
       return true;
     } catch (e) {

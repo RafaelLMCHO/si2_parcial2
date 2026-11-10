@@ -862,6 +862,145 @@ async def preparar_reserva(
 
 
 # ---------------------------------------------------------------------------
+# CU-21 – Completar reserva tras atención / prueba en tienda
+# ---------------------------------------------------------------------------
+async def completar_reserva(
+    empresa_id: str,
+    user_id: str,
+    reserva_id: str,
+    motivo: str | None = None,
+    ip: str | None = None,
+) -> dict:
+    """
+    Marca la reserva como 'completada', libera el stock reservado en inventario
+    si no había sido liberado aún, registra el historial de estados y audita.
+    """
+    motivo_final = (motivo or "Reserva completada en sucursal").strip()
+
+    async with tenant_connection(empresa_id, user_id) as conn:
+        encargado = await conn.fetchrow(
+            "SELECT sucursal_id FROM usuario WHERE id = $1 AND empresa_id = $2",
+            UUID(user_id),
+            UUID(empresa_id),
+        )
+        sucursal_id_encargado = encargado["sucursal_id"] if encargado else None
+
+        r = await conn.fetchrow(
+            "SELECT * FROM reserva WHERE id = $1 AND empresa_id = $2 FOR UPDATE",
+            UUID(reserva_id),
+            UUID(empresa_id),
+        )
+        if not r:
+            raise api_error(404, "RESERVA_NO_ENCONTRADA", "Reserva no encontrada")
+
+        if sucursal_id_encargado and str(r["sucursal_id"]) != str(sucursal_id_encargado):
+            raise api_error(403, "ACCESO_DENEGADO", "Esta reserva no pertenece a tu sucursal")
+
+        estado_anterior = r["estado"]
+        if estado_anterior not in ("pendiente_preparacion", "preparada", "activa", "confirmada"):
+            raise api_error(
+                409,
+                "ESTADO_INVALIDO",
+                f"No es posible completar una reserva en estado '{estado_anterior}'",
+            )
+
+        if r["liberada_en"] is None and estado_anterior in ("pendiente_preparacion", "preparada"):
+            detalles = await conn.fetch(
+                "SELECT variante_id, cantidad FROM reserva_detalle WHERE reserva_id = $1 AND empresa_id = $2",
+                UUID(reserva_id),
+                UUID(empresa_id),
+            )
+            variante_ids = [d["variante_id"] for d in detalles]
+            if variante_ids:
+                await conn.fetch(
+                    """
+                    SELECT id FROM inventario
+                     WHERE empresa_id = $1 AND sucursal_id = $2 AND variante_id = ANY($3)
+                     ORDER BY variante_id
+                     FOR UPDATE
+                    """,
+                    UUID(empresa_id),
+                    r["sucursal_id"],
+                    variante_ids,
+                )
+                for d in detalles:
+                    await conn.execute(
+                        """
+                        UPDATE inventario
+                           SET stock_reservado = GREATEST(0, stock_reservado - $1),
+                               actualizado_en  = now()
+                         WHERE empresa_id  = $2
+                           AND sucursal_id = $3
+                           AND variante_id = $4
+                        """,
+                        d["cantidad"],
+                        UUID(empresa_id),
+                        r["sucursal_id"],
+                        d["variante_id"],
+                    )
+
+        reserva_updated = await conn.fetchrow(
+            """
+            UPDATE reserva
+               SET estado        = 'completada',
+                   liberada_en   = COALESCE(liberada_en, now()),
+                   motivo_cierre = $1,
+                   updated_at    = now()
+             WHERE id = $2
+               AND empresa_id = $3
+            RETURNING *
+            """,
+            motivo_final[:200],
+            UUID(reserva_id),
+            UUID(empresa_id),
+        )
+
+        # Garantizar historial único si el trigger ya insertó o en DB simulada sin triggers
+        ya_en_historial = await conn.fetchval(
+            """
+            SELECT 1
+              FROM reserva_estado_historial
+             WHERE reserva_id = $1
+               AND empresa_id = $2
+               AND estado_nuevo = 'completada'
+               AND ocurrido_en >= now() - interval '5 seconds'
+             LIMIT 1
+            """,
+            UUID(reserva_id),
+            UUID(empresa_id),
+        )
+        if not ya_en_historial:
+            await conn.execute(
+                """
+                INSERT INTO reserva_estado_historial
+                    (empresa_id, reserva_id, estado_anterior, estado_nuevo, motivo, usuario_id)
+                VALUES ($1, $2, $3, 'completada', $4, $5)
+                """,
+                UUID(empresa_id),
+                UUID(reserva_id),
+                estado_anterior,
+                motivo_final[:200],
+                UUID(user_id),
+            )
+
+        resultado = await _get_reserva_completa(conn, empresa_id, reserva_id)
+
+    await audit_event(
+        empresa_id=empresa_id,
+        usuario_id=user_id,
+        actor_tipo="usuario",
+        accion="update",
+        entidad="reserva",
+        entidad_id=reserva_id,
+        datos_antes={"estado": estado_anterior},
+        datos_despues={"estado": "completada", "motivo": motivo_final},
+        ip=ip,
+    )
+
+    return resultado
+
+
+# ---------------------------------------------------------------------------
 # CU-20 – Reportar incidencia de stock (encargado)
 # ---------------------------------------------------------------------------
 async def reportar_incidencia(
@@ -1117,22 +1256,81 @@ class ReservaService:
         self.pool = pool
 
     async def crear_reserva(self, empresa_id: str, cliente_id: str, datos=None):
-        return await crear_reserva(empresa_id=empresa_id, cliente_id=cliente_id, datos=datos)
+        sucursal_id = str(getattr(datos, "sucursal_id", "") or (datos.get("sucursal_id") if isinstance(datos, dict) else ""))
+        fecha_visita = getattr(datos, "fecha_visita", None) or (datos.get("fecha_visita") if isinstance(datos, dict) else None)
+        raw_items = getattr(datos, "items", None) or (datos.get("items") if isinstance(datos, dict) else [])
+        items = [it.model_dump() if hasattr(it, "model_dump") else it for it in raw_items]
+        return await crear_reserva(
+            empresa_id=empresa_id,
+            user_id=cliente_id,
+            sucursal_id=sucursal_id,
+            fecha_visita=fecha_visita,
+            items=items,
+        )
 
-    async def mis_reservas(self, empresa_id: str, cliente_id: str):
-        return await listar_reservas(empresa_id=empresa_id, cliente_id=cliente_id)
+    async def mis_reservas(self, empresa_id: str, cliente_id: str, estado: str | None = None):
+        return await listar_reservas(
+            empresa_id=empresa_id,
+            user_id=cliente_id,
+            rol="cliente",
+            estado=estado,
+        )
 
-    async def cancelar_reserva(self, empresa_id: str, reserva_id: str, cliente_id: str, motivo: str = None):
-        return await cancelar_reserva(empresa_id=empresa_id, reserva_id=reserva_id, actor_id=cliente_id, motivo=motivo)
+    async def cancelar_reserva(self, empresa_id: str, reserva_id: str, cliente_id: str, motivo: str | None = None):
+        return await cancelar_reserva(
+            empresa_id=empresa_id,
+            user_id=cliente_id,
+            rol="cliente",
+            reserva_id=reserva_id,
+            motivo=motivo,
+        )
 
-    async def listar_reservas(self, empresa_id: str, sucursal_id: str = None, estado: str = None):
-        return await listar_reservas(empresa_id=empresa_id, sucursal_id=sucursal_id, estado=estado)
+    async def listar_reservas(
+        self,
+        empresa_id: str,
+        sucursal_id: str | None = None,
+        estado: str | None = None,
+        usuario_id: str | None = None,
+        rol: str = "administrador",
+    ):
+        return await listar_reservas(
+            empresa_id=empresa_id,
+            user_id=usuario_id or empresa_id,
+            rol=rol,
+            sucursal_id_filtro=sucursal_id,
+            estado=estado,
+        )
 
-    async def preparar_reserva(self, empresa_id: str, reserva_id: str, usuario_id: str):
-        return await preparar_reserva(empresa_id=empresa_id, reserva_id=reserva_id, staff_id=usuario_id)
+    async def preparar_reserva(self, empresa_id: str, reserva_id: str, usuario_id: str, probador: str | None = None):
+        return await preparar_reserva(
+            empresa_id=empresa_id,
+            user_id=usuario_id,
+            reserva_id=reserva_id,
+            probador=probador,
+        )
 
-    async def completar_reserva(self, empresa_id: str, reserva_id: str, usuario_id: str):
-        return await get_reserva(empresa_id=empresa_id, reserva_id=reserva_id)
+    async def completar_reserva(self, empresa_id: str, reserva_id: str, usuario_id: str, motivo: str | None = None):
+        return await completar_reserva(
+            empresa_id=empresa_id,
+            user_id=usuario_id,
+            reserva_id=reserva_id,
+            motivo=motivo,
+        )
 
-    async def registrar_incidencia(self, empresa_id: str, reserva_id: str, usuario_id: str, detalle: str):
-        return await reportar_incidencia(empresa_id=empresa_id, reserva_id=reserva_id, staff_id=usuario_id, motivo=detalle)
+    async def registrar_incidencia(
+        self,
+        empresa_id: str,
+        reserva_id: str,
+        usuario_id: str,
+        detalle: str,
+        variante_ids: list[str] | None = None,
+        registrar_merma: bool = False,
+    ):
+        return await reportar_incidencia(
+            empresa_id=empresa_id,
+            user_id=usuario_id,
+            reserva_id=reserva_id,
+            variante_ids=variante_ids or [],
+            motivo=detalle,
+            registrar_merma=registrar_merma,
+        )

@@ -1,7 +1,6 @@
 from __future__ import annotations
 from datetime import datetime
-from decimal import Decimal
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 from pydantic import BaseModel, Field
 
@@ -24,9 +23,16 @@ class PagoOut(BaseModel):
     monto: float
     metodo: str
     estado: str
-    pasarela_id: Optional[str]
-    referencia: Optional[str]
+    pasarela_id: Optional[str] = None
+    referencia: Optional[str] = None
     created_at: datetime
+
+
+class PagoListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[PagoOut]
 
 
 class EstadoPagoOut(BaseModel):
@@ -41,6 +47,18 @@ class EstadoPagoOut(BaseModel):
 # Aliases para compatibilidad con controladores
 IntencionPagoCreate = PagoIntencionRequest
 
+
 class ReembolsoCreate(BaseModel):
-    monto: Optional[float] = None
+    monto: Optional[float] = Field(default=None, gt=0)
+    motivo: Optional[str] = Field(default=None, max_length=200)
+
+
+class ReembolsoOut(BaseModel):
+    ok: bool = True
+    pago_id: UUID
+    venta_id: UUID
+    estado: str
+    venta_estado: str
+    monto_reembolsado: float
+    refund_id: Optional[str] = None
     motivo: Optional[str] = None
