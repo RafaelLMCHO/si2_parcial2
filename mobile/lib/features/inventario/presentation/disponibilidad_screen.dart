@@ -47,34 +47,44 @@ class _DisponibilidadScreenState extends State<DisponibilidadScreen> {
       return;
     }
 
+    final tenant = (await widget.localDb.readTenant()) ?? 'demo';
+
     try {
       final dynamic response = await widget.apiClient.get(
         '/inventario/prendas/${widget.prendaId}/disponibilidad',
       );
-      final datos = DisponibilidadPrenda.fromJson(
-        Map<String, dynamic>.from(response as Map),
+      final mapRes = Map<String, dynamic>.from(response as Map);
+      await widget.localDb.saveDisponibilidadPrenda(
+        tenant,
+        widget.prendaId,
+        mapRes,
       );
+      final datos = DisponibilidadPrenda.fromJson(mapRes);
       if (!mounted) return;
       setState(() {
         _datos = datos;
         _cargando = false;
       });
     } catch (e) {
-      // Fallback a SQLite local (CU-18)
-      final locales = await widget.localDb.listarExistenciasLocales();
-      final actualizadoEn = locales.isNotEmpty
-          ? (locales.first['actualizado_en']?.toString() ?? DateTime.now().toIso8601String())
-          : DateTime.now().toIso8601String();
+      // Fallback a SQLite local (CU-18): disponibilidad_cache o sucursales_cache + existencias_local
+      final cached = await widget.localDb.buildDisponibilidadOffline(
+        tenant,
+        widget.prendaId,
+      );
       if (!mounted) return;
       setState(() {
-        _error = 'No se pudo contactar al servidor; usando respaldo local ($e).';
-        _datos = DisponibilidadPrenda(
-          prendaId: widget.prendaId,
-          agotadoEnTodas: locales.isEmpty,
-          actualizadoEn: actualizadoEn,
-          sucursales: [],
-          esLocal: true,
-        );
+        _error = cached == null
+            ? 'No se pudo obtener disponibilidad en línea ni en caché local ($e).'
+            : null;
+        _datos =
+            cached ??
+            DisponibilidadPrenda(
+              prendaId: widget.prendaId,
+              agotadoEnTodas: false,
+              actualizadoEn: DateTime.now().toIso8601String(),
+              sucursales: const [],
+              esLocal: true,
+            );
         _cargando = false;
       });
     }

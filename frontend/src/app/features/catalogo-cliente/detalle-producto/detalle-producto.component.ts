@@ -1,10 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { CU25DescargarCatalogoOfflineController } from '../../../controller/cu25_descargar_catalogo_offline_controller';
 import { CatalogoService } from '../../../core/catalogo.service';
 import { CheckoutService } from '../../../core/checkout.service';
 import { AuthService } from '../../../core/auth.service';
-import { Prenda, VariantePrenda } from '../../../core/models';
+import { InventarioService } from '../../../core/inventario.service';
+import { NetworkService } from '../../../core/network.service';
+import { DisponibilidadPrendaResponse, Prenda, VariantePrenda } from '../../../core/models';
 
 @Component({
   selector: 'app-detalle-producto',
@@ -174,10 +177,14 @@ import { Prenda, VariantePrenda } from '../../../core/models';
                 <div class="secondary-buttons-grid">
                   <a
                     [routerLink]="['/reservas/nueva']"
-                    [queryParams]="{ prenda_id: p.id }"
+                    [queryParams]="{
+                      prenda_id: p.id,
+                      variante_id: varianteSeleccionada()?.id || null,
+                      cantidad: cantidad()
+                    }"
                     class="btn-secondary"
                   >
-                    👗 Reservar Probador (CU-19)
+                    👗 {{ network.online() ? 'Reservar Probador (CU-19)' : 'Reservar Offline (CU-26)' }}
                   </a>
                   <a
                     [routerLink]="['/vestidor-virtual']"
@@ -186,6 +193,30 @@ import { Prenda, VariantePrenda } from '../../../core/models';
                     ✨ Probar en Vestidor RA
                   </a>
                 </div>
+
+                @if (disponibilidad(); as disp) {
+                  <div style="margin-top: 10px; padding: 12px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                      <span style="font-size:0.75rem; font-weight:800; color:#334155; text-transform:uppercase;">
+                        Disponibilidad por tienda {{ disp.es_local ? '(Stock Local)' : '' }}
+                      </span>
+                    </div>
+                    @if (disp.sucursales.length === 0) {
+                      <p style="font-size:0.78rem; color:#64748b; margin:0;">Sin existencias registradas en caché para esta prenda.</p>
+                    } @else {
+                      <div style="display:flex; flex-direction:column; gap:6px;">
+                        @for (suc of disp.sucursales; track suc.sucursal_id) {
+                          <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem;">
+                            <span style="font-weight:600; color:#1e293b;">{{ suc.nombre }} @if (suc.ciudad) { <small style="color:#64748b;">({{ suc.ciudad }})</small> }</span>
+                            <span style="font-weight:700;" [style.color]="stockEnSucursal(suc) > 0 ? '#059669' : '#64748b'">
+                              {{ stockEnSucursal(suc) }} disp.
+                            </span>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
               </div>
             </div>
           </div>
@@ -533,11 +564,15 @@ export class DetalleProductoComponent implements OnInit {
   private router = inject(Router);
   private catalogoService = inject(CatalogoService);
   private checkoutService = inject(CheckoutService);
+  private inventarioService = inject(InventarioService);
+  private cu25Offline = inject(CU25DescargarCatalogoOfflineController);
+  readonly network = inject(NetworkService);
   private auth = inject(AuthService);
 
   cargando = signal(false);
   prenda = signal<Prenda | null>(null);
   varianteSeleccionada = signal<VariantePrenda | null>(null);
+  disponibilidad = signal<DisponibilidadPrendaResponse | null>(null);
   cantidad = signal(1);
   guardando = signal(false);
 
@@ -550,6 +585,7 @@ export class DetalleProductoComponent implements OnInit {
     if (id) {
       this.cargar(id);
     }
+    this.cu25Offline.asegurarCatalogoOfflineCargado();
   }
 
   cargar(id: string) {
@@ -561,9 +597,33 @@ export class DetalleProductoComponent implements OnInit {
           this.varianteSeleccionada.set(res.variantes[0]);
         }
         this.cargando.set(false);
+        this.cargarDisponibilidad(id);
       },
-      error: () => this.cargando.set(false)
+      error: () => {
+        this.cargando.set(false);
+        this.mostrarToast('No se pudo cargar esta prenda sin conexión. Descarga o abre el catálogo en línea al menos una vez.', true);
+      }
     });
+  }
+
+  cargarDisponibilidad(prendaId: string) {
+    if (!this.auth.isAuthenticated() && this.network.online()) {
+      return;
+    }
+    this.inventarioService.consultarDisponibilidad(prendaId).subscribe({
+      next: (disp) => this.disponibilidad.set(disp),
+      error: () => {},
+    });
+  }
+
+  stockEnSucursal(suc: { variantes?: Array<{ variante_id: string; stock_disponible: number }> }): number {
+    const varId = this.varianteSeleccionada()?.id;
+    const vars = suc?.variantes || [];
+    if (varId) {
+      const match = vars.find((v) => v.variante_id === varId);
+      if (match) return Number(match.stock_disponible || 0);
+    }
+    return vars.reduce((acc, v) => acc + Number(v.stock_disponible || 0), 0);
   }
 
   getPrendaImg(p: Prenda | { nombre?: string; categoria_nombre?: string; imagen_url?: string | null }): string {

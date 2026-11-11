@@ -4,8 +4,10 @@ import '../../features/auditoria/presentation/auditoria_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/verify_email_screen.dart';
+import '../../features/catalogo/data/catalogo_models.dart';
 import '../../features/catalogo/presentation/catalogo_controller.dart';
 import '../../features/catalogo/presentation/catalogo_screen.dart';
+import '../../features/catalogo/presentation/detalle_producto_screen.dart';
 import '../../features/catalogo_admin/presentation/catalogo_admin_screen.dart';
 import '../../features/checkout/presentation/checkout_screen.dart';
 import '../../features/empleados/presentation/empleados_screen.dart';
@@ -32,6 +34,7 @@ import '../../features/saas/presentation/saas_screen.dart';
 import '../../features/sucursales/presentation/sucursales_screen.dart';
 import '../../features/temporadas/presentation/temporadas_screen.dart';
 import '../session/session_controller.dart';
+import 'role_permissions.dart';
 
 GoRouter createRouter(
   SessionController session,
@@ -51,6 +54,10 @@ GoRouter createRouter(
         return '/login';
       }
       if (session.isAuthenticated && isAuthRoute) {
+        return '/profile';
+      }
+      if (session.isAuthenticated &&
+          !canAccessRoute(session.user?.rol, location)) {
         return '/profile';
       }
       return null;
@@ -83,6 +90,15 @@ GoRouter createRouter(
             CatalogoScreen(session: session, controller: catalogoController),
       ),
       GoRoute(
+        path: '/catalogo/prenda/:id',
+        builder: (context, state) => DetalleProductoScreen(
+          apiClient: session.apiClient,
+          prendaId: state.pathParameters['id'] ?? '',
+          initialPrenda: state.extra is Prenda ? state.extra as Prenda : null,
+          session: session,
+        ),
+      ),
+      GoRoute(
         path: '/inventario',
         builder: (context, state) =>
             InventarioScreen(apiClient: session.apiClient),
@@ -98,13 +114,21 @@ GoRouter createRouter(
       ),
       GoRoute(
         path: '/reservas',
-        builder: (context, state) =>
-            ReservasScreen(apiClient: session.apiClient, esEncargado: session.user?.rol == 'encargado'),
+        builder: (context, state) => ReservasScreen(
+          apiClient: session.apiClient,
+          esEncargado:
+              session.user?.rol == 'encargado' ||
+              session.user?.rol == 'administrador',
+          rol: session.user?.rol,
+          empresaSlug: session.tenant,
+          localDatabase: session.database,
+          session: session,
+        ),
       ),
       GoRoute(
         path: '/checkout',
         builder: (context, state) =>
-            CheckoutScreen(apiClient: session.apiClient),
+            CheckoutScreen(apiClient: session.apiClient, session: session),
       ),
       GoRoute(
         path: '/pos',
@@ -153,14 +177,18 @@ GoRouter createRouter(
       ),
       GoRoute(
         path: '/offline/catalogo',
-        builder: (context, state) =>
-            CatalogoOfflineScreen(apiClient: session.apiClient, database: session.database),
+        builder: (context, state) => CatalogoOfflineScreen(
+          apiClient: session.apiClient,
+          database: session.database,
+          session: session,
+        ),
       ),
       GoRoute(
         path: '/offline/reserva',
         builder: (context, state) => ReservaOfflineScreen(
           database: session.database,
           apiClient: session.apiClient,
+          session: session,
           initialSucursalId: state.uri.queryParameters['sucursal_id'],
           initialVarianteId: state.uri.queryParameters['variante_id'],
         ),
@@ -189,8 +217,11 @@ GoRouter createRouter(
       ),
       GoRoute(
         path: '/offline/cola',
-        builder: (context, state) =>
-            ColaOperacionesScreen(apiClient: session.apiClient, database: session.database),
+        builder: (context, state) => ColaOperacionesScreen(
+          apiClient: session.apiClient,
+          database: session.database,
+          session: session,
+        ),
       ),
       GoRoute(
         path: '/offline/conflictos',

@@ -9,6 +9,7 @@ import { NetworkService } from '../../core/network.service';
 import { CheckoutService } from '../../core/checkout.service';
 import { AuthService } from '../../core/auth.service';
 import { SessionStoreService } from '../../core/session-store.service';
+import { CU25DescargarCatalogoOfflineController } from '../../controller/cu25_descargar_catalogo_offline_controller';
 import { CU38RecomendacionesIaController, OutfitRecomendado } from '../../controller/cu38_recomendaciones_ia_controller';
 
 @Component({
@@ -2164,6 +2165,7 @@ export class CatalogoClienteComponent implements OnInit {
   readonly network = inject(NetworkService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly cu25Offline = inject(CU25DescargarCatalogoOfflineController);
   readonly stylistIa = inject(CU38RecomendacionesIaController);
 
   // Prompt para el Personal Stylist IA (CU-38)
@@ -2236,6 +2238,7 @@ export class CatalogoClienteComponent implements OnInit {
       this.cargarAuxiliares();
       this.cargar();
       this.recargarCarrito();
+      this.cu25Offline.asegurarCatalogoOfflineCargado();
     });
   }
 

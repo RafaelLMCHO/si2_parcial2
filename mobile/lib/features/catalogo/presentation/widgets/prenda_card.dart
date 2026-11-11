@@ -1,142 +1,131 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/utils/prenda_image_helper.dart';
 import '../../data/catalogo_models.dart';
 
 class PrendaCard extends StatelessWidget {
-  const PrendaCard({super.key, required this.prenda});
+  const PrendaCard({super.key, required this.prenda, this.onTap});
 
   final Prenda prenda;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
       elevation: 0,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: const BorderSide(color: Color(0xFFE5E7EB)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                width: 96,
-                height: 116,
-                child: _PrendaImage(url: prenda.imagenUrl),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 96,
+                  height: 116,
+                  child: PrendaNetworkImage(
+                    imagenUrl: prenda.imagenUrl,
+                    nombre: prenda.nombre,
+                    categoriaNombre: prenda.categoriaNombre,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    prenda.nombre,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    [prenda.marca, prenda.categoriaNombre]
-                        .where((value) => value != null && value.isNotEmpty)
-                        .join(' - '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: theme.colorScheme.outline),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${prenda.moneda} ${prenda.precioBase.toStringAsFixed(2)}',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (prenda.tallasDisponibles.isNotEmpty)
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      'Tallas: ${prenda.tallasDisponibles.join(', ')}',
-                      maxLines: 1,
+                      prenda.nombre,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  if (prenda.coloresDisponibles.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 5,
-                      runSpacing: 5,
-                      children: prenda.coloresDisponibles
-                          .take(6)
-                          .map((color) => _ColorDot(color: color))
-                          .toList(growable: false),
-                    ),
-                  ],
-                  if (prenda.tallasDisponibles.isEmpty &&
-                      prenda.coloresDisponibles.isEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Sin variantes registradas',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.outline,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
+                    const SizedBox(height: 3),
+                    Text(
+                      [prenda.marca, prenda.categoriaNombre]
+                          .where((value) => value != null && value.isNotEmpty)
+                          .join(' - '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: theme.colorScheme.outline),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${prenda.moneda} ${prenda.precioBase.toStringAsFixed(2)}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (prenda.tallasDisponibles.isNotEmpty)
+                      Text(
+                        'Tallas: ${prenda.tallasDisponibles.join(', ')}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    if (prenda.coloresDisponibles.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 5,
+                        runSpacing: 5,
+                        children: prenda.coloresDisponibles
+                            .take(6)
+                            .map((color) => _ColorDot(color: color))
+                            .toList(growable: false),
+                      ),
+                    ],
+                    if (prenda.tallasDisponibles.isEmpty &&
+                        prenda.coloresDisponibles.isEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Sin variantes registradas',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
+                      ),
+                    ],
+                    if (onTap != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            'Seleccionar',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 16,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    );
-  }
-}
-
-class _PrendaImage extends StatelessWidget {
-  const _PrendaImage({required this.url});
-
-  final String? url;
-
-  @override
-  Widget build(BuildContext context) {
-    final placeholder = Container(
-      color: const Color(0xFFF3F4F6),
-      alignment: Alignment.center,
-      child: Icon(
-        Icons.checkroom,
-        size: 34,
-        color: Theme.of(context).colorScheme.outline,
-      ),
-    );
-    final imageUrl = url;
-    if (imageUrl == null || imageUrl.isEmpty) {
-      return placeholder;
-    }
-    return Image.network(
-      imageUrl,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => placeholder,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) {
-          return child;
-        }
-        return const ColoredBox(
-          color: Color(0xFFF3F4F6),
-          child: Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-        );
-      },
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/session/session_controller.dart';
 import '../../../core/storage/local_database.dart';
 import '../../../controller/cu30_cola_operaciones_offline_controller.dart';
 import '../../../controller/cu31_sincronizar_operaciones_controller.dart';
@@ -7,11 +8,13 @@ import '../../../controller/cu31_sincronizar_operaciones_controller.dart';
 class ColaOperacionesScreen extends StatefulWidget {
   final ApiClient apiClient;
   final LocalDatabase database;
+  final SessionController? session;
 
   const ColaOperacionesScreen({
     super.key,
     required this.apiClient,
     required this.database,
+    this.session,
   });
 
   @override
@@ -40,6 +43,7 @@ class _ColaOperacionesScreenState extends State<ColaOperacionesScreen> {
   Future<void> _sincronizar() async {
     final ok = await _syncCtrl.sincronizarLote();
     await _colaCtrl.cargarCola();
+    await widget.session?.refreshPendingOperations();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

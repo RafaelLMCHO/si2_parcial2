@@ -89,7 +89,44 @@ class _InventarioScreenState extends State<InventarioScreen> {
                     separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final item = _controller.items[index];
-                      final bool bajoMin = (item['cantidad'] ?? 0) <= (item['stock_minimo'] ?? 0);
+                      final existenciasRaw = item['existencias'];
+                      final existencias = existenciasRaw is List
+                          ? existenciasRaw.whereType<Map>().toList(growable: false)
+                          : const <Map>[];
+
+                      int totalDisp = 0;
+                      int totalMin = 0;
+                      bool bajoMin = false;
+                      String sucursalResumen;
+
+                      if (existencias.isNotEmpty) {
+                        for (final ex in existencias) {
+                          final disp = (ex['stock_disponible'] as num?)?.toInt() ?? 0;
+                          final min = (ex['stock_minimo'] as num?)?.toInt() ?? 0;
+                          totalDisp += disp;
+                          totalMin += min;
+                          if (ex['bajo_minimo'] == true || disp <= min) {
+                            bajoMin = true;
+                          }
+                        }
+                        sucursalResumen = existencias
+                            .map((ex) {
+                              final suc = ex['sucursal_nombre'] ?? '-';
+                              final disp = ex['stock_disponible'] ?? 0;
+                              final ubic = ex['ubicacion']?.toString();
+                              return ubic != null && ubic.isNotEmpty
+                                  ? '$suc: $disp ($ubic)'
+                                  : '$suc: $disp';
+                            })
+                            .join(' | ');
+                      } else {
+                        totalDisp = (item['cantidad'] as num?)?.toInt() ?? 0;
+                        totalMin = (item['stock_minimo'] as num?)?.toInt() ?? 0;
+                        bajoMin = totalDisp <= totalMin;
+                        sucursalResumen =
+                            'Sucursal: ${item['sucursal_nombre'] ?? '-'} | Ubic: ${item['ubicacion'] ?? 'Estante Gral'}';
+                      }
+
                       return ListTile(
                         leading: CircleAvatar(
                           backgroundColor: bajoMin ? Colors.red.shade100 : Colors.indigo.shade100,
@@ -100,14 +137,15 @@ class _InventarioScreenState extends State<InventarioScreen> {
                         ),
                         title: Text(item['prenda_nombre'] ?? item['sku'] ?? 'Producto'),
                         subtitle: Text(
-                          'SKU: ${item['sku']} | Talla: ${item['talla'] ?? '-'} | Color: ${item['color'] ?? '-'}\nSucursal: ${item['sucursal_nombre'] ?? '-'} | Ubic: ${item['ubicacion'] ?? 'Estante Gral'}',
+                          'SKU: ${item['sku']} | Talla: ${item['talla'] ?? '-'} | Color: ${item['color'] ?? '-'}\n$sucursalResumen',
                         ),
+                        isThreeLine: true,
                         trailing: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              '${item['cantidad']} uds',
+                              '$totalDisp uds',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -115,7 +153,7 @@ class _InventarioScreenState extends State<InventarioScreen> {
                               ),
                             ),
                             Text(
-                              'Mín: ${item['stock_minimo'] ?? 0}',
+                              'Mín: $totalMin',
                               style: const TextStyle(fontSize: 11, color: Colors.grey),
                             ),
                           ],

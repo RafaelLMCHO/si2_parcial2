@@ -20,7 +20,7 @@ import { CU25DescargarCatalogoOfflineController } from '../../../controller/cu25
 
         @if (ctrl.ultimaDescarga(); as fecha) {
           <div class="text-xs text-gray-600">
-            <strong>Última descarga:</strong> {{ fecha | date:'medium' }} • <strong>Prendas:</strong> {{ ctrl.articulosDescargados() }}
+            <strong>Última descarga:</strong> {{ fecha | date:'medium' }} • <strong>Prendas:</strong> {{ ctrl.articulosDescargados() }} • <strong>Sucursales:</strong> {{ ctrl.sucursalesDescargadas() }}
           </div>
         }
 

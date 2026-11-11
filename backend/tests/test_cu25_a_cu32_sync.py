@@ -54,6 +54,16 @@ class FakeConn:
 
     async def fetch(self, sql, *args):
         self.executed.append((sql, args))
+        if "FROM sucursal" in sql:
+            return [
+                {
+                    "id": uuid.uuid4(),
+                    "nombre": "Sucursal Centro",
+                    "direccion": "Av. Principal 100",
+                    "ciudad": "Santa Cruz",
+                    "es_matriz": True,
+                }
+            ]
         if "FROM soft_lock sl" in sql:
             return [
                 {
@@ -119,6 +129,8 @@ async def test_cu25_descargar_catalogo_offline():
     pkg = await service.descargar_catalogo_offline(empresa_id=str(uuid.uuid4()))
     assert pkg.total_articulos >= 0
     assert len(pkg.prendas) >= 0
+    assert len(pkg.sucursales) == 1
+    assert pkg.sucursales[0]["nombre"] == "Sucursal Centro"
 
 async def test_cu27_crear_soft_lock():
     pool = FakePool()
@@ -242,4 +254,111 @@ async def test_cu27_listar_y_liberar_soft_locks():
     with pytest.raises(HTTPException) as exc_400:
         await service.liberar_soft_lock(empresa_id=empresa_id, lock_id="invalid-uuid")
     assert exc_400.value.status_code == 400
+
+
+async def test_cu26_cu31_cu32_reserva_offline_sync_y_conflicto():
+    """CU-26/CU-31/CU-32: Sync reserva offline, expiración futura, ID legacy y conflicto."""
+    pool = FakePool()
+    service = SyncService(pool)
+    empresa_id = str(uuid.uuid4())
+    usuario_id = str(uuid.uuid4())
+    sucursal_id = str(uuid.uuid4())
+    var_id = str(uuid.uuid4())
+    op_uuid = str(uuid.uuid4())
+    visita_pasada = (datetime.now(timezone.utc) - timedelta(hours=5)).isoformat()
+
+    lote_ok = SyncBatchRequest(
+        operaciones=[
+            OperacionSyncItem(
+                id=op_uuid,
+                tipo="reserva_offline",
+                sucursal_id=sucursal_id,
+                payload={
+                    "items": [{"variante_id": var_id, "cantidad": 2}],
+                    "fecha_visita": visita_pasada,
+                    "probador": True,
+                },
+                creada_en=datetime.now(timezone.utc).isoformat(),
+                idempotency_key=f"IDEMP-{op_uuid}",
+            )
+        ]
+    )
+    res_ok = await service.procesar_lote_sync(empresa_id, usuario_id, lote_ok)
+    assert res_ok.confirmados == [op_uuid]
+    assert res_ok.conflictos == []
+
+    # Verifica expira_en > created_at aunque fecha_visita haya sido hace 5 horas
+    reserva_insert = [
+        args for sql, args in pool.conn.executed if "INSERT INTO reserva (" in sql
+    ][-1]
+    assert reserva_insert[5] > datetime.now(timezone.utc)
+
+    # Stock insuficiente debe generar conflicto sin abortar el lote, incluso con ID legacy no-UUID
+    class LowStockConn(FakeConn):
+        async def fetchrow(self, sql, *args):
+            if "inventario" in sql:
+                return {"stock_disponible": 1}
+            return await super().fetchrow(sql, *args)
+
+    pool.conn = LowStockConn()
+    legacy_id = "res-off-1710000001"
+    lote_conf = SyncBatchRequest(
+        operaciones=[
+            OperacionSyncItem(
+                id=legacy_id,
+                tipo="reserva_offline",
+                sucursal_id=sucursal_id,
+                payload={
+                    "items": [{"variante_id": var_id, "cantidad": 3}],
+                    "fecha_visita": datetime.now(timezone.utc).isoformat(),
+                },
+                creada_en=datetime.now(timezone.utc).isoformat(),
+                idempotency_key=f"IDEMP-{legacy_id}",
+            )
+        ]
+    )
+    res_conf = await service.procesar_lote_sync(empresa_id, usuario_id, lote_conf)
+    assert res_conf.confirmados == []
+    assert len(res_conf.conflictos) == 1
+    assert res_conf.conflictos[0].id == legacy_id
+    assert res_conf.conflictos[0].causa == "stock_insuficiente"
+    # El ID persistido en operacion_pendiente debe haberse normalizado a UUID válido
+    op_pend_insert = [
+        args for sql, args in pool.conn.executed if "INSERT INTO operacion_pendiente" in sql
+    ][-1]
+    uuid.UUID(str(op_pend_insert[0]))
+
+    # CU-32: resolver conflicto de reserva_offline con decision='ajustar'
+    class ConflictReservaConn(FakeConn):
+        async def fetchrow(self, sql, *args):
+            if "operacion_pendiente" in sql:
+                return {
+                    "id": str(uuid.uuid4()),
+                    "empresa_id": empresa_id,
+                    "sucursal_id": sucursal_id,
+                    "usuario_id": usuario_id,
+                    "tipo": "reserva_offline",
+                    "payload": json.dumps(
+                        {
+                            "items": [{"variante_id": var_id, "cantidad": 2}],
+                            "fecha_visita": datetime.now(timezone.utc).isoformat(),
+                            "probador": True,
+                        }
+                    ),
+                    "estado": "conflicto",
+                }
+            return await super().fetchrow(sql, *args)
+
+    pool.conn = ConflictReservaConn()
+    res_res = await service.resolver_conflicto(
+        empresa_id=empresa_id,
+        usuario_id=str(uuid.uuid4()),
+        datos=ResolucionConflictoRequest(
+            operacion_id=str(uuid.uuid4()),
+            decision="ajustar",
+            motivo="Stock regularizado para reserva offline",
+        ),
+    )
+    assert res_res["nuevo_estado"] == "resuelta"
+    assert any("INSERT INTO reserva (" in sql for sql, _ in pool.conn.executed)
 

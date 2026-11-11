@@ -1,4 +1,4 @@
-﻿import { HttpClient } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { EMPTY, Observable, catchError, finalize, tap, throwError } from 'rxjs';
@@ -29,7 +29,7 @@ export class AuthService {
   readonly refreshToken = signal<string | null>(this.store.readRefreshToken());
   readonly expiresAt = signal<number | null>(this.store.readExpiresAt());
   readonly isAuthenticated = computed(() => !!this.accessToken() && !!this.user());
-  readonly pendingOffline = signal(this.offline.hasPending());
+  readonly pendingOffline = this.offline.pendingSignal.asReadonly();
   readonly canWrite = computed(
     () => this.network.online() && this.isAuthenticated() && !this.isSessionExpired(),
   );
@@ -156,7 +156,7 @@ export class AuthService {
     this.refreshToken.set(null);
     this.expiresAt.set(null);
     this.user.set(null);
-    this.pendingOffline.set(this.offline.hasPending());
+    this.offline.refreshStatus();
   }
 
   private storeSession(response: LoginResponse): void {
@@ -165,6 +165,6 @@ export class AuthService {
     this.refreshToken.set(response.refresh_token);
     this.expiresAt.set(Date.now() + response.expires_in * 1000);
     this.user.set(response.usuario);
-    this.pendingOffline.set(this.offline.hasPending());
+    this.offline.refreshStatus();
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/session/session_controller.dart';
 
 class CU35DashboardAnaliticoMlController extends ChangeNotifier {
@@ -32,7 +33,10 @@ class CU35DashboardAnaliticoMlController extends ChangeNotifier {
       notifyListeners();
       return _dashboardMl;
     } catch (e) {
-      _error = e.toString();
+      _error = ApiException.fromObject(
+        e,
+        fallback: 'No se pudo cargar el dashboard ML.',
+      ).message;
       _isLoading = false;
       notifyListeners();
       return null;
@@ -44,7 +48,10 @@ class CU35DashboardAnaliticoMlController extends ChangeNotifier {
       final res = await apiClient.get('/inteligencia/ml/demanda');
       return Map<String, dynamic>.from(res as Map);
     } catch (e) {
-      _error = e.toString();
+      _error = ApiException.fromObject(
+        e,
+        fallback: 'No se pudo predecir la demanda.',
+      ).message;
       notifyListeners();
       return null;
     }
@@ -55,7 +62,10 @@ class CU35DashboardAnaliticoMlController extends ChangeNotifier {
       final res = await apiClient.get('/inteligencia/ml/segmentacion');
       return Map<String, dynamic>.from(res as Map);
     } catch (e) {
-      _error = e.toString();
+      _error = ApiException.fromObject(
+        e,
+        fallback: 'No se pudo segmentar clientes.',
+      ).message;
       notifyListeners();
       return null;
     }
@@ -69,7 +79,10 @@ class CU35DashboardAnaliticoMlController extends ChangeNotifier {
       );
       return Map<String, dynamic>.from(res as Map);
     } catch (e) {
-      _error = e.toString();
+      _error = ApiException.fromObject(
+        e,
+        fallback: 'No se pudo generar el audio ejecutivo.',
+      ).message;
       notifyListeners();
       return null;
     }

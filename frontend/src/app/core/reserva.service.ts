@@ -1,15 +1,27 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable, catchError, of, throwError } from 'rxjs';
+import { Observable, catchError, map, of, throwError } from 'rxjs';
 import { environment } from '../../environments/environment';
+import {
+  CU26RegistrarReservaOfflineController,
+  ReservaOfflineItemPayload,
+  generarUuidV4,
+} from '../controller/cu26_registrar_reserva_offline_controller';
 import { Reserva } from './models';
+import { NetworkService } from './network.service';
 
-/**
- * Punto de integración para CU-26 (Registrar reserva offline).
- */
-export interface ReservaOfflineHandler {
-  registrar(reservaData: any, clienteUuid: string): Promise<boolean>;
+export interface CrearReservaPayload {
+  sucursal_id: string;
+  sucursal_nombre?: string | null;
+  fecha_visita: string;
+  probador?: boolean;
+  items: ReservaOfflineItemPayload[];
 }
+
+export type ReservaResultado = Reserva & {
+  offline?: boolean;
+  message?: string;
+};
 
 @Injectable({
   providedIn: 'root',
@@ -17,18 +29,11 @@ export interface ReservaOfflineHandler {
 export class ReservaService {
   private readonly baseUrl = `${environment.apiUrl}/reservas`;
 
-  // Stub de integración para modo sin conexión (CU-26)
-  private offlineHandler: ReservaOfflineHandler = {
-    registrar: async (reservaData, clienteUuid) => {
-      console.warn(
-        `[CU-26 STUB] Reserva encolada offline con UUID: ${clienteUuid}. Se sincronizará al recuperar conexión.`,
-        reservaData
-      );
-      return true;
-    },
-  };
-
-  constructor(private readonly http: HttpClient) {}
+  constructor(
+    private readonly http: HttpClient,
+    private readonly network: NetworkService,
+    private readonly cu26: CU26RegistrarReservaOfflineController,
+  ) {}
 
   validarReserva(payload: {
     sucursal_id: string;
@@ -38,49 +43,146 @@ export class ReservaService {
     return this.http.post<{ ok: boolean }>(`${this.baseUrl}/validar`, payload);
   }
 
-  crearReserva(
-    payload: {
-      sucursal_id: string;
-      fecha_visita: string;
-      probador?: boolean;
-      items: { variante_id: string; cantidad: number }[];
-    },
-    idempotencyKey?: string
-  ): Observable<Reserva> {
-    const key = idempotencyKey || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2));
+  crearReserva(payload: CrearReservaPayload, idempotencyKey?: string): Observable<ReservaResultado> {
+    const key = idempotencyKey || generarUuidV4();
+    const offlineAhora =
+      !this.network.online() || (typeof navigator !== 'undefined' && !navigator.onLine);
+
+    if (offlineAhora) {
+      return of(this.encolarReservaOffline(payload));
+    }
+
+    const requestBody = {
+      sucursal_id: payload.sucursal_id,
+      fecha_visita: payload.fecha_visita,
+      items: payload.items.map((it) => ({
+        variante_id: it.variante_id,
+        cantidad: Number(it.cantidad || 1),
+      })),
+    };
+
     return this.http
-      .post<Reserva>(this.baseUrl, payload, {
+      .post<Reserva>(this.baseUrl, requestBody, {
         headers: { 'Idempotency-Key': key },
       })
       .pipe(
         catchError((err) => {
-          // Flujo 4.a: Error de transporte/red -> delegar en hook offline CU-26
-          if (!navigator.onLine || err.status === 0) {
-            this.offlineHandler.registrar(payload, key);
-            return throwError(() => ({
-              offline: true,
-              message: 'Sin conexión: la reserva se guardó localmente y se registrará al recuperar la red.',
-            }));
+          const esFalloRed =
+            !this.network.online() ||
+            (typeof navigator !== 'undefined' && !navigator.onLine) ||
+            err?.status === 0 ||
+            err?.status === 502 ||
+            err?.status === 503 ||
+            err?.status === 504;
+          if (esFalloRed) {
+            return of(this.encolarReservaOffline(payload));
           }
           return throwError(() => err);
-        })
+        }),
       );
+  }
+
+  private encolarReservaOffline(payload: CrearReservaPayload): ReservaResultado {
+    const uuid = this.cu26.registrarReserva({
+      sucursal_id: payload.sucursal_id,
+      sucursal_nombre: payload.sucursal_nombre ?? null,
+      fecha_visita: payload.fecha_visita,
+      probador: Boolean(payload.probador ?? true),
+      items: payload.items,
+    });
+    const codigoLocal = `RES-OFF-${uuid.slice(0, 8).toUpperCase()}`;
+
+    return {
+      id: uuid,
+      empresa_id: '',
+      usuario_id: '',
+      sucursal_id: payload.sucursal_id,
+      sucursal_nombre: payload.sucursal_nombre || 'Sucursal seleccionada (Local)',
+      codigo: codigoLocal,
+      estado: 'pendiente_sync',
+      fecha_visita: payload.fecha_visita,
+      expira_en: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      probador: payload.probador ? 'Por asignar (Offline)' : null,
+      items: payload.items.map((it) => ({
+        variante_id: it.variante_id,
+        sku: it.sku || '',
+        prenda_nombre: it.prenda_nombre || 'Prenda reservada (Offline)',
+        talla: it.talla || '-',
+        color: it.color || '-',
+        cantidad: Number(it.cantidad || 1),
+      })),
+      created_at: new Date().toISOString(),
+      offline: true,
+      message: `Sin conexión: reserva guardada localmente (${codigoLocal}) y se sincronizará al recuperar la red.`,
+    };
+  }
+
+  obtenerReservasOfflineLocales(): ReservaResultado[] {
+    const ops = this.cu26.listarPendientes();
+    return ops.map((op) => {
+      const p = op.payload || {};
+      const itemsRaw = Array.isArray(p.items) ? p.items : [];
+      const codigo = op.codigo_local || p.codigo_local || `RES-OFF-${String(op.id).slice(0, 8).toUpperCase()}`;
+      return {
+        id: String(op.id),
+        empresa_id: '',
+        usuario_id: '',
+        sucursal_id: String(op.sucursal_id || p.sucursal_id || ''),
+        sucursal_nombre: op.sucursal_nombre || p.sucursal_nombre || String(op.sucursal_id || p.sucursal_id || ''),
+        codigo,
+        estado: op.estado === 'en_conflicto' ? 'conflicto_sync' : 'pendiente_sync',
+        fecha_visita: String(p.fecha_visita || op.creada_en || new Date().toISOString()),
+        expira_en: String(p.fecha_visita || op.creada_en || new Date().toISOString()),
+        probador: p.probador ? 'Por asignar (Offline)' : null,
+        items: itemsRaw.map((it: any) => ({
+          variante_id: String(it.variante_id || ''),
+          sku: String(it.sku || ''),
+          prenda_nombre: String(it.prenda_nombre || 'Prenda reservada (Offline)'),
+          talla: String(it.talla || '-'),
+          color: String(it.color || '-'),
+          cantidad: Number(it.cantidad || 1),
+        })),
+        created_at: String(op.creada_en || new Date().toISOString()),
+        offline: true,
+        message: op.ultimo_error ? String(op.ultimo_error) : undefined,
+      };
+    });
   }
 
   obtenerMisReservas(params?: {
     estado?: string;
     page?: number;
     page_size?: number;
-  }): Observable<{ total: number; items: Reserva[] }> {
+  }): Observable<{ total: number; items: ReservaResultado[] }> {
+    const locales = this.obtenerReservasOfflineLocales();
+    const offlineAhora =
+      !this.network.online() || (typeof navigator !== 'undefined' && !navigator.onLine);
+    if (offlineAhora) {
+      return of({ total: locales.length, items: locales });
+    }
+
     let httpParams = new HttpParams();
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
         if (v !== undefined && v !== null) httpParams = httpParams.set(k, String(v));
       });
     }
-    return this.http.get<{ total: number; items: Reserva[] }>(`${this.baseUrl}/mis-reservas`, {
-      params: httpParams,
-    });
+    return this.http
+      .get<{ total: number; items: Reserva[] }>(`${this.baseUrl}/mis-reservas`, {
+        params: httpParams,
+      })
+      .pipe(
+        map((resp) => ({
+          total: (resp.total ?? resp.items.length) + locales.length,
+          items: [...locales, ...(resp.items || [])],
+        })),
+        catchError((err) => {
+          if (!this.network.online() || err?.status === 0) {
+            return of({ total: locales.length, items: locales });
+          }
+          return throwError(() => err);
+        }),
+      );
   }
 
   completarReserva(id: string): Observable<Reserva> {
@@ -92,14 +194,32 @@ export class ReservaService {
     sucursal_id?: string;
     page?: number;
     page_size?: number;
-  }): Observable<{ total: number; items: Reserva[] }> {
+  }): Observable<{ total: number; items: ReservaResultado[] }> {
+    const locales = this.obtenerReservasOfflineLocales();
+    const offlineAhora =
+      !this.network.online() || (typeof navigator !== 'undefined' && !navigator.onLine);
+    if (offlineAhora) {
+      return of({ total: locales.length, items: locales });
+    }
+
     let httpParams = new HttpParams();
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
         if (v !== undefined && v !== null) httpParams = httpParams.set(k, String(v));
       });
     }
-    return this.http.get<{ total: number; items: Reserva[] }>(this.baseUrl, { params: httpParams });
+    return this.http.get<{ total: number; items: Reserva[] }>(this.baseUrl, { params: httpParams }).pipe(
+      map((resp) => ({
+        total: (resp.total ?? resp.items.length) + locales.length,
+        items: [...locales, ...(resp.items || [])],
+      })),
+      catchError((err) => {
+        if (!this.network.online() || err?.status === 0) {
+          return of({ total: locales.length, items: locales });
+        }
+        return throwError(() => err);
+      }),
+    );
   }
 
   listarPorPreparar(params?: { sucursal_id?: string }): Observable<{ total: number; items: Reserva[] }> {
@@ -113,6 +233,21 @@ export class ReservaService {
   }
 
   cancelarReserva(id: string, motivo?: string): Observable<Reserva> {
+    if (this.cu26.esReservaLocal(id)) {
+      this.cu26.cancelarReservaLocal(id);
+      return of({
+        id,
+        empresa_id: '',
+        usuario_id: '',
+        sucursal_id: '',
+        codigo: `RES-OFF-${id.slice(0, 8).toUpperCase()}`,
+        estado: 'cancelada',
+        fecha_visita: new Date().toISOString(),
+        expira_en: new Date().toISOString(),
+        items: [],
+        created_at: new Date().toISOString(),
+      });
+    }
     return this.http.post<Reserva>(`${this.baseUrl}/${id}/cancelar`, { motivo });
   }
 

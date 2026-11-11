@@ -42,14 +42,22 @@ class CU31SincronizarOperacionesController extends ChangeNotifier {
 
       final payload = {
         'dispositivo_id': 'FLUTTER-APP-01',
-        'operaciones': pendientes.map((o) => {
-          'id': o['id'],
-          'tipo': o['tipo'],
-          'sucursal_id': (o['payload'] as Map<String, dynamic>)['sucursal_id'] ?? '11111111-1111-1111-1111-111111111101',
-          'payload': o['payload'],
-          'creada_en': o['creada_en'],
-          'idempotency_key': 'IDEMP-${o['id']}',
-        }).toList()
+        'operaciones': pendientes.map((o) {
+          final rawPayload = o['payload'];
+          final payloadMap = rawPayload is Map
+              ? Map<String, dynamic>.from(rawPayload)
+              : <String, dynamic>{};
+          return {
+            'id': o['id'],
+            'tipo': o['tipo'],
+            'sucursal_id':
+                payloadMap['sucursal_id'] ??
+                '11111111-1111-1111-1111-111111111101',
+            'payload': payloadMap,
+            'creada_en': o['creada_en'],
+            'idempotency_key': 'IDEMP-${o['id']}',
+          };
+        }).toList(),
       };
 
       try {

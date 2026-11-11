@@ -45,32 +45,94 @@ class _SucursalesScreenState extends State<SucursalesScreen> {
           body: _controller.loading
               ? const Center(child: CircularProgressIndicator())
               : _controller.error != null
-                  ? Center(child: Text('Error: ${_controller.error}'))
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Error: ${_controller.error}',
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: () => _controller.cargarSucursales(),
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Reintentar'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                   : _controller.sucursales.isEmpty
                       ? const Center(child: Text('No hay sucursales registradas.'))
-                      : ListView.separated(
-                          itemCount: _controller.sucursales.length,
-                          separatorBuilder: (_, _) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final suc = _controller.sucursales[index];
-                            return ListTile(
-                              leading: const CircleAvatar(
-                                child: Icon(Icons.store),
+                      : Column(
+                          children: [
+                            if (_controller.limitePlan != null)
+                              Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.indigo.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.indigo.shade100),
+                                ),
+                                child: Text(
+                                  'Sucursales activas: ${_controller.activas} de ${_controller.limitePlan} permitidas por el plan (Total: ${_controller.total})',
+                                  style: TextStyle(
+                                    color: Colors.indigo.shade900,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
-                              title: Text(suc['nombre'] ?? 'Sucursal'),
-                              subtitle: Text(
-                                '${suc['direccion'] ?? 'Sin dirección'}\nTel: ${suc['telefono'] ?? '-'}',
+                            Expanded(
+                              child: ListView.separated(
+                                itemCount: _controller.sucursales.length,
+                                separatorBuilder: (_, _) => const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final suc = _controller.sucursales[index];
+                                  final isActiva = suc['estado'] == 'activa' ||
+                                      suc['activo'] == true;
+                                  final esMatriz = suc['es_matriz'] == true;
+                                  final ciudad = suc['ciudad_nombre']?.toString();
+                                  final dir = suc['direccion'] ?? 'Sin dirección';
+                                  final ubicacion = ciudad != null && ciudad.isNotEmpty
+                                      ? '$ciudad • $dir'
+                                      : dir;
+                                  return ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: esMatriz
+                                          ? Colors.indigo.shade100
+                                          : null,
+                                      child: Icon(
+                                        esMatriz ? Icons.star : Icons.store,
+                                      ),
+                                    ),
+                                    title: Text(
+                                      esMatriz
+                                          ? '${suc['nombre'] ?? 'Sucursal'} (Matriz)'
+                                          : (suc['nombre'] ?? 'Sucursal'),
+                                    ),
+                                    subtitle: Text(
+                                      '$ubicacion\nTel: ${suc['telefono'] ?? '-'}',
+                                    ),
+                                    isThreeLine: true,
+                                    trailing: Chip(
+                                      label: Text(isActiva ? 'Abierta' : 'Cerrada'),
+                                      backgroundColor: isActiva
+                                          ? Colors.green.shade50
+                                          : Colors.grey.shade200,
+                                    ),
+                                  );
+                                },
                               ),
-                              trailing: Chip(
-                                label: Text(suc['activo'] == true ? 'Abierta' : 'Cerrada'),
-                                backgroundColor: suc['activo'] == true ? Colors.green.shade50 : Colors.grey.shade200,
-                              ),
-                            );
-                          },
+                            ),
+                          ],
                         ),
         );
       },
     );
   }
 }
-

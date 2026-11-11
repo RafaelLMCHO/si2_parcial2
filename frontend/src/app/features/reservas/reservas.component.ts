@@ -1,7 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Reserva } from '../../core/models';
+import { CU25DescargarCatalogoOfflineController } from '../../controller/cu25_descargar_catalogo_offline_controller';
+import { CU31SincronizarOperacionesController } from '../../controller/cu31_sincronizar_operaciones_controller';
+import { CatalogoService } from '../../core/catalogo.service';
+import { InventarioService } from '../../core/inventario.service';
+import { Prenda, Reserva, Variante } from '../../core/models';
+import { NetworkService } from '../../core/network.service';
 import { ReservaService } from '../../core/reserva.service';
 
 @Component({
@@ -15,10 +20,16 @@ import { ReservaService } from '../../core/reserva.service';
         <div class="tab-buttons">
           <button class="btn" [class.btn-primary]="tab === 'mis'" (click)="setTab('mis')">CU-20: Mis Reservas</button>
           <button class="btn" [class.btn-primary]="tab === 'preparar'" (click)="setTab('preparar')">CU-21: Por Preparar (Staff)</button>
+          <button *ngIf="pendientesOfflineCount > 0 && network.online()" class="btn btn-success" (click)="sincronizarPendientes()">
+            ↻ Sincronizar ({{ pendientesOfflineCount }})
+          </button>
           <button class="btn btn-outline" (click)="abrirModalNueva()">+ CU-19: Nueva Reserva</button>
         </div>
       </div>
 
+      <div *ngIf="!network.online()" class="alert alert-offline">
+        📡 Modo sin conexión activo: puedes consultar tus reservas guardadas y crear nuevas reservas en cola local (CU-26).
+      </div>
       <div *ngIf="mensajeError" class="alert alert-error">{{ mensajeError }}</div>
       <div *ngIf="mensajeExito" class="alert alert-success">{{ mensajeExito }}</div>
 
@@ -47,11 +58,11 @@ import { ReservaService } from '../../core/reserva.service';
           </div>
 
           <div class="card-actions">
-            <!-- Botón Cancelar (CU-20: solo si pendiente_preparacion) -->
-            <button *ngIf="r.estado === 'pendiente_preparacion'" 
+            <!-- Botón Cancelar (CU-20: pendiente_preparacion o pendiente_sync offline) -->
+            <button *ngIf="r.estado === 'pendiente_preparacion' || r.estado === 'pendiente_sync' || r.estado === 'conflicto_sync'" 
                     class="btn btn-danger btn-sm" 
                     (click)="cancelarReserva(r.id)">
-              Cancelar Reserva
+              {{ r.estado === 'pendiente_sync' || r.estado === 'conflicto_sync' ? 'Eliminar Pendiente' : 'Cancelar Reserva' }}
             </button>
 
             <!-- Acciones de Encargado (CU-21: Preparar o Reportar Incidencia) -->
@@ -76,9 +87,20 @@ import { ReservaService } from '../../core/reserva.service';
         <div class="modal-card">
           <h3>Realizar Reserva de Prendas (Prueba Presencial)</h3>
           <form [formGroup]="reservaForm" (ngSubmit)="guardarReserva()">
+            <div class="form-group" *ngIf="prendasCache.length > 0">
+              <label>Prenda</label>
+              <select class="form-control" [value]="prendaSeleccionadaId" (change)="onPrendaSeleccionada($event)">
+                <option *ngFor="let p of prendasCache" [value]="p.id">{{ p.nombre }} ({{ p.codigo }})</option>
+              </select>
+            </div>
             <div class="form-group">
               <label>Sucursal Destino</label>
-              <input formControlName="sucursal_id" class="form-control" placeholder="UUID de la Sucursal" />
+              <select *ngIf="sucursalesCache.length > 0; else manualSuc" formControlName="sucursal_id" class="form-control">
+                <option *ngFor="let s of sucursalesCache" [value]="s.id">{{ s.nombre }} <ng-container *ngIf="s.ciudad">({{ s.ciudad }})</ng-container></option>
+              </select>
+              <ng-template #manualSuc>
+                <input formControlName="sucursal_id" class="form-control" placeholder="UUID de la Sucursal" />
+              </ng-template>
             </div>
             <div class="form-group">
               <label>Fecha y Hora Tentativa de Visita</label>
@@ -86,7 +108,12 @@ import { ReservaService } from '../../core/reserva.service';
             </div>
             <div class="form-group">
               <label>Variante (Prenda/Talla/Color)</label>
-              <input formControlName="variante_id" class="form-control" placeholder="UUID de la variante" />
+              <select *ngIf="variantesPrendaActual.length > 0; else manualVar" formControlName="variante_id" class="form-control">
+                <option *ngFor="let v of variantesPrendaActual" [value]="v.id">{{ v.talla_nombre || 'Talla' }} / {{ v.color_nombre || 'Color' }} ({{ v.sku }})</option>
+              </select>
+              <ng-template #manualVar>
+                <input formControlName="variante_id" class="form-control" placeholder="UUID de la variante" />
+              </ng-template>
             </div>
             <div class="form-group">
               <label>Cantidad</label>
@@ -104,8 +131,8 @@ import { ReservaService } from '../../core/reserva.service';
   `,
   styles: [`
     .reservas-page { padding: 24px; font-family: inherit; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .tab-buttons { display: flex; gap: 8px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+    .tab-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
     .btn { padding: 8px 14px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; font-size: 0.88rem; }
     .btn-primary { background: #2563eb; color: #fff; }
     .btn-outline { border-color: #cbd5e1; background: #fff; }
@@ -119,6 +146,8 @@ import { ReservaService } from '../../core/reserva.service';
     .codigo { font-weight: 700; color: #1e293b; }
     .badge { padding: 3px 8px; border-radius: 12px; font-size: 0.72rem; text-transform: uppercase; font-weight: 600; }
     .badge-pendiente_preparacion { background: #fef3c7; color: #b45309; }
+    .badge-pendiente_sync { background: #fef3c7; color: #92400e; }
+    .badge-conflicto_sync { background: #fee2e2; color: #991b1b; }
     .badge-preparada { background: #dcfce7; color: #15803d; }
     .badge-cancelada { background: #f1f5f9; color: #64748b; }
     .badge-incidencia_stock { background: #fee2e2; color: #b91c1c; }
@@ -128,10 +157,11 @@ import { ReservaService } from '../../core/reserva.service';
     .ubicacion-tag { background: #e0f2fe; color: #0369a1; padding: 1px 4px; border-radius: 3px; font-size: 0.75rem; }
     .card-actions { display: flex; gap: 8px; margin-top: 14px; border-top: 1px solid #f1f5f9; padding-top: 10px; }
     .alert { padding: 10px; border-radius: 6px; margin-bottom: 16px; font-size: 0.9rem; }
+    .alert-offline { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
     .alert-error { background: #fee2e2; color: #991b1b; }
     .alert-success { background: #dcfce7; color: #166534; }
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; }
-    .modal-card { background: #fff; padding: 24px; border-radius: 8px; width: 420px; }
+    .modal-card { background: #fff; padding: 24px; border-radius: 8px; width: 440px; max-width: 95vw; }
     .form-group { margin-bottom: 12px; }
     .form-group label { display: block; font-size: 0.82rem; margin-bottom: 4px; }
     .form-control { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
@@ -146,20 +176,61 @@ export class ReservasComponent implements OnInit {
   mostrarModalNueva = false;
   reservaForm: FormGroup;
 
+  prendasCache: Prenda[] = [];
+  sucursalesCache: Array<{ id: string; nombre: string; ciudad?: string }> = [];
+  prendaSeleccionadaId = '';
+  variantesPrendaActual: Variante[] = [];
+
   constructor(
     private readonly reservaService: ReservaService,
+    private readonly catalogoService: CatalogoService,
+    private readonly inventarioService: InventarioService,
+    private readonly cu25Offline: CU25DescargarCatalogoOfflineController,
+    private readonly syncCtrl: CU31SincronizarOperacionesController,
+    readonly network: NetworkService,
     private readonly fb: FormBuilder
   ) {
     this.reservaForm = this.fb.group({
       sucursal_id: ['', Validators.required],
-      fecha_visita: ['', Validators.required],
+      fecha_visita: [new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 16), Validators.required],
       variante_id: ['', Validators.required],
       cantidad: [1, [Validators.required, Validators.min(1)]],
     });
   }
 
+  get pendientesOfflineCount(): number {
+    return this.reservas.filter((r) => r.estado === 'pendiente_sync' || r.estado === 'conflicto_sync').length;
+  }
+
   ngOnInit(): void {
+    this.cu25Offline.asegurarCatalogoOfflineCargado();
+    this.cargarSelectoresLocales();
     this.cargarReservas();
+  }
+
+  private cargarSelectoresLocales(): void {
+    this.sucursalesCache = this.inventarioService.obtenerSucursalesOffline();
+    if (this.sucursalesCache.length > 0 && !this.reservaForm.value.sucursal_id) {
+      this.reservaForm.patchValue({ sucursal_id: this.sucursalesCache[0].id });
+    }
+    this.prendasCache = this.catalogoService.obtenerPrendasCacheadas();
+    if (this.prendasCache.length > 0 && !this.prendaSeleccionadaId) {
+      this.seleccionarPrenda(this.prendasCache[0].id);
+    }
+  }
+
+  private seleccionarPrenda(prendaId: string): void {
+    this.prendaSeleccionadaId = prendaId;
+    const prenda = this.prendasCache.find((p) => p.id === prendaId);
+    this.variantesPrendaActual = prenda?.variantes || [];
+    if (this.variantesPrendaActual.length > 0) {
+      this.reservaForm.patchValue({ variante_id: this.variantesPrendaActual[0].id });
+    }
+  }
+
+  onPrendaSeleccionada(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.seleccionarPrenda(value);
   }
 
   setTab(nuevaTab: 'mis' | 'preparar'): void {
@@ -180,6 +251,20 @@ export class ReservasComponent implements OnInit {
         error: (err) => (this.mensajeError = err?.error?.detail?.message || 'Error al cargar reservas por preparar'),
       });
     }
+  }
+
+  sincronizarPendientes(): void {
+    this.syncCtrl.sincronizarLote().subscribe({
+      next: (res) => {
+        const ok = (res?.confirmados || []).length;
+        const conf = (res?.conflictos || []).length;
+        this.mensajeExito = `Sincronización completa: ${ok} confirmada(s), ${conf} con conflicto.`;
+        this.cargarReservas();
+      },
+      error: (err) => {
+        this.mensajeError = err?.message || 'No se pudo sincronizar la cola offline.';
+      },
+    });
   }
 
   cancelarReserva(id: string): void {
@@ -210,7 +295,7 @@ export class ReservasComponent implements OnInit {
     if (!motivo) return;
 
     this.reservaService.reportarIncidencia(id, { variante_ids: [], motivo }).subscribe({
-      next: (resp) => {
+      next: () => {
         this.mensajeExito = 'Incidencia registrada. Se han generado alternativas para el cliente.';
         this.cargarReservas();
       },
@@ -219,26 +304,38 @@ export class ReservasComponent implements OnInit {
   }
 
   abrirModalNueva(): void {
+    this.cargarSelectoresLocales();
     this.mostrarModalNueva = true;
     this.mensajeError = '';
   }
 
   guardarReserva(): void {
     const val = this.reservaForm.value;
-    const idempotencyKey = crypto.randomUUID();
+    const prenda = this.prendasCache.find((p) => p.id === this.prendaSeleccionadaId);
+    const variante = this.variantesPrendaActual.find((v) => v.id === val.variante_id);
+    const sucursal = this.sucursalesCache.find((s) => s.id === val.sucursal_id);
 
     this.reservaService
-      .crearReserva(
-        {
-          sucursal_id: val.sucursal_id,
-          fecha_visita: new Date(val.fecha_visita).toISOString(),
-          items: [{ variante_id: val.variante_id, cantidad: Number(val.cantidad) }],
-        },
-        idempotencyKey
-      )
+      .crearReserva({
+        sucursal_id: val.sucursal_id,
+        sucursal_nombre: sucursal?.nombre || null,
+        fecha_visita: new Date(val.fecha_visita).toISOString(),
+        items: [
+          {
+            variante_id: val.variante_id,
+            cantidad: Number(val.cantidad),
+            sku: variante?.sku || '',
+            prenda_nombre: prenda?.nombre || 'Prenda',
+            talla: variante?.talla_nombre || '-',
+            color: variante?.color_nombre || '-',
+          },
+        ],
+      })
       .subscribe({
         next: (res) => {
-          this.mensajeExito = `Reserva creada exitosamente con código digital: ${res.codigo}`;
+          this.mensajeExito = res.offline
+            ? res.message || `Reserva guardada offline (${res.codigo}).`
+            : `Reserva creada exitosamente con código digital: ${res.codigo}`;
           this.mostrarModalNueva = false;
           this.cargarReservas();
         },

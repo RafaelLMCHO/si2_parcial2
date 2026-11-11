@@ -7,6 +7,7 @@ class CatalogoOfflinePackage(BaseModel):
     empresa_id: str
     sucursal_id: Optional[str] = None
     generado_en: datetime
+    sucursales: List[dict] = Field(default_factory=list)
     prendas: List[dict]
     variantes: List[dict]
     existencias: List[dict]

@@ -43,6 +43,10 @@ class SessionController extends ChangeNotifier {
   bool _online;
   bool _loading = false;
   bool _bootstrapping = true;
+  bool _disposed = false;
+  bool _syncInProgress = false;
+  bool _prefetchInProgress = false;
+  bool _hasPrefetchedOffline = false;
   String? _error;
   String? _message;
   String? _notice;
@@ -94,9 +98,13 @@ class SessionController extends ChangeNotifier {
       }
     } else if (isAuthenticated && _online) {
       await refreshProfile();
+      await sincronizarPendientesSilencioso();
+      await prefetcharCatalogoOfflineSilencioso();
     }
 
-    notifyListeners();
+    if (!_disposed) {
+      notifyListeners();
+    }
   }
 
   Future<bool> login({
@@ -353,8 +361,150 @@ class SessionController extends ChangeNotifier {
 
   Future<void> saveTenant(String slug) async {
     _tenant = slug.trim().isEmpty ? 'demo' : slug.trim();
+    _hasPrefetchedOffline = false;
     await _database.saveTenant(_tenant);
     notifyListeners();
+  }
+
+  Future<void> refreshPendingOperations() async {
+    if (_disposed) return;
+    _pendingOperations = await _database.pendingOperationsCount();
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, int>?> sincronizarPendientesSilencioso() async {
+    if (_disposed ||
+        _syncInProgress ||
+        !isAuthenticated ||
+        !_online ||
+        isSessionExpired ||
+        _accessToken == null) {
+      return null;
+    }
+
+    _syncInProgress = true;
+    try {
+      final ops = await _database.listarOperacionesOffline();
+      final pendientes = ops
+          .where((o) => o['estado']?.toString() == 'pendiente')
+          .toList(growable: false);
+      if (pendientes.isEmpty) {
+        await refreshPendingOperations();
+        return {'confirmados': 0, 'conflictos': 0};
+      }
+
+      for (final op in pendientes) {
+        await _database.actualizarEstadoOperacion(
+          op['id'].toString(),
+          'enviada',
+        );
+      }
+
+      final batchPayload = {
+        'dispositivo_id': 'FLUTTER-APP-01',
+        'operaciones': pendientes
+            .map((o) {
+              final rawPayload = o['payload'];
+              final payloadMap = rawPayload is Map
+                  ? Map<String, dynamic>.from(rawPayload)
+                  : <String, dynamic>{};
+              return {
+                'id': o['id'],
+                'tipo': o['tipo'],
+                'sucursal_id':
+                    payloadMap['sucursal_id'] ??
+                    '11111111-1111-1111-1111-111111111101',
+                'payload': payloadMap,
+                'creada_en': o['creada_en'],
+                'idempotency_key': 'IDEMP-${o['id']}',
+              };
+            })
+            .toList(growable: false),
+      };
+
+      try {
+        final res = await apiClient.post('/sync', batchPayload);
+        final resMap = res is Map
+            ? Map<String, dynamic>.from(res)
+            : const <String, dynamic>{};
+        final confList = (resMap['confirmados'] as List<dynamic>? ?? []);
+        final conflList = (resMap['conflictos'] as List<dynamic>? ?? []);
+
+        for (final id in confList) {
+          await _database.actualizarEstadoOperacion(
+            id.toString(),
+            'confirmada',
+          );
+        }
+        for (final c in conflList) {
+          final cid = c is Map ? c['id']?.toString() : c?.toString();
+          if (cid != null && cid.isNotEmpty) {
+            await _database.actualizarEstadoOperacion(cid, 'en_conflicto');
+          }
+        }
+        _lastSync = DateTime.now();
+        await _database.saveLastSync(_lastSync!);
+        await refreshPendingOperations();
+        return {
+          'confirmados': confList.length,
+          'conflictos': conflList.length,
+        };
+      } catch (_) {
+        for (final op in pendientes) {
+          await _database.actualizarEstadoOperacion(
+            op['id'].toString(),
+            'pendiente',
+          );
+        }
+        await refreshPendingOperations();
+        return null;
+      }
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+
+  Future<bool> prefetcharCatalogoOfflineSilencioso({bool force = false}) async {
+    if (_disposed ||
+        _prefetchInProgress ||
+        !isAuthenticated ||
+        !_online ||
+        isSessionExpired ||
+        _accessToken == null ||
+        (_user?.rol.trim().toLowerCase() == 'superadmin')) {
+      return false;
+    }
+    if (!force && _hasPrefetchedOffline) {
+      final sucursales = await _database.readSucursalesCache(_tenant);
+      if (sucursales.isNotEmpty) {
+        return true;
+      }
+    }
+
+    _prefetchInProgress = true;
+    try {
+      final res = await apiClient.get('/sync/catalogo-offline');
+      if (res is Map) {
+        await _database.saveOfflinePackage(
+          _tenant,
+          Map<String, dynamic>.from(res),
+        );
+        _hasPrefetchedOffline = true;
+        _lastSync = DateTime.now();
+        await _database.saveLastSync(_lastSync!);
+        if (!_disposed) {
+          notifyListeners();
+        }
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    } finally {
+      _prefetchInProgress = false;
+    }
   }
 
   void clearMessages() {
@@ -385,7 +535,10 @@ class SessionController extends ChangeNotifier {
     await _database.saveUser(response.usuario);
     await _database.saveTenant(_tenant);
     await _database.saveLastSync(_lastSync!);
+    _hasPrefetchedOffline = false;
     _networkStatus.markOnline();
+    sincronizarPendientesSilencioso();
+    prefetcharCatalogoOfflineSilencioso();
   }
 
   Future<void> _clearAuth() async {
@@ -396,6 +549,7 @@ class SessionController extends ChangeNotifier {
     _expiresAt = null;
     _user = null;
     _lastSync = null;
+    _hasPrefetchedOffline = false;
     _pendingOperations = await _database.pendingOperationsCount();
   }
 
@@ -408,6 +562,7 @@ class SessionController extends ChangeNotifier {
   }
 
   void _onNetworkChanged() {
+    final wasOnline = _online;
     _online = _networkStatus.value;
     if (!_online) {
       _notice = 'Sin conexion. Las escrituras estan deshabilitadas.';
@@ -415,10 +570,15 @@ class SessionController extends ChangeNotifier {
       _notice = null;
     }
     notifyListeners();
+    if (!wasOnline && _online && isAuthenticated && _accessToken != null) {
+      sincronizarPendientesSilencioso();
+      prefetcharCatalogoOfflineSilencioso();
+    }
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _networkStatus.removeListener(_onNetworkChanged);
     super.dispose();
   }

@@ -11,11 +11,13 @@ class ApiException implements Exception {
     final response = error.response;
     final data = response?.data;
 
-    if (data is Map<String, dynamic>) {
-      final detail = data['detail'];
-      if (detail is Map<String, dynamic>) {
-        final message = detail['message']?.toString();
-        final code = detail['code']?.toString();
+    if (data is Map) {
+      final map = Map<String, dynamic>.from(data);
+      final detail = map['detail'];
+      if (detail is Map) {
+        final detailMap = Map<String, dynamic>.from(detail);
+        final message = detailMap['message']?.toString().trim();
+        final code = detailMap['code']?.toString();
         if (message != null && message.isNotEmpty) {
           return ApiException(
             message,
@@ -23,11 +25,38 @@ class ApiException implements Exception {
             statusCode: response?.statusCode,
           );
         }
+      } else if (detail is String && detail.trim().isNotEmpty) {
+        return ApiException(
+          detail.trim(),
+          statusCode: response?.statusCode,
+        );
+      } else if (detail is List && detail.isNotEmpty) {
+        final first = detail.first;
+        if (first is Map && first['msg'] != null) {
+          return ApiException(
+            first['msg'].toString(),
+            code: 'VALIDACION',
+            statusCode: response?.statusCode,
+          );
+        }
+        return ApiException(
+          first.toString(),
+          code: 'VALIDACION',
+          statusCode: response?.statusCode,
+        );
       }
-      final message = data['message']?.toString();
+
+      final message = map['message']?.toString().trim();
       if (message != null && message.isNotEmpty) {
         return ApiException(message, statusCode: response?.statusCode);
       }
+    } else if (data is String &&
+        data.trim().isNotEmpty &&
+        !data.trimLeft().startsWith('<')) {
+      return ApiException(
+        data.trim(),
+        statusCode: response?.statusCode,
+      );
     }
 
     if (error.type == DioExceptionType.connectionTimeout ||

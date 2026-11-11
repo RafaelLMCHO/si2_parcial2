@@ -130,10 +130,12 @@ class CU27BloquearStockSoftLockController extends ChangeNotifier {
             'variante_id': varianteId,
             'sucursal_id': sucursalId,
             'cantidad': cantidad,
+            'dispositivo_id': 'FLUTTER-APP-01',
             'ttl_minutos': ttlMinutos,
           });
           if (res is Map) {
-            lockId = res['lock_id']?.toString() ?? lockId;
+            lockId =
+                res['id']?.toString() ?? res['lock_id']?.toString() ?? lockId;
             expiraEn = res['expira_en']?.toString() ?? expiraEn;
             origen = 'servidor';
           }

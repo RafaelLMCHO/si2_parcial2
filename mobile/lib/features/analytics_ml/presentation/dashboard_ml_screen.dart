@@ -12,7 +12,7 @@ class DashboardMlScreen extends StatefulWidget {
 }
 
 class _DashboardMlScreenState extends State<DashboardMlScreen> {
-  late CU35DashboardAnaliticoMlController _controller;
+  late final CU35DashboardAnaliticoMlController _controller;
 
   @override
   void initState() {
@@ -22,12 +22,19 @@ class _DashboardMlScreenState extends State<DashboardMlScreen> {
   }
 
   @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('CU-35: Dashboard Analítico ML'),
         actions: [
           IconButton(
+            tooltip: 'Actualizar',
             icon: const Icon(Icons.refresh),
             onPressed: () => _controller.consultarDashboardMl(),
           ),
@@ -43,18 +50,41 @@ class _DashboardMlScreenState extends State<DashboardMlScreen> {
           final dash = _controller.dashboardMl;
           if (dash == null) {
             return Center(
-              child: ElevatedButton(
-                onPressed: () => _controller.consultarDashboardMl(),
-                child: const Text('Cargar Dashboard ML'),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_controller.error != null) ...[
+                      Text(
+                        _controller.error!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    ElevatedButton.icon(
+                      onPressed: () => _controller.consultarDashboardMl(),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Cargar Dashboard ML'),
+                    ),
+                  ],
+                ),
               ),
             );
           }
 
-          final demanda = dash['prediccion_demanda'] as Map<String, dynamic>? ?? {};
+          final rawDemanda = dash['prediccion_demanda'];
+          final demanda = rawDemanda is Map
+              ? Map<String, dynamic>.from(rawDemanda)
+              : const <String, dynamic>{};
           final predicciones = (demanda['predicciones'] as List<dynamic>?) ?? [];
-          final seg = dash['segmentacion_clientes'] as Map<String, dynamic>? ?? {};
+          final rawSeg = dash['segmentacion_clientes'];
+          final seg = rawSeg is Map
+              ? Map<String, dynamic>.from(rawSeg)
+              : const <String, dynamic>{};
           final segmentos = (seg['segmentos'] as List<dynamic>?) ?? [];
-          final sintesis = dash['sintesis_ejecutiva'] as String? ?? '';
+          final sintesis = dash['sintesis_ejecutiva']?.toString() ?? '';
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -68,8 +98,8 @@ class _DashboardMlScreenState extends State<DashboardMlScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: const [
+                      const Row(
+                        children: [
                           Icon(Icons.volume_up, color: Colors.amber),
                           SizedBox(width: 8),
                           Text(
@@ -99,12 +129,16 @@ class _DashboardMlScreenState extends State<DashboardMlScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 8),
-              ...predicciones.map((p) {
-                final map = p as Map<String, dynamic>;
+              ...predicciones.whereType<Map>().map((p) {
+                final map = Map<String, dynamic>.from(p);
                 return Card(
                   child: ListTile(
-                    title: Text(map['categoria_nombre'] ?? 'Categoría'),
-                    subtitle: Text('Período: ${map['periodo']} | Tendencia: ${map['tendencia']}'),
+                    title: Text(
+                      map['categoria_nombre']?.toString() ?? 'Categoría',
+                    ),
+                    subtitle: Text(
+                      'Período: ${map['periodo']} | Tendencia: ${map['tendencia']}',
+                    ),
                     trailing: Text(
                       '${map['demanda_estimada']} un.',
                       style: const TextStyle(
@@ -124,8 +158,8 @@ class _DashboardMlScreenState extends State<DashboardMlScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 8),
-              ...segmentos.map((s) {
-                final map = s as Map<String, dynamic>;
+              ...segmentos.whereType<Map>().map((s) {
+                final map = Map<String, dynamic>.from(s);
                 return Card(
                   child: Padding(
                     padding: const EdgeInsets.all(12),
@@ -135,9 +169,11 @@ class _DashboardMlScreenState extends State<DashboardMlScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              map['nombre'] ?? 'Segmento',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            Expanded(
+                              child: Text(
+                                map['nombre']?.toString() ?? 'Segmento',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
                             ),
                             Chip(
                               label: Text('${map['porcentaje_base']}% base'),
@@ -146,7 +182,7 @@ class _DashboardMlScreenState extends State<DashboardMlScreen> {
                           ],
                         ),
                         Text(
-                          map['descripcion'] ?? '',
+                          map['descripcion']?.toString() ?? '',
                           style: const TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                         const SizedBox(height: 6),
@@ -166,4 +202,3 @@ class _DashboardMlScreenState extends State<DashboardMlScreen> {
     );
   }
 }
-

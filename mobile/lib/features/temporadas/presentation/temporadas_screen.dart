@@ -46,28 +46,67 @@ class _TemporadasScreenState extends State<TemporadasScreen> {
               ? const Center(child: CircularProgressIndicator())
               : _controller.error != null
                   ? Center(child: Text('Error: ${_controller.error}'))
-                  : _controller.temporadas.isEmpty
-                      ? const Center(child: Text('No hay temporadas registradas.'))
-                      : ListView.separated(
-                          itemCount: _controller.temporadas.length,
-                          separatorBuilder: (_, _) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final temp = _controller.temporadas[index];
-                            return ListTile(
-                              leading: const CircleAvatar(
-                                child: Icon(Icons.calendar_today),
+              : _controller.temporadas.isEmpty && _controller.colecciones.isEmpty
+                  ? const Center(
+                      child: Text('No hay temporadas ni colecciones registradas.'),
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.all(12),
+                      children: [
+                        if (_controller.temporadas.isNotEmpty) ...[
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(4, 4, 4, 8),
+                            child: Text(
+                              'Temporadas',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
-                              title: Text(temp['nombre'] ?? 'Temporada'),
-                              subtitle: Text(
-                                'Código: ${temp['codigo']}\n${temp['fecha_inicio'] ?? ''} a ${temp['fecha_fin'] ?? ''}',
-                              ),
-                              trailing: Chip(
-                                label: Text(temp['activo'] == true ? 'Vigente' : 'Inactiva'),
-                                backgroundColor: temp['activo'] == true ? Colors.green.shade50 : Colors.grey.shade200,
+                            ),
+                          ),
+                          ..._controller.temporadas.map((temp) {
+                            final inicio = temp['fecha_inicio']?.toString() ?? '-';
+                            final fin = temp['fecha_fin']?.toString() ?? '-';
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ListTile(
+                                leading: const CircleAvatar(
+                                  child: Icon(Icons.calendar_today),
+                                ),
+                                title: Text(temp['nombre']?.toString() ?? 'Temporada'),
+                                subtitle: Text('Vigencia: $inicio a $fin'),
                               ),
                             );
-                          },
-                        ),
+                          }),
+                          const SizedBox(height: 12),
+                        ],
+                        if (_controller.colecciones.isNotEmpty) ...[
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(4, 4, 4, 8),
+                            child: Text(
+                              'Colecciones',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          ..._controller.colecciones.map((col) {
+                            final anio = col['anio']?.toString() ?? '-';
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ListTile(
+                                leading: const CircleAvatar(
+                                  child: Icon(Icons.collections_bookmark),
+                                ),
+                                title: Text(col['nombre']?.toString() ?? 'Colección'),
+                                subtitle: Text('Año: $anio'),
+                              ),
+                            );
+                          }),
+                        ],
+                      ],
+                    ),
         );
       },
     );

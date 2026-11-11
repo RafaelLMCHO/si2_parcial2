@@ -233,6 +233,16 @@
               <span class="link-text">Preparación de Reservas</span>
               <span class="cu-tag">CU-21</span>
             </a>
+            <a routerLink="/offline/catalogo" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">🗂️</span>
+              <span class="link-text">Catálogo Local Offline</span>
+              <span class="cu-tag">CU-25</span>
+            </a>
+            <a routerLink="/offline/reserva" routerLinkActive="active" class="sidebar-link">
+              <span class="link-icon">📝</span>
+              <span class="link-text">Reserva Offline</span>
+              <span class="cu-tag">CU-26</span>
+            </a>
             <a routerLink="/offline/bloqueos" routerLinkActive="active" class="sidebar-link">
               <span class="link-icon">🔒</span>
               <span class="link-text">Bloqueos Activos</span>
@@ -414,7 +424,7 @@
     <!-- Banners de Sistema -->
     @if (!network.online()) {
       <div class="system-banner offline" role="status">
-        ⚠️ Modo sin conexión a internet. Consultando catálogo guardado localmente.
+        ⚠️ Modo sin conexión a internet. Consultando catálogo local; tus reservas offline (CU-26) se sincronizarán automáticamente al reconectar.
       </div>
     }
 

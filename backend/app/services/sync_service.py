@@ -3,7 +3,7 @@ import hmac
 import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 from asyncpg import Pool
 from fastapi import HTTPException
 
@@ -26,7 +26,24 @@ def _op_get(op, name: str, default=None):
     """Accede a operaciones que pueden ser Pydantic, dict o asyncpg.Record."""
     if isinstance(op, dict):
         return op.get(name, default)
+    try:
+        if hasattr(op, "__contains__") and name in op:
+            return op[name]
+    except TypeError:
+        pass
     return getattr(op, name, default)
+
+
+def _coerce_uuid_str(raw: Any, namespace_prefix: str = "op") -> str:
+    """Garantiza un UUID valido incluso si un cliente antiguo envio un ID legible."""
+    text = str(raw or "").strip()
+    if text:
+        try:
+            return str(UUID(text))
+        except (ValueError, TypeError):
+            pass
+    return str(uuid5(NAMESPACE_URL, f"{namespace_prefix}:{text or 'empty'}"))
+
 
 class SyncService:
     def __init__(self, pool: Pool):
@@ -39,6 +56,39 @@ class SyncService:
         self, empresa_id: str, sucursal_id: Optional[str] = None
     ) -> CatalogoOfflinePackage:
         async with self.pool.acquire() as conn:
+            # 0. Sucursales activas (accesible tambien para clientes sin requerir rol admin)
+            if sucursal_id:
+                sucursales_rows = await conn.fetch(
+                    """
+                    SELECT s.id, s.nombre, s.direccion, ci.nombre AS ciudad, s.es_matriz
+                    FROM sucursal s
+                    LEFT JOIN ciudad ci ON ci.id = s.ciudad_id
+                    WHERE s.empresa_id = $1 AND s.id = $2
+                      AND s.estado = 'activa' AND s.deleted_at IS NULL
+                    ORDER BY s.es_matriz DESC, s.nombre ASC
+                    """,
+                    empresa_id, sucursal_id
+                )
+            else:
+                sucursales_rows = await conn.fetch(
+                    """
+                    SELECT s.id, s.nombre, s.direccion, ci.nombre AS ciudad, s.es_matriz
+                    FROM sucursal s
+                    LEFT JOIN ciudad ci ON ci.id = s.ciudad_id
+                    WHERE s.empresa_id = $1 AND s.estado = 'activa' AND s.deleted_at IS NULL
+                    ORDER BY s.es_matriz DESC, s.nombre ASC
+                    """,
+                    empresa_id
+                )
+            sucursales = [dict(r) for r in sucursales_rows]
+            for s in sucursales:
+                if s.get("id") is not None:
+                    s["id"] = str(s["id"])
+                if s.get("direccion") is None:
+                    s["direccion"] = ""
+                if s.get("ciudad") is None:
+                    s["ciudad"] = ""
+
             # 1. Prendas activas
             prendas_rows = await conn.fetch(
                 """
@@ -111,6 +161,7 @@ class SyncService:
                 empresa_id=str(empresa_id),
                 sucursal_id=str(sucursal_id) if sucursal_id else None,
                 generado_en=datetime.now(timezone.utc),
+                sucursales=sucursales,
                 prendas=prendas,
                 variantes=variantes,
                 existencias=existencias,
@@ -379,6 +430,7 @@ class SyncService:
 
         async with self.pool.acquire() as conn:
             for op in lote.operaciones:
+                op_db_id = _coerce_uuid_str(op.id, op.tipo)
                 # 1. Idempotencia RNF05: ¿ya fue procesada previamente?
                 previo = await conn.fetchrow(
                     """
@@ -393,6 +445,11 @@ class SyncService:
 
                 # 2. Procesar según tipo de operación
                 try:
+                    try:
+                        UUID(str(op.sucursal_id))
+                    except (ValueError, TypeError):
+                        raise Exception(f"Sucursal inválida en operación offline: {op.sucursal_id}")
+
                     async with conn.transaction():
                         if op.tipo == "venta_offline":
                             await self._procesar_venta_offline_sync(conn, empresa_id, usuario_id, op)
@@ -404,7 +461,7 @@ class SyncService:
                             raise Exception(f"Tipo de operación offline no soportada: {op.tipo}")
 
                         # Guardar idempotencia
-                        resultado = {"status": "confirmada", "op_id": op.id}
+                        resultado = {"status": "confirmada", "op_id": op.id, "op_db_id": op_db_id}
                         await conn.execute(
                             """
                             INSERT INTO sync_registro_idempotencia (empresa_id, idempotency_key, tipo_operacion, resultado_json)
@@ -423,7 +480,7 @@ class SyncService:
                             ON CONFLICT (empresa_id, id) DO UPDATE
                             SET estado = 'aplicada', procesada_en = NOW()
                             """,
-                            op.id, empresa_id, op.sucursal_id, usuario_id, op.tipo,
+                            op_db_id, empresa_id, op.sucursal_id, usuario_id, op.tipo,
                             json.dumps(op.payload), op.idempotency_key
                         )
 
@@ -431,18 +488,22 @@ class SyncService:
                 except Exception as ex:
                     # Registrar en conflicto sin anular el resto del lote
                     err_msg = str(ex)
-                    await conn.execute(
-                        """
-                        INSERT INTO operacion_pendiente (
-                            id, empresa_id, sucursal_id, usuario_id, tipo,
-                            payload, idempotency_key, estado, ultimo_error
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'conflicto', $8)
-                        ON CONFLICT (empresa_id, id) DO UPDATE
-                        SET estado = 'conflicto', ultimo_error = $8
-                        """,
-                        op.id, empresa_id, op.sucursal_id, usuario_id, op.tipo,
-                        json.dumps(op.payload), op.idempotency_key, err_msg
-                    )
+                    try:
+                        UUID(str(op.sucursal_id))
+                        await conn.execute(
+                            """
+                            INSERT INTO operacion_pendiente (
+                                id, empresa_id, sucursal_id, usuario_id, tipo,
+                                payload, idempotency_key, estado, ultimo_error
+                            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'conflicto', $8)
+                            ON CONFLICT (empresa_id, id) DO UPDATE
+                            SET estado = 'conflicto', ultimo_error = $8
+                            """,
+                            op_db_id, empresa_id, op.sucursal_id, usuario_id, op.tipo,
+                            json.dumps(op.payload), op.idempotency_key, err_msg
+                        )
+                    except Exception:
+                        pass
                     conflictos.append(ConflictoSyncItem(
                         id=op.id,
                         tipo=op.tipo,
@@ -457,8 +518,9 @@ class SyncService:
         )
 
     async def _procesar_venta_offline_sync(self, conn, empresa_id: str, usuario_id: str, op):
-        op_id = _op_get(op, "id")
+        op_id = _coerce_uuid_str(_op_get(op, "id"), "venta_offline")
         sucursal_id = _op_get(op, "sucursal_id")
+        op_usuario_id = str(_op_get(op, "usuario_id") or usuario_id)
         p = _op_get(op, "payload") or {}
         if isinstance(p, str):
             p = json.loads(p)
@@ -504,7 +566,7 @@ class SyncService:
             ) VALUES ($1, $2, $3, $4, $5, $6, 0, 0, $6, 'completada', 'OFFLINE', $7, $8, $9)
             RETURNING id
             """,
-            op_id, empresa_id, sucursal_id, usuario_id, numero_ticket,
+            op_id, empresa_id, sucursal_id, op_usuario_id, numero_ticket,
             total, f"offline_{op_id}", p.get("cliente_nombre", "Consumidor Final"),
             p.get("cliente_documento", "0")
         )
@@ -524,13 +586,51 @@ class SyncService:
             )
 
     async def _procesar_reserva_offline_sync(self, conn, empresa_id: str, usuario_id: str, op):
-        op_id = _op_get(op, "id")
+        op_id = _coerce_uuid_str(_op_get(op, "id"), "reserva_offline")
         sucursal_id = _op_get(op, "sucursal_id")
+        op_usuario_id = str(_op_get(op, "usuario_id") or usuario_id)
         p = _op_get(op, "payload") or {}
         if isinstance(p, str):
             p = json.loads(p)
         items = p.get("items", [])
-        fecha_visita = p.get("fecha_visita") or datetime.now(timezone.utc).isoformat()
+        if not items:
+            raise Exception("Reserva offline sin ítems")
+
+        cantidades: Dict[str, int] = {}
+        for it in items:
+            var_id = str(it.get("variante_id") or "").strip()
+            if not var_id:
+                raise Exception("Variante inválida en reserva offline")
+            try:
+                UUID(var_id)
+            except (ValueError, TypeError):
+                raise Exception(f"Identificador de variante inválido: {var_id}")
+            cant = int(it.get("cantidad", 1))
+            if cant <= 0:
+                raise Exception(f"Cantidad inválida para variante {var_id}")
+            cantidades[var_id] = cantidades.get(var_id, 0) + cant
+
+        # Verificar stock disponible en orden determinístico (el trigger fn_actualizar_stock_reservado
+        # incrementa stock_reservado al insertar reserva_detalle)
+        for var_id in sorted(cantidades.keys()):
+            cant = cantidades[var_id]
+            stock = await conn.fetchrow(
+                """
+                SELECT stock_disponible FROM inventario
+                WHERE empresa_id = $1 AND sucursal_id = $2 AND variante_id = $3
+                FOR UPDATE
+                """,
+                empresa_id, sucursal_id, var_id
+            )
+            if not stock or int(stock["stock_disponible"]) < cant:
+                raise Exception(f"Stock insuficiente en servidor para variante {var_id}")
+
+        fv_raw = str(p.get("fecha_visita") or datetime.now(timezone.utc).isoformat())
+        fv = datetime.fromisoformat(fv_raw.replace("Z", "+00:00"))
+        if fv.tzinfo is None:
+            fv = fv.replace(tzinfo=timezone.utc)
+        now_utc = datetime.now(timezone.utc)
+        expira_en = max(fv, now_utc) + timedelta(hours=2)
         probador = p.get("probador", True)
 
         reserva_id = await conn.fetchval(
@@ -541,20 +641,20 @@ class SyncService:
             ) VALUES ($1, $2, $3, $4, 'pendiente_preparacion', $5, $6, $7, $8)
             RETURNING id
             """,
-            op_id, empresa_id, usuario_id, sucursal_id,
-            datetime.fromisoformat(fecha_visita.replace("Z", "+00:00")),
-            datetime.fromisoformat(fecha_visita.replace("Z", "+00:00")) + timedelta(hours=2),
+            op_id, empresa_id, op_usuario_id, sucursal_id,
+            fv,
+            expira_en,
             "Cabina 1" if probador else None,
             f"RES-OFF-{str(op_id)[:6].upper()}"
         )
 
-        for it in items:
+        for var_id, cant in cantidades.items():
             await conn.execute(
                 """
                 INSERT INTO reserva_detalle (empresa_id, reserva_id, variante_id, cantidad)
                 VALUES ($1, $2, $3, $4)
                 """,
-                empresa_id, reserva_id, it["variante_id"], int(it.get("cantidad", 1))
+                empresa_id, reserva_id, var_id, cant
             )
 
     async def _procesar_cambio_offline_sync(self, conn, empresa_id: str, usuario_id: str, op):
@@ -619,13 +719,24 @@ class SyncService:
                 if not op:
                     raise HTTPException(status_code=404, detail="Operación en conflicto no encontrada")
 
-                p = json.loads(op["payload"]) if isinstance(op["payload"], str) else op["payload"]
+                p = json.loads(op["payload"]) if isinstance(op["payload"], str) else (op["payload"] or {})
+                op_tipo = _op_get(op, "tipo") or "venta_offline"
+                op_usuario_id = str(_op_get(op, "usuario_id") or usuario_id)
 
                 if datos.decision == "ajustar":
-                    # Inyectar stock de regularización y asentar la venta
-                    for linea in p.get("lineas", []):
-                        var_id = linea["variante_id"]
-                        cant = int(linea["cantidad"])
+                    # Inyectar stock de regularización y reprocesar según tipo
+                    items_ajuste = (
+                        p.get("items", [])
+                        if op_tipo == "reserva_offline"
+                        else (
+                            [{"variante_id": p["variante_nueva_id"], "cantidad": int(p.get("cantidad", 1))}]
+                            if op_tipo == "cambio_offline" and p.get("variante_nueva_id")
+                            else p.get("lineas", [])
+                        )
+                    )
+                    for item in items_ajuste:
+                        var_id = item["variante_id"]
+                        cant = int(item.get("cantidad", 1))
                         await conn.execute(
                             """
                             UPDATE inventario
@@ -634,15 +745,25 @@ class SyncService:
                             """,
                             cant, empresa_id, op["sucursal_id"], var_id
                         )
-                    await self._procesar_venta_offline_sync(conn, empresa_id, usuario_id, op)
+                    if op_tipo == "reserva_offline":
+                        await self._procesar_reserva_offline_sync(conn, empresa_id, op_usuario_id, op)
+                    elif op_tipo == "cambio_offline":
+                        await self._procesar_cambio_offline_sync(conn, empresa_id, op_usuario_id, op)
+                    else:
+                        await self._procesar_venta_offline_sync(conn, empresa_id, op_usuario_id, op)
                     nuevo_estado = "resuelta"
 
                 elif datos.decision == "rechazar":
                     nuevo_estado = "rechazada"
 
                 elif datos.decision == "aceptar":
-                    # Forzar registro
-                    await self._procesar_venta_offline_sync(conn, empresa_id, usuario_id, op)
+                    # Forzar registro según tipo de operación
+                    if op_tipo == "reserva_offline":
+                        await self._procesar_reserva_offline_sync(conn, empresa_id, op_usuario_id, op)
+                    elif op_tipo == "cambio_offline":
+                        await self._procesar_cambio_offline_sync(conn, empresa_id, op_usuario_id, op)
+                    else:
+                        await self._procesar_venta_offline_sync(conn, empresa_id, op_usuario_id, op)
                     nuevo_estado = "resuelta"
 
                 else:

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/routing/role_permissions.dart';
 import '../../../core/session/session_controller.dart';
 import '../data/catalogo_models.dart';
 import 'catalogo_controller.dart';
@@ -30,6 +32,7 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
     _searchController.addListener(_onSearchTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.controller.cargarInicial(widget.session.tenant);
+      widget.session.prefetcharCatalogoOfflineSilencioso();
     });
   }
 
@@ -113,6 +116,12 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
           appBar: AppBar(
             title: const Text('Catalogo'),
             actions: [
+              if (canAccessRoute(widget.session.user?.rol, '/checkout'))
+                IconButton(
+                  tooltip: 'Carrito y Checkout',
+                  onPressed: () => context.push('/checkout'),
+                  icon: const Icon(Icons.shopping_bag_outlined),
+                ),
               IconButton(
                 tooltip: 'Filtros',
                 onPressed: controller.loading ? null : _abrirFiltros,
@@ -219,7 +228,13 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
                           ...controller.items.map(
                             (prenda) => Padding(
                               padding: const EdgeInsets.only(bottom: 10),
-                              child: PrendaCard(prenda: prenda),
+                              child: PrendaCard(
+                                prenda: prenda,
+                                onTap: () => context.push(
+                                  '/catalogo/prenda/${prenda.id}',
+                                  extra: prenda,
+                                ),
+                              ),
                             ),
                           ),
                         ],

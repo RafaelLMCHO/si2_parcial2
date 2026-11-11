@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, catchError, map, of, throwError } from 'rxjs';
+import { Observable, catchError, map, of, tap, throwError } from 'rxjs';
 
 import {
   AuxiliaresCatalogoResponse,
@@ -103,7 +103,129 @@ export class CatalogoService {
   }
 
   obtenerPrendaPorId(id: string): Observable<Prenda> {
-    return this.http.get<Prenda>(`/api/v1/catalogo/prendas/${id}`);
+    const isOnline = this.network.online() && (typeof navigator === 'undefined' || navigator.onLine);
+    if (!isOnline) {
+      const local = this.leerPrendaDesdeCaches(id);
+      if (local) {
+        return of(local);
+      }
+      return throwError(() => new Error('Sin conexión y prenda no encontrada en caché local.'));
+    }
+
+    return this.http.get<Prenda>(`/api/v1/catalogo/prendas/${id}`).pipe(
+      tap((prenda) => this.upsertSnapshotPrenda(prenda)),
+      catchError((err) => {
+        const local = this.leerPrendaDesdeCaches(id);
+        if (local) {
+          return of(local);
+        }
+        return throwError(() => err);
+      }),
+    );
+  }
+
+  obtenerPrendasCacheadas(): Prenda[] {
+    return this.leerPrendasOfflineCombinadas();
+  }
+
+  private upsertSnapshotPrenda(prenda: Prenda): void {
+    if (typeof localStorage === 'undefined' || !prenda?.id) return;
+    try {
+      const raw = localStorage.getItem(this.cacheKey);
+      const cache: OfflineCatalogCache = raw
+        ? JSON.parse(raw)
+        : { version: 1, updated_at: new Date().toISOString(), items: [] };
+      const items = Array.isArray(cache.items) ? [...cache.items] : [];
+      const idx = items.findIndex((x) => x?.id === prenda.id);
+      if (idx >= 0) {
+        items[idx] = prenda;
+      } else {
+        items.push(prenda);
+      }
+      cache.items = items;
+      cache.updated_at = new Date().toISOString();
+      localStorage.setItem(this.cacheKey, JSON.stringify(cache));
+    } catch {
+      // Ignorar quota exceeded
+    }
+  }
+
+  private leerPrendaDesdeCaches(id: string): Prenda | null {
+    return this.leerPrendasOfflineCombinadas().find((p) => p.id === id) ?? null;
+  }
+
+  private leerPrendasOfflineCombinadas(): Prenda[] {
+    if (typeof localStorage === 'undefined') return [];
+    const porId = new Map<string, Prenda>();
+
+    try {
+      const raw = localStorage.getItem(this.cacheKey);
+      if (raw) {
+        const cache: OfflineCatalogCache = JSON.parse(raw);
+        for (const p of Array.isArray(cache?.items) ? cache.items : []) {
+          if (p?.id) porId.set(String(p.id), p);
+        }
+      }
+    } catch {
+      // Ignorar cache corrupto
+    }
+
+    try {
+      const cu25Raw = localStorage.getItem('catalogo_offline_cache');
+      if (cu25Raw) {
+        const cu25 = JSON.parse(cu25Raw);
+        const variantesPorPrenda = new Map<string, any[]>();
+        for (const v of Array.isArray(cu25?.variantes) ? cu25.variantes : []) {
+          const pid = String(v?.prenda_id || '');
+          if (!pid) continue;
+          const arr = variantesPorPrenda.get(pid) || [];
+          arr.push({
+            id: String(v.id),
+            prenda_id: pid,
+            talla_id: Number(v.talla_id || 0),
+            talla_nombre: v.talla ?? v.talla_nombre ?? null,
+            color_id: Number(v.color_id || 0),
+            color_nombre: v.color ?? v.color_nombre ?? null,
+            color_hex: v.color_hex ?? null,
+            sku: String(v.sku || ''),
+            codigo_barras: v.codigo_barras ?? null,
+            precio_venta: Number(v.precio_venta || 0),
+            costo: Number(v.costo || 0),
+            estado: 'activa',
+            created_at: '',
+            updated_at: '',
+          });
+          variantesPorPrenda.set(pid, arr);
+        }
+
+        for (const p of Array.isArray(cu25?.prendas) ? cu25.prendas : []) {
+          const pid = String(p?.id || '');
+          if (!pid || porId.has(pid)) continue;
+          porId.set(pid, {
+            id: pid,
+            empresa_id: String(cu25?.empresa_id || ''),
+            codigo: String(p.codigo || ''),
+            nombre: String(p.nombre || 'Prenda'),
+            descripcion: p.descripcion ?? null,
+            marca: p.marca ?? null,
+            genero: String(p.genero || 'unisex'),
+            precio_base: Number(p.precio_base || 0),
+            moneda: 'BOB',
+            categoria_id: String(p.categoria_id || ''),
+            categoria_nombre: p.categoria_nombre ?? null,
+            imagen_url: p.imagen_url ?? null,
+            estado: 'activa',
+            created_at: '',
+            updated_at: '',
+            variantes: variantesPorPrenda.get(pid) || [],
+          });
+        }
+      }
+    } catch {
+      // Ignorar cache corrupto
+    }
+
+    return Array.from(porId.values());
   }
 
   private guardarSnapshotLocal(version: number, items: Prenda[]): void {
@@ -121,12 +243,8 @@ export class CatalogoService {
   }
 
   private consultarOfflineLocal(filters: CatalogFilterParams): CatalogQueryResult {
-    if (typeof localStorage === 'undefined') {
-      return { items: [], total: 0, version_catalogo: 0, isOffline: true, sinDatosLocales: true };
-    }
-
-    const raw = localStorage.getItem(this.cacheKey);
-    if (!raw) {
+    const items = this.leerPrendasOfflineCombinadas();
+    if (items.length === 0) {
       return {
         items: [],
         total: 0,
@@ -137,8 +255,9 @@ export class CatalogoService {
     }
 
     try {
-      const cache: OfflineCatalogCache = JSON.parse(raw);
-      let filtrados = [...cache.items];
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(this.cacheKey) : null;
+      const cacheVersion = raw ? (JSON.parse(raw)?.version ?? 1) : 1;
+      let filtrados = [...items];
 
       // Aplicar filtros en memoria local (CU-14 Offline)
       if (filters.categoria_id) {
@@ -182,7 +301,7 @@ export class CatalogoService {
       return {
         items: filtrados,
         total: filtrados.length,
-        version_catalogo: cache.version,
+        version_catalogo: cacheVersion,
         isOffline: true,
         sinDatosLocales: false,
       };

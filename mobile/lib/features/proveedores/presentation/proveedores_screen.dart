@@ -53,14 +53,23 @@ class _ProveedoresScreenState extends State<ProveedoresScreen> {
                           separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final prov = _controller.proveedores[index];
+                            final nitOrContacto =
+                                (prov['nit'] ?? prov['contacto_nombre'] ?? '-')
+                                    .toString();
+                            final correo =
+                                (prov['correo'] ?? prov['email'] ?? '-')
+                                    .toString();
+                            final telefono =
+                                (prov['telefono'] ?? '-').toString();
                             return ListTile(
                               leading: const CircleAvatar(
                                 child: Icon(Icons.local_shipping),
                               ),
                               title: Text(prov['nombre'] ?? 'Proveedor'),
                               subtitle: Text(
-                                'Contacto: ${prov['contacto_nombre'] ?? '-'}\nTel: ${prov['telefono'] ?? '-'} | Email: ${prov['email'] ?? '-'}',
+                                'NIT: $nitOrContacto\nTel: $telefono | Correo: $correo',
                               ),
+                              isThreeLine: true,
                             );
                           },
                         ),

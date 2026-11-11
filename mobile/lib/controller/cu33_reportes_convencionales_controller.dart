@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/session/session_controller.dart';
 
 class CU33ReportesConvencionalesController extends ChangeNotifier {
@@ -32,7 +33,10 @@ class CU33ReportesConvencionalesController extends ChangeNotifier {
       notifyListeners();
       return _dashboard;
     } catch (e) {
-      _error = e.toString();
+      _error = ApiException.fromObject(
+        e,
+        fallback: 'No se pudieron cargar los reportes convencionales.',
+      ).message;
       _isLoading = false;
       notifyListeners();
       return null;
@@ -53,7 +57,10 @@ class CU33ReportesConvencionalesController extends ChangeNotifier {
       final res = await apiClient.get('/reportes/convencionales/ventas', queryParameters: params);
       return Map<String, dynamic>.from(res as Map);
     } catch (e) {
-      _error = e.toString();
+      _error = ApiException.fromObject(
+        e,
+        fallback: 'No se pudo consultar ventas del período.',
+      ).message;
       notifyListeners();
       return null;
     }
@@ -64,7 +71,10 @@ class CU33ReportesConvencionalesController extends ChangeNotifier {
       final res = await apiClient.get('/reportes/convencionales/rotacion');
       return Map<String, dynamic>.from(res as Map);
     } catch (e) {
-      _error = e.toString();
+      _error = ApiException.fromObject(
+        e,
+        fallback: 'No se pudo consultar la rotación de stock.',
+      ).message;
       notifyListeners();
       return null;
     }
@@ -78,7 +88,10 @@ class CU33ReportesConvencionalesController extends ChangeNotifier {
       );
       return Map<String, dynamic>.from(res as Map);
     } catch (e) {
-      _error = e.toString();
+      _error = ApiException.fromObject(
+        e,
+        fallback: 'No se pudo consultar el top de prendas.',
+      ).message;
       notifyListeners();
       return null;
     }

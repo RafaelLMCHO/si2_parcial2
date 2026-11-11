@@ -53,15 +53,23 @@ class _EmpleadosScreenState extends State<EmpleadosScreen> {
                           separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final emp = _controller.empleados[index];
+                            final nombre = emp['nombre']?.toString() ?? 'Empleado';
+                            final correo = (emp['correo'] ?? emp['email'] ?? '-').toString();
+                            final rol = (emp['rol_nombre'] ?? emp['rol'] ?? '-').toString();
+                            final estado = emp['estado']?.toString();
+                            final isActivo = estado == 'activo' || emp['activo'] == true;
+                            final statusLabel = estado != null && estado.isNotEmpty
+                                ? '${estado[0].toUpperCase()}${estado.substring(1)}'
+                                : (isActivo ? 'Activo' : 'Inactivo');
                             return ListTile(
                               leading: CircleAvatar(
-                                child: Text((emp['nombre'] as String? ?? 'E')[0].toUpperCase()),
+                                child: Text((nombre.isNotEmpty ? nombre : 'E')[0].toUpperCase()),
                               ),
-                              title: Text(emp['nombre'] ?? 'Empleado'),
-                              subtitle: Text('${emp['email']} • Rol: ${emp['rol'] ?? 'vendedor'}'),
+                              title: Text(nombre),
+                              subtitle: Text('$correo • Rol: $rol'),
                               trailing: Chip(
-                                label: Text(emp['activo'] == true ? 'Activo' : 'Inactivo'),
-                                backgroundColor: emp['activo'] == true ? Colors.green.shade50 : Colors.red.shade50,
+                                label: Text(statusLabel),
+                                backgroundColor: isActivo ? Colors.green.shade50 : Colors.red.shade50,
                               ),
                             );
                           },

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/utils/prenda_image_helper.dart';
 import 'catalogo_admin_controller.dart';
 
 class CatalogoAdminScreen extends StatefulWidget {
@@ -53,13 +54,25 @@ class _CatalogoAdminScreenState extends State<CatalogoAdminScreen> {
                           separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final p = _controller.prendas[index];
+                            final nombre = p['nombre']?.toString() ?? 'Prenda';
+                            final categoria = p['categoria_nombre']?.toString();
                             return ListTile(
-                              leading: const CircleAvatar(
-                                child: Icon(Icons.checkroom),
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: SizedBox(
+                                  width: 48,
+                                  height: 48,
+                                  child: PrendaNetworkImage(
+                                    imagenUrl: p['imagen_url']?.toString(),
+                                    nombre: nombre,
+                                    categoriaNombre: categoria,
+                                    iconSize: 22,
+                                  ),
+                                ),
                               ),
-                              title: Text(p['nombre'] ?? 'Prenda'),
+                              title: Text(nombre),
                               subtitle: Text(
-                                'Código: ${p['codigo']} | Cat: ${p['categoria_nombre'] ?? '-'}\nPrecio: BOB ${p['precio_base']}',
+                                'Código: ${p['codigo']} | Cat: ${categoria ?? '-'}\nPrecio: BOB ${p['precio_base']}',
                               ),
                             );
                           },
