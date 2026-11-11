@@ -46,8 +46,25 @@ export class App {
       this.swUpdate.versionUpdates.subscribe((event) => {
         if (event.type === 'VERSION_READY') {
           this.updateReady.set(true);
+          void this.swUpdate?.activateUpdate().catch(() => undefined);
         }
       });
+
+      this.swUpdate.unrecoverable.subscribe(() => {
+        window.location.reload();
+      });
+
+      if (this.network.online()) {
+        void this.swUpdate.checkForUpdate().catch(() => undefined);
+      }
+
+      if (typeof window !== 'undefined') {
+        window.addEventListener('focus', () => {
+          if (this.network.online()) {
+            void this.swUpdate?.checkForUpdate().catch(() => undefined);
+          }
+        });
+      }
     }
 
     // Cerrar sidebar móvil en navegación
@@ -61,6 +78,10 @@ export class App {
       const isAuth = this.auth.isAuthenticated();
       const user = this.auth.user();
       const tieneEmpresa = Boolean(user?.empresa_id);
+
+      if (online && this.swUpdate?.isEnabled) {
+        void this.swUpdate.checkForUpdate().catch(() => undefined);
+      }
 
       if (isAuth && tieneEmpresa && online) {
         this.cu25Offline.asegurarCatalogoOfflineCargado();
@@ -100,7 +121,14 @@ export class App {
     this.auth.logout().subscribe();
   }
 
-  reload(): void {
+  async reload(): Promise<void> {
+    if (this.swUpdate?.isEnabled) {
+      try {
+        await this.swUpdate.activateUpdate();
+      } catch {
+        // Ignorar si ya fue activada
+      }
+    }
     window.location.reload();
   }
 }

@@ -428,6 +428,13 @@
       </div>
     }
 
+    @if (updateReady()) {
+      <div class="system-banner update" role="status">
+        ✨ <strong>Actualización disponible:</strong> Hay una nueva versión de FashionStore lista.
+        <button type="button" (click)="reload()" class="btn-banner-action">Actualizar Ahora</button>
+      </div>
+    }
+
     <!-- Vista de Catálogo / Checkout / Vestidor -->
     <main class="storefront-main">
       <router-outlet />

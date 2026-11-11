@@ -8,6 +8,7 @@ import {
   PrendaListResponse,
 } from './models';
 import { NetworkService } from './network.service';
+import { SessionStoreService } from './session-store.service';
 
 export interface CatalogFilterParams {
   empresa_slug?: string;
@@ -31,6 +32,7 @@ export interface CatalogQueryResult {
 }
 
 interface OfflineCatalogCache {
+  empresa_id?: string;
   version: number;
   updated_at: string;
   items: Prenda[];
@@ -40,6 +42,7 @@ interface OfflineCatalogCache {
 export class CatalogoService {
   private readonly http = inject(HttpClient);
   private readonly network = inject(NetworkService);
+  private readonly sessionStore = inject(SessionStoreService);
   private readonly cacheKey = 'fs_offline_catalog_cache';
 
   /**
@@ -131,10 +134,13 @@ export class CatalogoService {
   private upsertSnapshotPrenda(prenda: Prenda): void {
     if (typeof localStorage === 'undefined' || !prenda?.id) return;
     try {
+      const currentEmpresaId = this.sessionStore.readUser()?.empresa_id || prenda.empresa_id || '';
       const raw = localStorage.getItem(this.cacheKey);
-      const cache: OfflineCatalogCache = raw
-        ? JSON.parse(raw)
-        : { version: 1, updated_at: new Date().toISOString(), items: [] };
+      const parsed: OfflineCatalogCache | null = raw ? JSON.parse(raw) : null;
+      const cache: OfflineCatalogCache =
+        parsed && (!currentEmpresaId || !parsed.empresa_id || parsed.empresa_id === currentEmpresaId)
+          ? parsed
+          : { empresa_id: currentEmpresaId, version: 1, updated_at: new Date().toISOString(), items: [] };
       const items = Array.isArray(cache.items) ? [...cache.items] : [];
       const idx = items.findIndex((x) => x?.id === prenda.id);
       if (idx >= 0) {
@@ -142,6 +148,7 @@ export class CatalogoService {
       } else {
         items.push(prenda);
       }
+      cache.empresa_id = currentEmpresaId || cache.empresa_id;
       cache.items = items;
       cache.updated_at = new Date().toISOString();
       localStorage.setItem(this.cacheKey, JSON.stringify(cache));
@@ -157,13 +164,19 @@ export class CatalogoService {
   private leerPrendasOfflineCombinadas(): Prenda[] {
     if (typeof localStorage === 'undefined') return [];
     const porId = new Map<string, Prenda>();
+    const currentEmpresaId = this.sessionStore.readUser()?.empresa_id || '';
 
     try {
       const raw = localStorage.getItem(this.cacheKey);
       if (raw) {
         const cache: OfflineCatalogCache = JSON.parse(raw);
-        for (const p of Array.isArray(cache?.items) ? cache.items : []) {
-          if (p?.id) porId.set(String(p.id), p);
+        const sameTenant = !currentEmpresaId || !cache?.empresa_id || cache.empresa_id === currentEmpresaId;
+        if (sameTenant) {
+          for (const p of Array.isArray(cache?.items) ? cache.items : []) {
+            if (p?.id && (!currentEmpresaId || !p.empresa_id || p.empresa_id === currentEmpresaId)) {
+              porId.set(String(p.id), p);
+            }
+          }
         }
       }
     } catch {
@@ -174,6 +187,10 @@ export class CatalogoService {
       const cu25Raw = localStorage.getItem('catalogo_offline_cache');
       if (cu25Raw) {
         const cu25 = JSON.parse(cu25Raw);
+        const sameTenant = !currentEmpresaId || !cu25?.empresa_id || cu25.empresa_id === currentEmpresaId;
+        if (!sameTenant) {
+          return Array.from(porId.values());
+        }
         const variantesPorPrenda = new Map<string, any[]>();
         for (const v of Array.isArray(cu25?.variantes) ? cu25.variantes : []) {
           const pid = String(v?.prenda_id || '');
@@ -231,7 +248,9 @@ export class CatalogoService {
   private guardarSnapshotLocal(version: number, items: Prenda[]): void {
     if (typeof localStorage === 'undefined') return;
     try {
+      const empresaId = this.sessionStore.readUser()?.empresa_id || items[0]?.empresa_id || '';
       const payload: OfflineCatalogCache = {
+        empresa_id: empresaId,
         version,
         updated_at: new Date().toISOString(),
         items,

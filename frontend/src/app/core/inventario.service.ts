@@ -1,5 +1,5 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, from, map, of, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
@@ -7,6 +7,7 @@ import {
   InventarioListResponse,
 } from './models';
 import { NetworkService } from './network.service';
+import { SessionStoreService } from './session-store.service';
 
 @Injectable({
   providedIn: 'root',
@@ -15,6 +16,7 @@ export class InventarioService {
   private readonly baseUrl = `${environment.apiUrl}/inventario`;
   private readonly dbName = 'FashionStoreOfflineDB';
   private readonly storeName = 'existencias_local';
+  private readonly sessionStore = inject(SessionStoreService);
 
   constructor(
     private readonly http: HttpClient,
@@ -136,11 +138,14 @@ export class InventarioService {
       }
     };
 
+    const currentEmpresaId = this.sessionStore.readUser()?.empresa_id || '';
+
     try {
       const cu25Raw = localStorage.getItem('catalogo_offline_cache');
       if (cu25Raw) {
         const cu25 = JSON.parse(cu25Raw);
-        if (Array.isArray(cu25?.sucursales)) {
+        const sameTenant = !currentEmpresaId || !cu25?.empresa_id || cu25.empresa_id === currentEmpresaId;
+        if (sameTenant && Array.isArray(cu25?.sucursales)) {
           agregar(cu25.sucursales);
         }
       }
@@ -154,6 +159,12 @@ export class InventarioService {
         const seen = JSON.parse(seenRaw);
         if (Array.isArray(seen)) {
           agregar(seen);
+        } else if (
+          seen &&
+          (!currentEmpresaId || !seen.empresa_id || seen.empresa_id === currentEmpresaId) &&
+          Array.isArray(seen.items)
+        ) {
+          agregar(seen.items);
         }
       }
     } catch {
@@ -168,6 +179,7 @@ export class InventarioService {
       return;
     }
     try {
+      const currentEmpresaId = this.sessionStore.readUser()?.empresa_id || '';
       const actuales = this.obtenerSucursalesOffline();
       const porId = new Map(actuales.map((s) => [s.id, s]));
       for (const s of sucursales) {
@@ -181,7 +193,10 @@ export class InventarioService {
           es_matriz: Boolean(s.es_matriz ?? porId.get(id)?.es_matriz),
         });
       }
-      localStorage.setItem('fs_sucursales_cache', JSON.stringify(Array.from(porId.values())));
+      localStorage.setItem(
+        'fs_sucursales_cache',
+        JSON.stringify({ empresa_id: currentEmpresaId, items: Array.from(porId.values()) }),
+      );
     } catch {
       // Ignorar quota exceeded
     }
@@ -273,8 +288,13 @@ export class InventarioService {
     }
 
     try {
+      const currentEmpresaId = this.sessionStore.readUser()?.empresa_id || '';
       const cu25Raw = localStorage.getItem('catalogo_offline_cache');
-      const cu25 = cu25Raw ? JSON.parse(cu25Raw) : null;
+      const parsedCu25 = cu25Raw ? JSON.parse(cu25Raw) : null;
+      const cu25 =
+        parsedCu25 && (!currentEmpresaId || !parsedCu25.empresa_id || parsedCu25.empresa_id === currentEmpresaId)
+          ? parsedCu25
+          : null;
       const sucursalesCache = this.obtenerSucursalesOffline();
       if (sucursalesCache.length === 0) {
         return empty;

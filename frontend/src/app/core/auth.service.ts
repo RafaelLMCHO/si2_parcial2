@@ -106,6 +106,7 @@ export class AuthService {
     return request.pipe(
       catchError(() => EMPTY),
       finalize(() => {
+        this.clearTenantOfflineCaches();
         this.clearSession();
         void this.router.navigate(['/login']);
       }),
@@ -159,12 +160,54 @@ export class AuthService {
     this.offline.refreshStatus();
   }
 
+  private clearTenantOfflineCaches(): void {
+    if (typeof localStorage === 'undefined') {
+      return;
+    }
+    localStorage.removeItem('catalogo_offline_cache');
+    localStorage.removeItem('catalogo_last_sync');
+    localStorage.removeItem('fs_sucursales_cache');
+    localStorage.removeItem('fs_offline_catalog_cache');
+    localStorage.removeItem('soft_locks_locales');
+  }
+
   private storeSession(response: LoginResponse): void {
+    const prevEmpresaId = this.user()?.empresa_id || null;
+    const nextEmpresaId = response.usuario?.empresa_id || null;
+    if (nextEmpresaId && prevEmpresaId !== nextEmpresaId) {
+      this.clearStaleTenantOfflineCaches(nextEmpresaId);
+    }
     this.store.saveSession(response);
     this.accessToken.set(response.access_token);
     this.refreshToken.set(response.refresh_token);
     this.expiresAt.set(Date.now() + response.expires_in * 1000);
     this.user.set(response.usuario);
     this.offline.refreshStatus();
+  }
+
+  private clearStaleTenantOfflineCaches(targetEmpresaId: string): void {
+    if (typeof localStorage === 'undefined') {
+      return;
+    }
+    try {
+      const cu25Raw = localStorage.getItem('catalogo_offline_cache');
+      const cu25 = cu25Raw ? JSON.parse(cu25Raw) : null;
+      if (cu25?.empresa_id && cu25.empresa_id !== targetEmpresaId) {
+        this.clearTenantOfflineCaches();
+        return;
+      }
+      const sucsRaw = localStorage.getItem('fs_sucursales_cache');
+      const sucs = sucsRaw ? JSON.parse(sucsRaw) : null;
+      if (Array.isArray(sucs) || (sucs?.empresa_id && sucs.empresa_id !== targetEmpresaId)) {
+        localStorage.removeItem('fs_sucursales_cache');
+      }
+      const catRaw = localStorage.getItem('fs_offline_catalog_cache');
+      const cat = catRaw ? JSON.parse(catRaw) : null;
+      if (cat?.empresa_id && cat.empresa_id !== targetEmpresaId) {
+        localStorage.removeItem('fs_offline_catalog_cache');
+      }
+    } catch {
+      this.clearTenantOfflineCaches();
+    }
   }
 }
