@@ -3,7 +3,6 @@
   "framework": "angular",
   "buildCommand": "npm run build",
   "outputDirectory": "dist/frontend/browser",
-  "cleanUrls": true,
   "rewrites": [
     {
       "source": "/api/(.*)",
