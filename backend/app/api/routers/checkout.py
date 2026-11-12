@@ -8,11 +8,27 @@ from app.schemas.venta import (
     CheckoutValidarOut,
     CheckoutValidarRequest,
     CrearOrdenRequest,
+    DireccionesClienteResponse,
     OrdenCreadaOut,
 )
 from app.services import checkout_service, comprobante_service
 
 router = APIRouter(prefix="/checkout", tags=["Checkout y Compras Online (CU-22)"])
+
+
+@router.get("/direcciones", response_model=DireccionesClienteResponse)
+async def listar_direcciones(
+    current: CurrentUser = Depends(get_current_user),
+) -> DireccionesClienteResponse:
+    """CU-22: Lista las direcciones de envío activas del usuario autenticado."""
+    if not current.empresa_id:
+        raise api_error(400, "TENANT_REQUERIDO", "Debe pertenecer a un tenant")
+
+    items = await checkout_service.listar_direcciones_cliente(
+        empresa_id=current.empresa_id,
+        user_id=current.user_id,
+    )
+    return DireccionesClienteResponse(items=items)
 
 
 @router.post("/validar", response_model=CheckoutValidarOut)

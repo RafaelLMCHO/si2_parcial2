@@ -1,9 +1,26 @@
 from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any, List, Optional
 from uuid import UUID
 from pydantic import BaseModel, Field
+
+
+class DireccionClienteOut(BaseModel):
+    id: UUID
+    etiqueta: Optional[str] = None
+    destinatario: str
+    telefono: str
+    linea1: str
+    linea2: Optional[str] = None
+    ciudad: str
+    departamento: Optional[str] = None
+    referencia: Optional[str] = None
+    es_principal: bool = False
+
+
+class DireccionesClienteResponse(BaseModel):
+    items: List[DireccionClienteOut]
 
 
 class CheckoutValidarRequest(BaseModel):
@@ -109,6 +126,7 @@ class PosVentaOut(BaseModel):
     metodo_pago: str
     estado: str
     comprobante_url: str
+    intencion_pago: Optional[dict[str, Any]] = None
 
 
 # Aliases para compatibilidad con controladores

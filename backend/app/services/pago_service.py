@@ -92,7 +92,7 @@ class StripeGateway(PasarelaPago):
             currency=moneda,
             metadata=metadata,
             idempotency_key=idempotency_key,
-            automatic_payment_methods={"enabled": True},
+            automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
         )
         return {
             "id": intent.id,

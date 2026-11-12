@@ -263,6 +263,10 @@ async def crear_venta_pos(
     Realiza una venta directa en caja.
     Cumple atomicidad RNF04, idempotencia RNF05 y auditoría BR-13/BR-14.
     """
+    existing_card_sale = None
+    existing_immediate_sale = None
+    pending_card_sale = None
+
     async with tenant_connection(empresa_id, user_id) as conn:
         # 1. Idempotencia: Verificar si ya existe una venta con ese idempotency_key
         venta_existente = await conn.fetchrow(
@@ -271,355 +275,414 @@ async def crear_venta_pos(
               FROM venta v
               LEFT JOIN pago p ON p.venta_id = v.id
              WHERE v.empresa_id = $1 AND v.idempotency_key = $2
+             ORDER BY p.created_at DESC NULLS LAST
+             LIMIT 1
             """,
             UUID(empresa_id),
             idempotency_key,
         )
         if venta_existente:
-            return {
+            metodo_existente = venta_existente["metodo"] or pago.get("metodo", "efectivo")
+            base_existente = {
                 "venta_id": str(venta_existente["id"]),
                 "numero": venta_existente["numero"],
                 "total": venta_existente["total"],
                 "cambio": Decimal("0.00"),
-                "metodo_pago": venta_existente["metodo"] or "efectivo",
+                "metodo_pago": metodo_existente,
                 "estado": venta_existente["estado"],
                 "comprobante_url": f"/api/v1/ventas/{venta_existente['id']}/ticket",
             }
+            if venta_existente["estado"] == "pendiente_pago" and metodo_existente == "tarjeta":
+                existing_card_sale = base_existente
+            else:
+                existing_immediate_sale = base_existente
 
-        # 2. Determinar sucursal del cajero y validar dispositivo
-        sucursal_id = await _resolver_sucursal_cajero(conn, empresa_id, user_id, rol, sucursal_solicitada)
-        dispositivo_id = await _validar_dispositivo_pos(conn, empresa_id, sucursal_id, device_serial)
+        if existing_immediate_sale is None and existing_card_sale is None:
+            # 2. Determinar sucursal del cajero y validar dispositivo
+            sucursal_id = await _resolver_sucursal_cajero(conn, empresa_id, user_id, rol, sucursal_solicitada)
+            dispositivo_id = await _validar_dispositivo_pos(conn, empresa_id, sucursal_id, device_serial)
 
-        # 3. Validar cliente y datos de facturación
-        tipo_cliente = cliente.get("tipo", "consumidor_final")
-        cliente_nombre = "Consumidor Final"
-        cliente_documento = "0"
-        if tipo_cliente == "identificado":
-            cliente_nombre = (cliente.get("nombre") or "").strip()
-            cliente_documento = (cliente.get("documento") or "").strip()
-            if not cliente_nombre or not cliente_documento:
-                raise api_error(422, "DATOS_FACTURACION_INCOMPLETOS", "Debe proporcionar nombre y documento del cliente")
+            # 3. Validar cliente y datos de facturación
+            tipo_cliente = cliente.get("tipo", "consumidor_final")
+            cliente_nombre = "Consumidor Final"
+            cliente_documento = "0"
+            if tipo_cliente == "identificado":
+                cliente_nombre = (cliente.get("nombre") or "").strip()
+                cliente_documento = (cliente.get("documento") or "").strip()
+                if not cliente_nombre or not cliente_documento:
+                    raise api_error(422, "DATOS_FACTURACION_INCOMPLETOS", "Debe proporcionar nombre y documento del cliente")
 
-        # 4. Cargar variantes y calcular subtotales
-        variante_ids = [UUID(str(it["variante_id"])) for it in items]
-        variantes_db = await conn.fetch(
-            """
-            SELECT id, precio_venta, sku
-              FROM variante
-             WHERE id = ANY($1::uuid[]) AND empresa_id = $2 AND deleted_at IS NULL
-            """,
-            variante_ids,
-            UUID(empresa_id),
-        )
-        variantes_dict = {str(r["id"]): r for r in variantes_db}
-
-        if len(variantes_dict) != len(set(str(it["variante_id"]) for it in items)):
-            raise api_error(404, "VARIANTE_NO_VALIDA", "Una o más variantes no pertenecen al tenant o no existen")
-
-        subtotal_acumulado = Decimal("0.00")
-        descuento_acumulado = Decimal("0.00")
-        lineas_procesadas = []
-
-        for it in items:
-            var_id_str = str(it["variante_id"])
-            var_info = variantes_dict[var_id_str]
-            cant = int(it["cantidad"])
-            if cant <= 0:
-                raise api_error(422, "CANTIDAD_INVALIDA", "La cantidad debe ser mayor a 0")
-
-            precio_lista = Decimal(str(var_info["precio_venta"]))
-            descuento_linea = Decimal(str(it.get("descuento_linea") or "0.00"))
-            subtotal_linea = (precio_lista * cant) - descuento_linea
-            if subtotal_linea < 0:
-                raise api_error(422, "DESCUENTO_EXCESIVO", "El descuento no puede superar el precio del artículo")
-
-            subtotal_acumulado += precio_lista * cant
-            descuento_acumulado += descuento_linea
-
-            lineas_procesadas.append({
-                "variante_id": UUID(var_id_str),
-                "cantidad": cant,
-                "precio_lista": precio_lista,
-                "precio_unitario": precio_lista,
-                "descuento_linea": descuento_linea,
-                "subtotal": subtotal_linea,
-            })
-
-        # Regla contable: total = subtotal - descuento + impuesto
-        impuesto_calculado = (subtotal_acumulado - descuento_acumulado) * TASA_IVA
-        total_a_pagar = (subtotal_acumulado - descuento_acumulado) + impuesto_calculado
-
-        metodo_pago = pago.get("metodo", "efectivo")
-        monto_recibido = Decimal(str(pago.get("monto_recibido") or "0.00"))
-        cambio = Decimal("0.00")
-
-        # 5. Validaciones según método de pago
-        if metodo_pago == "efectivo":
-            if monto_recibido < total_a_pagar:
-                faltante = total_a_pagar - monto_recibido
-                raise api_error(
-                    422,
-                    "SALDO_INSUFICIENTE",
-                    f"Efectivo insuficiente. Total: {total_a_pagar:.2f}, Recibido: {monto_recibido:.2f}, Faltante: {faltante:.2f}",
-                )
-            cambio = monto_recibido - total_a_pagar
-        elif metodo_pago == "qr":
-            referencia = pago.get("referencia")
-            if not referencia or not referencia.strip():
-                raise api_error(422, "REFERENCIA_REQUERIDA", "El pago QR requiere código o número de referencia bancaria")
-        elif metodo_pago == "tarjeta":
-            pass  # Será redirigido a Stripe
-        else:
-            raise api_error(422, "METODO_NO_SOPORTADO", f"Método de pago '{metodo_pago}' no soportado")
-
-        # 6. Generar correlativo de venta
-        correlativo_val = await conn.fetchval(
-            "SELECT COUNT(*) + 1 FROM venta WHERE empresa_id = $1", UUID(empresa_id)
-        )
-        prefijo_suc = sucursal_id[:4].upper()
-        numero_venta = f"POS-{prefijo_suc}-{correlativo_val:05d}"
-
-        # 7. Si es Tarjeta, crear venta en 'pendiente_pago' y delegar a pago_service
-        if metodo_pago == "tarjeta":
-            venta_row = await conn.fetchrow(
+            # 4. Cargar variantes y calcular subtotales
+            variante_ids = [UUID(str(it["variante_id"])) for it in items]
+            variantes_db = await conn.fetch(
                 """
-                INSERT INTO venta (
-                    empresa_id, numero, sucursal_id, cajero_id, canal,
-                    subtotal, descuento, impuesto, total, estado,
-                    idempotency_key, cliente_nombre, cliente_documento,
-                    dispositivo_id, moneda
-                )
-                VALUES (
-                    $1, $2, $3, $4, 'POS',
-                    $5, $6, $7, $8, 'pendiente_pago',
-                    $9, $10, $11, $12, 'BOB'
-                )
-                RETURNING id
+                SELECT id, precio_venta, sku
+                  FROM variante
+                 WHERE id = ANY($1::uuid[]) AND empresa_id = $2 AND deleted_at IS NULL
+                """,
+                variante_ids,
+                UUID(empresa_id),
+            )
+            variantes_dict = {str(r["id"]): r for r in variantes_db}
+
+            if len(variantes_dict) != len(set(str(it["variante_id"]) for it in items)):
+                raise api_error(404, "VARIANTE_NO_VALIDA", "Una o más variantes no pertenecen al tenant o no existen")
+
+            subtotal_acumulado = Decimal("0.00")
+            descuento_acumulado = Decimal("0.00")
+            lineas_procesadas = []
+
+            for it in items:
+                var_id_str = str(it["variante_id"])
+                var_info = variantes_dict[var_id_str]
+                cant = int(it["cantidad"])
+                if cant <= 0:
+                    raise api_error(422, "CANTIDAD_INVALIDA", "La cantidad debe ser mayor a 0")
+
+                precio_lista = Decimal(str(var_info["precio_venta"]))
+                descuento_linea = Decimal(str(it.get("descuento_linea") or "0.00"))
+                subtotal_linea = (precio_lista * cant) - descuento_linea
+                if subtotal_linea < 0:
+                    raise api_error(422, "DESCUENTO_EXCESIVO", "El descuento no puede superar el precio del artículo")
+
+                subtotal_acumulado += precio_lista * cant
+                descuento_acumulado += descuento_linea
+
+                lineas_procesadas.append({
+                    "variante_id": UUID(var_id_str),
+                    "cantidad": cant,
+                    "precio_lista": precio_lista,
+                    "precio_unitario": precio_lista,
+                    "descuento_linea": descuento_linea,
+                    "subtotal": subtotal_linea,
+                })
+
+            # Regla contable: total = subtotal - descuento + impuesto
+            impuesto_calculado = ((subtotal_acumulado - descuento_acumulado) * TASA_IVA).quantize(Decimal("0.01"))
+            total_a_pagar = (subtotal_acumulado - descuento_acumulado) + impuesto_calculado
+
+            metodo_pago = pago.get("metodo", "efectivo")
+            monto_recibido = Decimal(str(pago.get("monto_recibido") or "0.00"))
+            cambio = Decimal("0.00")
+
+            # 5. Validaciones según método de pago
+            if metodo_pago == "efectivo":
+                if monto_recibido < total_a_pagar:
+                    faltante = total_a_pagar - monto_recibido
+                    raise api_error(
+                        422,
+                        "SALDO_INSUFICIENTE",
+                        f"Efectivo insuficiente. Total: {total_a_pagar:.2f}, Recibido: {monto_recibido:.2f}, Faltante: {faltante:.2f}",
+                    )
+                cambio = monto_recibido - total_a_pagar
+            elif metodo_pago == "qr":
+                referencia = pago.get("referencia")
+                if not referencia or not referencia.strip():
+                    raise api_error(422, "REFERENCIA_REQUERIDA", "El pago QR requiere código o número de referencia bancaria")
+            elif metodo_pago == "tarjeta":
+                pass  # Será confirmado vía Stripe PaymentIntent
+            else:
+                raise api_error(422, "METODO_NO_SOPORTADO", f"Método de pago '{metodo_pago}' no soportado")
+
+            # 6. Generar correlativo de venta
+            correlativo_val = await conn.fetchval(
+                "SELECT COUNT(*) + 1 FROM venta WHERE empresa_id = $1", UUID(empresa_id)
+            )
+            prefijo_suc = sucursal_id[:4].upper()
+            numero_venta = f"POS-{prefijo_suc}-{correlativo_val:05d}"
+
+            variantes_ordenadas = sorted(lineas_procesadas, key=lambda x: str(x["variante_id"]))
+            var_uuids_sorted = [x["variante_id"] for x in variantes_ordenadas]
+            inv_rows = await conn.fetch(
+                """
+                SELECT variante_id, stock_fisico, stock_reservado, stock_disponible
+                  FROM inventario
+                 WHERE empresa_id = $1 AND sucursal_id = $2 AND variante_id = ANY($3::uuid[])
+                 FOR UPDATE
                 """,
                 UUID(empresa_id),
-                numero_venta,
                 UUID(sucursal_id),
-                UUID(user_id),
-                subtotal_acumulado,
-                descuento_acumulado,
-                impuesto_calculado,
-                total_a_pagar,
-                idempotency_key,
-                cliente_nombre,
-                cliente_documento,
-                UUID(dispositivo_id) if dispositivo_id else None,
+                var_uuids_sorted,
             )
-            venta_id = venta_row["id"]
+            inv_dict = {str(r["variante_id"]): r for r in inv_rows}
 
-            for lin in lineas_procesadas:
+            faltantes = []
+            for lin in variantes_ordenadas:
+                vid_str = str(lin["variante_id"])
+                stock_info = inv_dict.get(vid_str)
+                disp = stock_info["stock_disponible"] if stock_info else 0
+                if disp < lin["cantidad"]:
+                    faltantes.append({
+                        "variante_id": vid_str,
+                        "solicitado": lin["cantidad"],
+                        "disponible": disp,
+                    })
+
+            if faltantes:
+                raise api_error(
+                    409,
+                    "STOCK_INSUFICIENTE",
+                    f"Existencias insuficientes en sucursal para: {faltantes}",
+                )
+
+            qr_nonce = secrets.token_hex(8)
+            ahora_iso = await conn.fetchval("SELECT now()::text")
+            firma_qr = _generar_firma_pos(empresa_id, numero_venta, total_a_pagar, str(ahora_iso), qr_nonce)
+
+            # 7. Si es Tarjeta, guardar venta 'pendiente_pago' y confirmar intención fuera de esta tx
+            if metodo_pago == "tarjeta":
+                venta_row = await conn.fetchrow(
+                    """
+                    INSERT INTO venta (
+                        empresa_id, numero, sucursal_id, cajero_id, canal,
+                        subtotal, descuento, impuesto, total, estado,
+                        idempotency_key, firma_qr, qr_nonce, firma_algoritmo,
+                        cliente_nombre, cliente_documento, dispositivo_id, moneda
+                    )
+                    VALUES (
+                        $1, $2, $3, $4, 'POS',
+                        $5, $6, $7, $8, 'pendiente_pago',
+                        $9, $10, $11, 'HMAC-SHA256',
+                        $12, $13, $14, 'BOB'
+                    )
+                    RETURNING id
+                    """,
+                    UUID(empresa_id),
+                    numero_venta,
+                    UUID(sucursal_id),
+                    UUID(user_id),
+                    subtotal_acumulado,
+                    descuento_acumulado,
+                    impuesto_calculado,
+                    total_a_pagar,
+                    idempotency_key,
+                    firma_qr,
+                    qr_nonce,
+                    cliente_nombre,
+                    cliente_documento,
+                    UUID(dispositivo_id) if dispositivo_id else None,
+                )
+                venta_id = venta_row["id"]
+
+                for lin in variantes_ordenadas:
+                    await conn.execute(
+                        """
+                        INSERT INTO venta_detalle (
+                            empresa_id, venta_id, variante_id, cantidad,
+                            precio_lista, precio_unitario, descuento_linea, subtotal
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                        """,
+                        UUID(empresa_id),
+                        venta_id,
+                        lin["variante_id"],
+                        lin["cantidad"],
+                        lin["precio_lista"],
+                        lin["precio_unitario"],
+                        lin["descuento_linea"],
+                        lin["subtotal"],
+                    )
+
                 await conn.execute(
                     """
-                    INSERT INTO venta_detalle (
-                        empresa_id, venta_id, variante_id, cantidad,
-                        precio_lista, precio_unitario, descuento_linea, subtotal
+                    INSERT INTO venta_estado_historial (
+                        empresa_id, venta_id, estado_anterior, estado_nuevo, motivo, usuario_id
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    VALUES ($1, $2, NULL, 'pendiente_pago', 'Venta POS pendiente de cobro con tarjeta', $3)
                     """,
                     UUID(empresa_id),
                     venta_id,
-                    lin["variante_id"],
-                    lin["cantidad"],
-                    lin["precio_lista"],
-                    lin["precio_unitario"],
-                    lin["descuento_linea"],
-                    lin["subtotal"],
+                    UUID(user_id),
                 )
 
-            # Delegar intención en pago_service
-            from app.services import pago_service
-            intencion = await pago_service.crear_intencion_pago(
-                empresa_id=empresa_id,
-                user_id=user_id,
-                rol=rol,
-                venta_id=str(venta_id),
-                idempotency_key=f"card_{idempotency_key}",
-                ip=ip,
-            )
+                pending_card_sale = {
+                    "venta_id": str(venta_id),
+                    "numero": numero_venta,
+                    "total": total_a_pagar,
+                }
+            else:
+                # 8. Para Efectivo y QR: ATOMICIDAD TOTAL (Descuento + Venta + Pago + Kárdex)
+                venta_row = await conn.fetchrow(
+                    """
+                    INSERT INTO venta (
+                        empresa_id, numero, sucursal_id, cajero_id, canal,
+                        subtotal, descuento, impuesto, total, estado,
+                        idempotency_key, firma_qr, qr_nonce, firma_algoritmo,
+                        cliente_nombre, cliente_documento, dispositivo_id, moneda
+                    )
+                    VALUES (
+                        $1, $2, $3, $4, 'POS',
+                        $5, $6, $7, $8, 'completada',
+                        $9, $10, $11, 'HMAC-SHA256',
+                        $12, $13, $14, 'BOB'
+                    )
+                    RETURNING id, created_at
+                    """,
+                    UUID(empresa_id),
+                    numero_venta,
+                    UUID(sucursal_id),
+                    UUID(user_id),
+                    subtotal_acumulado,
+                    descuento_acumulado,
+                    impuesto_calculado,
+                    total_a_pagar,
+                    idempotency_key,
+                    firma_qr,
+                    qr_nonce,
+                    cliente_nombre,
+                    cliente_documento,
+                    UUID(dispositivo_id) if dispositivo_id else None,
+                )
+                venta_id = venta_row["id"]
 
-            return {
-                "venta_id": str(venta_id),
-                "numero": numero_venta,
-                "total": total_a_pagar,
-                "cambio": Decimal("0.00"),
+                # Insertar venta_detalle y descontar inventario con Kárdex
+                for lin in variantes_ordenadas:
+                    await conn.execute(
+                        """
+                        INSERT INTO venta_detalle (
+                            empresa_id, venta_id, variante_id, cantidad,
+                            precio_lista, precio_unitario, descuento_linea, subtotal
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                        """,
+                        UUID(empresa_id),
+                        venta_id,
+                        lin["variante_id"],
+                        lin["cantidad"],
+                        lin["precio_lista"],
+                        lin["precio_unitario"],
+                        lin["descuento_linea"],
+                        lin["subtotal"],
+                    )
+
+                    vid_str = str(lin["variante_id"])
+                    stock_prev = inv_dict[vid_str]["stock_fisico"]
+                    stock_post = stock_prev - lin["cantidad"]
+
+                    # Actualizar inventario físico
+                    await conn.execute(
+                        """
+                        UPDATE inventario
+                           SET stock_fisico = stock_fisico - $1,
+                               actualizado_en = now()
+                         WHERE empresa_id = $2 AND sucursal_id = $3 AND variante_id = $4
+                        """,
+                        lin["cantidad"],
+                        UUID(empresa_id),
+                        UUID(sucursal_id),
+                        lin["variante_id"],
+                    )
+
+                    # Insertar movimiento kárdex (particionado)
+                    await conn.execute(
+                        """
+                        INSERT INTO movimiento_inventario (
+                            empresa_id, variante_id, sucursal_id, tipo,
+                            cantidad, stock_anterior, stock_nuevo,
+                            referencia_tipo, referencia_id, motivo, usuario_id
+                        )
+                        VALUES (
+                            $1, $2, $3, 'venta',
+                            $4, $5, $6,
+                            'venta_pos', $7, 'Venta presencial en mostrador', $8
+                        )
+                        """,
+                        UUID(empresa_id),
+                        lin["variante_id"],
+                        UUID(sucursal_id),
+                        -lin["cantidad"],
+                        stock_prev,
+                        stock_post,
+                        venta_id,
+                        UUID(user_id),
+                    )
+
+                # Insertar pago completado
+                await conn.execute(
+                    """
+                    INSERT INTO pago (
+                        empresa_id, venta_id, monto, moneda, metodo,
+                        idempotency_key, estado, referencia, pagado_en
+                    )
+                    VALUES ($1, $2, $3, 'BOB', $4, $5, 'completado', $6, now())
+                    """,
+                    UUID(empresa_id),
+                    venta_id,
+                    total_a_pagar,
+                    metodo_pago,
+                    f"pago_{idempotency_key}",
+                    pago.get("referencia") or f"Cobro en mostrador ({metodo_pago})",
+                )
+
+                # Historial de estado
+                await conn.execute(
+                    """
+                    INSERT INTO venta_estado_historial (
+                        empresa_id, venta_id, estado_anterior, estado_nuevo, motivo, usuario_id
+                    )
+                    VALUES ($1, $2, NULL, 'completada', 'Venta y cobro directo en POS', $3)
+                    """,
+                    UUID(empresa_id),
+                    venta_id,
+                    UUID(user_id),
+                )
+
+    if existing_immediate_sale is not None:
+        return existing_immediate_sale
+
+    if existing_card_sale is not None:
+        from app.services import pago_service
+        intencion = await pago_service.crear_intencion_pago(
+            empresa_id=empresa_id,
+            user_id=user_id,
+            rol=rol,
+            venta_id=existing_card_sale["venta_id"],
+            idempotency_key=f"card_{idempotency_key}",
+            ip=ip,
+        )
+        return {
+            **existing_card_sale,
+            "intencion_pago": intencion,
+        }
+
+    if pending_card_sale is not None:
+        from app.services import pago_service
+        intencion = await pago_service.crear_intencion_pago(
+            empresa_id=empresa_id,
+            user_id=user_id,
+            rol=rol,
+            venta_id=pending_card_sale["venta_id"],
+            idempotency_key=f"card_{idempotency_key}",
+            ip=ip,
+        )
+        actor_tipo = "superadmin" if rol == "superadmin" else "usuario"
+        await audit_event(
+            empresa_id=empresa_id,
+            usuario_id=user_id,
+            actor_tipo=actor_tipo,
+            accion="insert",
+            entidad="venta",
+            entidad_id=pending_card_sale["venta_id"],
+            datos_despues={
+                "numero": pending_card_sale["numero"],
+                "total": str(pending_card_sale["total"]),
+                "canal": "POS",
                 "metodo_pago": "tarjeta",
                 "estado": "pendiente_pago",
-                "intencion_pago": intencion,
-                "comprobante_url": f"/api/v1/ventas/{venta_id}/ticket",
-            }
-
-        # 8. Para Efectivo y QR: ATOMICIDAD TOTAL (Bloqueo de inventario + Descuento + Venta + Pago + Kárdex)
-        # Ordenar variante_ids para prevenir deadlocks (RNF04)
-        variantes_ordenadas = sorted(lineas_procesadas, key=lambda x: str(x["variante_id"]))
-
-        # Bloquear filas de inventario
-        var_uuids_sorted = [x["variante_id"] for x in variantes_ordenadas]
-        inv_rows = await conn.fetch(
-            """
-            SELECT variante_id, stock_fisico, stock_reservado, stock_disponible
-              FROM inventario
-             WHERE empresa_id = $1 AND sucursal_id = $2 AND variante_id = ANY($3::uuid[])
-             FOR UPDATE
-            """,
-            UUID(empresa_id),
-            UUID(sucursal_id),
-            var_uuids_sorted,
+            },
+            ip=ip,
+            es_accion_superadmin=(rol == "superadmin"),
         )
-        inv_dict = {str(r["variante_id"]): r for r in inv_rows}
-
-        faltantes = []
-        for lin in variantes_ordenadas:
-            vid_str = str(lin["variante_id"])
-            stock_info = inv_dict.get(vid_str)
-            disp = stock_info["stock_disponible"] if stock_info else 0
-            if disp < lin["cantidad"]:
-                faltantes.append({
-                    "variante_id": vid_str,
-                    "solicitado": lin["cantidad"],
-                    "disponible": disp,
-                })
-
-        if faltantes:
-            raise api_error(
-                409,
-                "STOCK_INSUFICIENTE",
-                f"Existencias insuficientes en sucursal para: {faltantes}",
-            )
-
-        # Generar firma criptográfica para QR
-        qr_nonce = secrets.token_hex(8)
-        ahora_iso = await conn.fetchval("SELECT now()::text")
-        firma_qr = _generar_firma_pos(empresa_id, numero_venta, total_a_pagar, str(ahora_iso), qr_nonce)
-
-        # Insertar venta en 'completada'
-        venta_row = await conn.fetchrow(
-            """
-            INSERT INTO venta (
-                empresa_id, numero, sucursal_id, cajero_id, canal,
-                subtotal, descuento, impuesto, total, estado,
-                idempotency_key, firma_qr, qr_nonce, firma_algoritmo,
-                cliente_nombre, cliente_documento, dispositivo_id, moneda
-            )
-            VALUES (
-                $1, $2, $3, $4, 'POS',
-                $5, $6, $7, $8, 'completada',
-                $9, $10, $11, 'HMAC-SHA256',
-                $12, $13, $14, 'BOB'
-            )
-            RETURNING id, created_at
-            """,
-            UUID(empresa_id),
-            numero_venta,
-            UUID(sucursal_id),
-            UUID(user_id),
-            subtotal_acumulado,
-            descuento_acumulado,
-            impuesto_calculado,
-            total_a_pagar,
-            idempotency_key,
-            firma_qr,
-            qr_nonce,
-            cliente_nombre,
-            cliente_documento,
-            UUID(dispositivo_id) if dispositivo_id else None,
-        )
-        venta_id = venta_row["id"]
-
-        # Insertar venta_detalle y descontar inventario con Kárdex
-        for lin in variantes_ordenadas:
-            await conn.execute(
-                """
-                INSERT INTO venta_detalle (
-                    empresa_id, venta_id, variante_id, cantidad,
-                    precio_lista, precio_unitario, descuento_linea, subtotal
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                """,
-                UUID(empresa_id),
-                venta_id,
-                lin["variante_id"],
-                lin["cantidad"],
-                lin["precio_lista"],
-                lin["precio_unitario"],
-                lin["descuento_linea"],
-                lin["subtotal"],
-            )
-
-            vid_str = str(lin["variante_id"])
-            stock_prev = inv_dict[vid_str]["stock_fisico"]
-            stock_post = stock_prev - lin["cantidad"]
-
-            # Actualizar inventario físico
-            await conn.execute(
-                """
-                UPDATE inventario
-                   SET stock_fisico = stock_fisico - $1,
-                       actualizado_en = now()
-                 WHERE empresa_id = $2 AND sucursal_id = $3 AND variante_id = $4
-                """,
-                lin["cantidad"],
-                UUID(empresa_id),
-                UUID(sucursal_id),
-                lin["variante_id"],
-            )
-
-            # Insertar movimiento kárdex (particionado)
-            await conn.execute(
-                """
-                INSERT INTO movimiento_inventario (
-                    empresa_id, variante_id, sucursal_id, tipo,
-                    cantidad, stock_anterior, stock_nuevo,
-                    referencia_tipo, referencia_id, motivo, usuario_id
-                )
-                VALUES (
-                    $1, $2, $3, 'venta',
-                    $4, $5, $6,
-                    'venta_pos', $7, 'Venta presencial en mostrador', $8
-                )
-                """,
-                UUID(empresa_id),
-                lin["variante_id"],
-                UUID(sucursal_id),
-                -lin["cantidad"],
-                stock_prev,
-                stock_post,
-                venta_id,
-                UUID(user_id),
-            )
-
-        # Insertar pago completado
-        await conn.execute(
-            """
-            INSERT INTO pago (
-                empresa_id, venta_id, monto, moneda, metodo,
-                idempotency_key, estado, referencia, pagado_en
-            )
-            VALUES ($1, $2, $3, 'BOB', $4, $5, 'completado', $6, now())
-            """,
-            UUID(empresa_id),
-            venta_id,
-            total_a_pagar,
-            metodo_pago,
-            f"pago_{idempotency_key}",
-            pago.get("referencia") or f"Cobro en mostrador ({metodo_pago})",
-        )
-
-        # Historial de estado
-        await conn.execute(
-            """
-            INSERT INTO venta_estado_historial (
-                empresa_id, venta_id, estado_anterior, estado_nuevo, motivo, usuario_id
-            )
-            VALUES ($1, $2, NULL, 'completada', 'Venta y cobro directo en POS', $3)
-            """,
-            UUID(empresa_id),
-            venta_id,
-            UUID(user_id),
-        )
+        return {
+            "venta_id": pending_card_sale["venta_id"],
+            "numero": pending_card_sale["numero"],
+            "total": pending_card_sale["total"],
+            "cambio": Decimal("0.00"),
+            "metodo_pago": "tarjeta",
+            "estado": "pendiente_pago",
+            "intencion_pago": intencion,
+            "comprobante_url": f"/api/v1/ventas/{pending_card_sale['venta_id']}/ticket",
+        }
 
     # Auditoría
     actor_tipo = "superadmin" if rol == "superadmin" else "usuario"

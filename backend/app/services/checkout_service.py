@@ -211,6 +211,34 @@ async def _validar_cupon(
 # Endpoints públicos
 # ---------------------------------------------------------------------------
 
+async def listar_direcciones_cliente(empresa_id: str, user_id: str) -> list[dict]:
+    """Lista las direcciones activas del cliente dentro del tenant actual."""
+    async with tenant_connection(empresa_id, user_id) as conn:
+        rows = await conn.fetch(
+            """
+            SELECT d.id,
+                   d.etiqueta,
+                   d.destinatario,
+                   d.telefono,
+                   d.linea1,
+                   d.linea2,
+                   c.nombre AS ciudad,
+                   c.departamento,
+                   d.referencia,
+                   d.es_principal
+              FROM direccion_cliente d
+              JOIN ciudad c ON c.id = d.ciudad_id
+             WHERE d.empresa_id = $1
+               AND d.usuario_id = $2
+               AND d.deleted_at IS NULL
+             ORDER BY d.es_principal DESC, d.created_at ASC
+            """,
+            UUID(empresa_id),
+            UUID(user_id),
+        )
+        return [dict(r) for r in rows]
+
+
 async def validar_checkout(
     empresa_id: str,
     user_id: str,
@@ -244,6 +272,15 @@ async def validar_checkout(
             despacho_id = str(suc["id"])
             despacho_nombre = suc["nombre"]
         else:
+            dir_row = await conn.fetchrow(
+                """
+                SELECT id FROM direccion_cliente
+                 WHERE id=$1 AND empresa_id=$2 AND usuario_id=$3 AND deleted_at IS NULL
+                """,
+                UUID(direccion_id), UUID(empresa_id), UUID(user_id),
+            )
+            if dir_row is None:
+                raise api_error(404, "DIRECCION_NO_ENCONTRADA", "La dirección de envío seleccionada no existe")
             despacho_id, despacho_nombre = await _buscar_sucursal_despacho(conn, empresa_id, items)
 
         lineas_faltantes = []
@@ -333,6 +370,15 @@ async def crear_orden(
                 raise api_error(404, "SUCURSAL_NO_ENCONTRADA", "La sucursal seleccionada no existe")
             despacho_id = str(suc["id"])
         else:
+            dir_row = await conn.fetchrow(
+                """
+                SELECT id FROM direccion_cliente
+                 WHERE id=$1 AND empresa_id=$2 AND usuario_id=$3 AND deleted_at IS NULL
+                """,
+                UUID(direccion_id), UUID(empresa_id), UUID(user_id),
+            )
+            if dir_row is None:
+                raise api_error(404, "DIRECCION_NO_ENCONTRADA", "La dirección de envío seleccionada no existe")
             despacho_id, _ = await _buscar_sucursal_despacho(conn, empresa_id, items)
 
         # Calcular totales
@@ -474,7 +520,7 @@ async def finalizar_venta_pagada(
     async with tenant_connection(empresa_id) as conn:
         venta = await conn.fetchrow(
             """
-            SELECT id, numero, estado, sucursal_id, usuario_id, cupon_id, total
+            SELECT id, numero, estado, sucursal_id, usuario_id, cajero_id, cupon_id, total
               FROM venta
              WHERE id=$1 AND empresa_id=$2
             """,
@@ -488,11 +534,13 @@ async def finalizar_venta_pagada(
             logger.info("Venta %s ya está completada, omitiendo", venta_id)
             return
 
-        if venta["estado"] not in ("pendiente_pago", "pagada"):
+        if venta["estado"] not in ("pendiente_pago", "pagada", "pago_fallido"):
             raise api_error(
                 422, "ESTADO_INVALIDO",
                 f"La venta está en estado '{venta['estado']}' y no se puede completar",
             )
+
+        actor_usuario_id = venta["usuario_id"] or venta["cajero_id"]
 
         # Cargar líneas de detalle
         lineas = await conn.fetch(
@@ -575,7 +623,7 @@ async def finalizar_venta_pagada(
                     """,
                     UUID(empresa_id), sucursal_id, variante_id,
                     -cantidad, stock_anterior, stock_nuevo,
-                    UUID(venta_id), venta["usuario_id"],
+                    UUID(venta_id), actor_usuario_id,
                 )
 
         # Actualizar estado venta: pendiente_pago → pagada → completada.
@@ -590,7 +638,7 @@ async def finalizar_venta_pagada(
         )
 
         # Registrar uso de cupón
-        if venta["cupon_id"]:
+        if venta["cupon_id"] and venta["usuario_id"]:
             existing_uso = await conn.fetchval(
                 "SELECT id FROM cupon_uso WHERE empresa_id=$1 AND cupon_id=$2 AND venta_id=$3",
                 UUID(empresa_id), venta["cupon_id"], UUID(venta_id),
@@ -606,17 +654,18 @@ async def finalizar_venta_pagada(
                 )
 
         # Marcar carrito como convertido
-        await conn.execute(
-            """
-            UPDATE carrito SET estado='convertido', updated_at=now()
-             WHERE empresa_id=$1 AND usuario_id=$2 AND estado='activo'
-            """,
-            UUID(empresa_id), venta["usuario_id"],
-        )
+        if venta["usuario_id"]:
+            await conn.execute(
+                """
+                UPDATE carrito SET estado='convertido', updated_at=now()
+                 WHERE empresa_id=$1 AND usuario_id=$2 AND estado='activo'
+                """,
+                UUID(empresa_id), venta["usuario_id"],
+            )
 
     await audit_event(
         empresa_id=empresa_id,
-        usuario_id=str(venta["usuario_id"]) if venta["usuario_id"] else None,
+        usuario_id=str(actor_usuario_id) if actor_usuario_id else None,
         actor_tipo="sistema",
         accion="update",
         entidad="venta",

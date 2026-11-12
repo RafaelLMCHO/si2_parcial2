@@ -212,6 +212,11 @@ def test_cu24_offline_gateway_selection(monkeypatch):
     monkeypatch.setenv("PYTEST_CURRENT_TEST", "test_cu24_offline_gateway_selection")
     assert isinstance(pago_service.get_gateway(), pago_service.MockGateway)
 
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.setenv("STRIPE_ALLOW_MOCK", "true")
+    assert isinstance(pago_service.get_gateway(), pago_service.MockGateway)
+    monkeypatch.delenv("STRIPE_ALLOW_MOCK", raising=False)
+
     monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_sandbox_fake_key")
     gw = pago_service.get_gateway()
     assert isinstance(gw, pago_service.StripeGateway)
@@ -250,6 +255,7 @@ async def test_cu24_offline_stripe_gateway_operations(monkeypatch):
     assert intent["id"] == "pi_test_123"
     assert intent["client_secret"] == "pi_test_123_secret_abc"
     assert calls["create"]["amount"] == 2500
+    assert calls["create"]["automatic_payment_methods"] == {"enabled": True, "allow_redirects": "never"}
 
     consulted = await gw.consultar_intencion("pi_test_123")
     assert consulted["status"] == "succeeded"
@@ -357,4 +363,173 @@ async def test_cu24_offline_webhook_firma_y_conciliacion(monkeypatch):
     second = await pago_service.procesar_webhook_stripe(b"{}", signature="t=1,v1=valid")
     assert second["status"] == "already_processed"
     assert len(finalized_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_cu24_offline_pos_out_and_finalizar_pos_sin_usuario(monkeypatch):
+    """CU-23/24 (offline): PosVentaOut conserva intencion_pago y finalizar_venta_pagada soporta POS y pago_fallido."""
+    from contextlib import asynccontextmanager
+    from app.schemas.venta import PosVentaOut
+    from app.services import checkout_service
+
+    emp_id = uuid.uuid4()
+    venta_id = uuid.uuid4()
+    suc_id = uuid.uuid4()
+    cajero_id = uuid.uuid4()
+    var_id = uuid.uuid4()
+
+    out = PosVentaOut(
+        venta_id=venta_id,
+        numero="POS-1111-00001",
+        total=113.0,
+        cambio=0.0,
+        metodo_pago="tarjeta",
+        estado="pendiente_pago",
+        comprobante_url=f"/api/v1/ventas/{venta_id}/ticket",
+        intencion_pago={
+            "pago_id": str(uuid.uuid4()),
+            "client_secret": "pi_mock_1_secret_mock",
+            "publishable_key": "pk_test_demo",
+            "monto": 11300,
+            "moneda": "usd",
+        },
+    )
+    assert out.intencion_pago is not None
+    assert out.intencion_pago["monto"] == 11300
+
+    executed = []
+
+    class FakeConn:
+        async def fetchrow(self, sql, *args):
+            if "FROM venta" in sql:
+                return {
+                    "id": venta_id,
+                    "numero": "POS-1111-00001",
+                    "estado": "pago_fallido",
+                    "sucursal_id": suc_id,
+                    "usuario_id": None,
+                    "cajero_id": cajero_id,
+                    "cupon_id": None,
+                    "total": 113.0,
+                }
+            return None
+
+        async def fetch(self, sql, *args):
+            if "FROM venta_detalle" in sql:
+                return [{"id": uuid.uuid4(), "variante_id": var_id, "cantidad": 2}]
+            if "FROM inventario" in sql:
+                return [{"variante_id": var_id, "stock_fisico": 5}]
+            return []
+
+        async def execute(self, sql, *args):
+            executed.append((sql.strip(), args))
+            return "UPDATE 1"
+
+    @asynccontextmanager
+    async def fake_tenant_conn(*args, **kwargs):
+        yield FakeConn()
+
+    async def fake_audit(**kwargs):
+        return None
+
+    monkeypatch.setattr(checkout_service, "tenant_connection", fake_tenant_conn)
+    monkeypatch.setattr(checkout_service, "audit_event", fake_audit)
+
+    await checkout_service.finalizar_venta_pagada(
+        empresa_id=str(emp_id),
+        venta_id=str(venta_id),
+        pago_id=str(uuid.uuid4()),
+    )
+
+    mov_calls = [args for sql, args in executed if "INSERT INTO movimiento_inventario" in sql]
+    assert len(mov_calls) == 1
+    assert mov_calls[0][-1] == cajero_id
+    assert not any("UPDATE carrito" in sql for sql, _ in executed)
+
+
+@pytest.mark.asyncio
+async def test_cu24_offline_pos_tarjeta_commits_before_intencion(monkeypatch):
+    """CU-23/24 (offline): crear_venta_pos con tarjeta confirma la transacción antes de crear la intención Stripe."""
+    from contextlib import asynccontextmanager
+    from app.services import pos_service
+
+    emp_id = uuid.uuid4()
+    cajero_id = uuid.uuid4()
+    suc_id = uuid.uuid4()
+    var_id = uuid.uuid4()
+    venta_id = uuid.uuid4()
+
+    tx_state = {"in_tx": False, "committed": False, "seen_committed_in_intencion": False}
+
+    class FakePosConn:
+        async def fetchrow(self, sql, *args):
+            if "idempotency_key" in sql and "FROM venta" in sql:
+                return None
+            if "FROM usuario" in sql:
+                return {"sucursal_id": suc_id}
+            if "INSERT INTO venta" in sql:
+                return {"id": venta_id}
+            return None
+
+        async def fetchval(self, sql, *args):
+            if "FROM sucursal" in sql:
+                return suc_id
+            if "COUNT(*) + 1 FROM venta" in sql:
+                return 7
+            if "SELECT now()" in sql:
+                return "2026-11-11 22:00:00+00"
+            return None
+
+        async def fetch(self, sql, *args):
+            if "FROM variante" in sql:
+                return [{"id": var_id, "precio_venta": 100.0, "sku": "SKU-1"}]
+            if "FROM inventario" in sql:
+                return [{"variante_id": var_id, "stock_fisico": 4, "stock_reservado": 0, "stock_disponible": 4}]
+            return []
+
+        async def execute(self, sql, *args):
+            return "INSERT 0 1"
+
+    @asynccontextmanager
+    async def fake_tenant_conn(*args, **kwargs):
+        tx_state["in_tx"] = True
+        try:
+            yield FakePosConn()
+        finally:
+            tx_state["in_tx"] = False
+            tx_state["committed"] = True
+
+    async def fake_crear_intencion_pago(**kwargs):
+        tx_state["seen_committed_in_intencion"] = tx_state["committed"] and not tx_state["in_tx"]
+        assert tx_state["seen_committed_in_intencion"] is True
+        return {
+            "pago_id": str(uuid.uuid4()),
+            "client_secret": "pi_mock_secret",
+            "publishable_key": "pk_test_demo",
+            "monto": 11300,
+            "moneda": "usd",
+        }
+
+    async def fake_audit(**kwargs):
+        return None
+
+    monkeypatch.setattr(pos_service, "tenant_connection", fake_tenant_conn)
+    monkeypatch.setattr(pos_service, "audit_event", fake_audit)
+    monkeypatch.setattr(pago_service, "crear_intencion_pago", fake_crear_intencion_pago)
+
+    res = await pos_service.crear_venta_pos(
+        empresa_id=str(emp_id),
+        user_id=str(cajero_id),
+        rol="cajero",
+        idempotency_key="pos-card-idem-1",
+        items=[{"variante_id": str(var_id), "cantidad": 1}],
+        cliente={"tipo": "consumidor_final"},
+        pago={"metodo": "tarjeta"},
+    )
+
+    assert tx_state["seen_committed_in_intencion"] is True
+    assert res["estado"] == "pendiente_pago"
+    assert res["metodo_pago"] == "tarjeta"
+    assert res["intencion_pago"]["monto"] == 11300
+
 

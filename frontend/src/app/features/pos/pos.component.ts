@@ -1,6 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { of, switchMap, throwError } from 'rxjs';
+import { apiErrorMessage } from '../../core/error-mapper';
+import { PagoService } from '../../core/pago.service';
 import { PosService } from '../../core/pos.service';
 
 interface PosLinea {
@@ -290,10 +293,10 @@ interface PosLinea {
           type="button"
           class="btn-charge-main"
           (click)="cobrarVenta()"
-          [disabled]="lineas.length === 0 || (metodoPago === 'efectivo' && cambio < 0)"
+          [disabled]="lineas.length === 0 || procesandoCobro || (metodoPago === 'efectivo' && cambio < 0)"
         >
           <span class="charge-icon">⚡</span>
-          <span class="charge-label">FINALIZAR Y COBRAR (F12)</span>
+          <span class="charge-label">{{ procesandoCobro ? 'PROCESANDO COBRO...' : 'FINALIZAR Y COBRAR (F12)' }}</span>
         </button>
       </aside>
 
@@ -1254,9 +1257,13 @@ export class PosComponent implements OnInit {
   subtotalNeto = 0;
   referenciaPago = '';
   mensajeError = '';
+  procesandoCobro = false;
   ticketImprimir: any = null;
 
-  constructor(private readonly posService: PosService) {}
+  constructor(
+    private readonly posService: PosService,
+    private readonly pagoService: PagoService
+  ) {}
 
   ngOnInit(): void {
     setTimeout(() => this.scannerInput?.nativeElement?.focus(), 300);
@@ -1343,7 +1350,9 @@ export class PosComponent implements OnInit {
   }
 
   cobrarVenta(): void {
+    if (this.procesandoCobro || this.lineas.length === 0) return;
     this.mensajeError = '';
+    this.procesandoCobro = true;
     const idempotencyKey = crypto.randomUUID();
 
     const payload = {
@@ -1364,27 +1373,67 @@ export class PosComponent implements OnInit {
       },
     };
 
-    this.posService.registrarVenta(payload).subscribe({
-      next: (resp) => {
-        this.posService.imprimirTicket(resp.venta_id).subscribe({
-          next: (ticketData) => {
-            this.ticketImprimir = ticketData;
-          },
-          error: () => {
-            // Fallback elegante en caso de offline
-            this.ticketImprimir = {
-              empresa_nombre: 'FASHION STORE S.A.',
-              numero: resp.numero || 'VENTA-' + resp.venta_id.slice(0, 8),
-              fecha_hora: new Date(),
-              total: this.totalAPagar,
-            };
+    this.posService
+      .registrarVenta(payload)
+      .pipe(
+        switchMap((resp) => {
+          if (this.metodoPago === 'tarjeta' && resp.estado === 'pendiente_pago') {
+            const pagoId = resp.intencion_pago?.pago_id;
+            if (!pagoId) {
+              return throwError(() => new Error('No se recibió el identificador de pago Stripe para confirmar el cobro con tarjeta.'));
+            }
+            return this.pagoService.conciliarPago(pagoId, 'pm_card_visa').pipe(
+              switchMap((estado) => {
+                if (estado.venta_estado === 'completada' || estado.pago_estado === 'completado') {
+                  return of(resp);
+                }
+                return throwError(
+                  () => new Error(estado.mensaje_error || `El cobro con tarjeta quedó pendiente (${estado.pago_estado || estado.venta_estado}).`)
+                );
+              })
+            );
           }
-        });
-      },
-      error: (err) => {
-        this.mensajeError = err?.message || err?.error?.detail?.message || 'Error al procesar cobro en mostrador';
-      },
-    });
+          return of(resp);
+        })
+      )
+      .subscribe({
+        next: (resp) => {
+          this.procesandoCobro = false;
+          this.posService.imprimirTicket(resp.venta_id).subscribe({
+            next: (ticketData) => {
+              const t = ticketData?.ticket ?? ticketData;
+              this.ticketImprimir = t
+                ? {
+                    ...t,
+                    empresa_nombre: t.empresa_nombre ?? t.empresa,
+                    empresa_nit: t.empresa_nit ?? t.nit,
+                    sucursal_nombre: t.sucursal_nombre ?? t.sucursal,
+                    sucursal_direccion: t.sucursal_direccion ?? t.direccion,
+                    fecha_hora: t.fecha_hora ?? t.fecha,
+                    cliente_nombre: t.cliente_nombre ?? t.cliente,
+                    cliente_documento: t.cliente_documento ?? t.documento,
+                  }
+                : null;
+            },
+            error: () => {
+              // Fallback elegante en caso de offline
+              this.ticketImprimir = {
+                empresa_nombre: 'FASHION STORE S.A.',
+                numero: resp.numero || 'VENTA-' + resp.venta_id.slice(0, 8),
+                fecha_hora: new Date(),
+                total: this.totalAPagar,
+              };
+            },
+          });
+        },
+        error: (err) => {
+          this.procesandoCobro = false;
+          this.mensajeError =
+            err instanceof Error
+              ? err.message
+              : apiErrorMessage(err, 'Error al procesar cobro en mostrador');
+        },
+      });
   }
 
   imprimirTicket(): void {

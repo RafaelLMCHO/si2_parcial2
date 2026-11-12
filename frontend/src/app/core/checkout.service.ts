@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { Carrito } from './models';
+import { Carrito, DireccionCliente } from './models';
 
 @Injectable({
   providedIn: 'root',
@@ -34,6 +34,10 @@ export class CheckoutService {
   }
 
   // Checkout
+  listarDirecciones(): Observable<{ items: DireccionCliente[] }> {
+    return this.http.get<{ items: DireccionCliente[] }>(`${this.baseUrl}/direcciones`);
+  }
+
   validarCheckout(payload: {
     tipo_entrega: 'envio' | 'recojo';
     direccion_id?: string;

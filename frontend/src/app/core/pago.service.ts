@@ -44,6 +44,11 @@ export class PagoService {
     return this.http.get<EstadoPagoResponse>(`${this.baseUrl}/ventas/${ventaId}/estado-pago`);
   }
 
+  conciliarPago(pagoId: string, paymentMethod: string = 'pm_card_visa'): Observable<EstadoPagoResponse> {
+    const params = new HttpParams().set('payment_method', paymentMethod);
+    return this.http.post<EstadoPagoResponse>(`${this.baseUrl}/${pagoId}/conciliar`, {}, { params });
+  }
+
   getPago(pagoId: string): Observable<any> {
     return this.http.get(`${this.baseUrl}/${pagoId}`);
   }

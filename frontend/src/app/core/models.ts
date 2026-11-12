@@ -453,6 +453,26 @@ export interface PosVentaResponse {
   metodo_pago: string;
   estado: string;
   comprobante_url: string;
+  intencion_pago?: {
+    pago_id: string;
+    client_secret: string;
+    publishable_key: string;
+    monto: number;
+    moneda: string;
+  } | null;
+}
+
+export interface DireccionCliente {
+  id: string;
+  etiqueta?: string | null;
+  destinatario: string;
+  telefono: string;
+  linea1: string;
+  linea2?: string | null;
+  ciudad: string;
+  departamento?: string | null;
+  referencia?: string | null;
+  es_principal: boolean;
 }
 
 export type VariantePrenda = Variante;
