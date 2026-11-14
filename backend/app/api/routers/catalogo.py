@@ -89,7 +89,7 @@ async def list_prendas(
         offset=offset,
     )
 
-
+##getActivateCatalogo
 @router.get("/prendas/{prenda_id}", response_model=PrendaOut)
 async def get_prenda(
     prenda_id: str,

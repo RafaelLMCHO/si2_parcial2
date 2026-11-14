@@ -1,10 +1,15 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { VentasOfflineStore, VentaOfflineRecord } from '../core/ventas-offline-store.service';
+import { OfflineQueueService } from '../core/offline-queue.service';
 
 /**
  * Controlador Web para CU-28: Registrar Venta de Contado Offline (Efectivo y Ticket Preliminar)
  */
 @Injectable({ providedIn: 'root' })
 export class CU28VentaContadoOfflineController {
+  private readonly ventasStore = inject(VentasOfflineStore);
+  private readonly offlineQueue = inject(OfflineQueueService);
+
   cargando = signal(false);
   error = signal<string | null>(null);
   ticketPreliminar = signal<any>(null);
@@ -40,22 +45,22 @@ export class CU28VentaContadoOfflineController {
         total: datos.total,
         forma_pago: 'efectivo',
         estado: 'pendiente',
-        leyenda_ticket: 'VENTA EN MODO OFFLINE - PENDIENTE DE SINCRONIZACIÓN'
+        leyenda_ticket: 'VENTA EN MODO OFFLINE - PENDIENTE DE SINCRONIZACIÓN',
       };
 
-      const operacion = {
+      const operacion: VentaOfflineRecord = {
         id: uuid,
         tipo: 'venta_offline',
         sucursal_id: datos.sucursal_id,
         payload,
         creada_en: payload.fecha_hora_local,
         idempotency_key: 'VENTA-OFF-' + uuid,
-        estado: 'pendiente'
+        estado: 'pendiente',
+        intentos: 0,
       };
 
-      const cola = JSON.parse(localStorage.getItem('cola_operaciones_offline') || '[]');
-      cola.push(operacion);
-      localStorage.setItem('cola_operaciones_offline', JSON.stringify(cola));
+      this.ventasStore.enqueue(operacion);
+      this.offlineQueue.refreshStatus();
 
       this.ticketPreliminar.set(payload);
       this.cargando.set(false);
@@ -67,4 +72,3 @@ export class CU28VentaContadoOfflineController {
     }
   }
 }
-

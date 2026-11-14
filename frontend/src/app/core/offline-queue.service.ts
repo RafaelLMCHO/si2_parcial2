@@ -1,7 +1,9 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { VentasOfflineStore } from './ventas-offline-store.service';
 
 @Injectable({ providedIn: 'root' })
 export class OfflineQueueService {
+  private readonly ventasStore = inject(VentasOfflineStore);
   private readonly queueKey = 'fashionstore_offline_queue';
   private readonly outboxKey = 'cola_operaciones_offline';
 
@@ -9,7 +11,7 @@ export class OfflineQueueService {
 
   hasPending(): boolean {
     if (typeof localStorage === 'undefined') {
-      return false;
+      return this.ventasStore.hasPending();
     }
 
     const raw = localStorage.getItem(this.queueKey);
@@ -29,11 +31,17 @@ export class OfflineQueueService {
       try {
         const outbox = JSON.parse(rawOutbox);
         if (Array.isArray(outbox)) {
-          return outbox.some((o) => o && o.estado !== 'confirmada');
+          if (outbox.some((o) => o && o.estado !== 'confirmada')) {
+            return true;
+          }
         }
       } catch {
         return true;
       }
+    }
+
+    if (this.ventasStore.hasPending()) {
+      return true;
     }
 
     return false;

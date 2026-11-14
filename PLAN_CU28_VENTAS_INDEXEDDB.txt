@@ -1,0 +1,334 @@
+================================================================================
+PLAN DE IMPLEMENTACION
+CU-28 - VENTAS OFFLINE WEB CON INDEXEDDB
+Proyecto: FashionStore / Segundo-parcial
+Frontend: Angular 20 standalone + PWA (frontend/)
+================================================================================
+
+1. OBJETIVO
+--------------------------------------------------------------------------------
+Migrar unicamente la persistencia de las VENTAS OFFLINE web (CU-28) de
+localStorage a IndexedDB, manteniendo intactos reservas (CU-26), cambios (CU-29),
+catalogo, soft-locks e inventario.
+
+Tambien corregir el mensaje enganoso del stub de POS (solo texto, sin wiring).
+
+
+2. DECISIONES APROBADAS
+--------------------------------------------------------------------------------
+[1] DB nueva: FashionStoreVentasOfflineDB (NO reutilizar FashionStoreOfflineDB).
+[2] Tras migrar ventas legacy a IndexedDB, eliminarlas de
+    localStorage['cola_operaciones_offline'].
+[3] OfflineQueueService.hasPending() debe considerar las ventas en IndexedDB.
+[4] pos.service.ts: solo corregir el texto del log. NO conectar al CU-28 real.
+[5] Tests con fake-indexeddb (devDependency).
+
+Supuestos:
+- Las ventas en estado 'confirmada' / 'en_conflicto' se conservan en IndexedDB
+  (igual que hoy se conservan en localStorage); hasPending las ignora.
+- Sin sincronizacion entre pestanas.
+- Fallback a localStorage solo si indexedDB no existe (modo privado / SSR).
+
+
+3. ALCANCE
+--------------------------------------------------------------------------------
+SI se modifica:
+- frontend/package.json
+- frontend/src/app/core/ventas-offline-store.service.ts          (NUEVO)
+- frontend/src/app/core/offline-queue.service.ts
+- frontend/src/app/controller/cu28_venta_contado_offline_controller.ts
+- frontend/src/app/controller/cu31_sincronizar_operaciones_controller.ts
+- frontend/src/app/controller/cu30_cola_operaciones_offline_controller.ts
+- frontend/src/app/app.config.ts
+- frontend/src/app/core/pos.service.ts
+- frontend/src/app/core/ventas-offline.spec.ts                   (NUEVO)
+- README.md
+
+NO se modifica:
+- cu26_registrar_reserva_offline_controller.ts
+- cu29_validar_qr_cambio_offline_controller.ts
+- core/reserva.service.ts
+- core/inventario.service.ts (su DB FashionStoreOfflineDB queda intacta)
+- catalogo offline, soft_locks_locales, Flutter/SQLite
+
+
+4. ARQUITECTURA
+--------------------------------------------------------------------------------
+- Espejo en memoria (Angular signal) como fuente de verdad en la sesion.
+- Write-through asincrono serializado hacia IndexedDB.
+- Hidratacion al arranque (provideAppInitializer) leyendo IndexedDB.
+- Las APIs publicas de CU-28 / CU-30 / CU-31 se mantienen sincronas/Observable.
+- Creacion perezosa de la DB: solo se abre/crea en el primer enqueue o en
+  hydrate() si existe marcador o ventas legacy.
+
+Flujo:
+  CU-28 registrarVenta()
+    -> ventasStore.enqueue(record)
+    -> mirror.push(record)  (sincrono)
+    -> persistChain = persistChain.then(put en IDB)
+    -> offlineQueue.refreshStatus()
+
+  App (al volver online)
+    -> auth.pendingOffline() == true
+    -> CU-31 sincronizarLote()
+    -> pendientes = cola localStorage SIN ventas + ventasStore.listPendientes()
+    -> POST /api/v1/sync
+    -> confirmadas/conflictos a cada fuente
+
+
+5. NUEVO SERVICIO
+--------------------------------------------------------------------------------
+Archivo: frontend/src/app/core/ventas-offline-store.service.ts
+
+constantes:
+  DB_NAME    = 'FashionStoreVentasOfflineDB'
+  DB_VERSION = 1
+  STORE      = 'ventas_offline'
+  MARKER_KEY = 'fashionstore_ventas_idb_initialized'
+  FALLBACK_KEY = 'fashionstore_ventas_offline'
+
+interface VentaOfflineRecord {
+  id: string;                  // uuid local (igual al usado hoy en CU-28)
+  tipo: 'venta_offline';
+  sucursal_id: string;
+  payload: Record<string, unknown>;
+  creada_en: string;
+  idempotency_key: string;     // 'VENTA-OFF-' + uuid (formato actual)
+  estado: 'pendiente' | 'enviada' | 'confirmada' | 'en_conflicto';
+  intentos: number;
+  ultimo_error?: string;
+}
+
+Estado interno:
+  private readonly itemsSignal = signal<VentaOfflineRecord[]>([]);
+  readonly items = this.itemsSignal.asReadonly();
+  private persistChain: Promise<void> = Promise.resolve();
+  private dbPromise: Promise<IDBDatabase> | null = null;
+  private fallback = false;
+  private hydrated = false;
+
+API publica:
+  hydrate(): Promise<void>
+  list(): VentaOfflineRecord[]
+  listPendientes(): VentaOfflineRecord[]
+  hasPending(): boolean
+  enqueue(record: VentaOfflineRecord): void
+  markEnviadas(ids: string[]): void
+  applySyncResult(confirmados: string[], conflictos: {id:string; detalle?:string; causa?:string}[]): void
+  revertEnviadas(): void
+  remove(id: string): void
+  whenIdle(): Promise<void>
+
+Comportamiento:
+
+hydrate()
+  - nunca lanza; try/catch interno con console.warn.
+  - si typeof indexedDB === 'undefined':
+      fallback = true; leer FALLBACK_KEY; setear items; hydrated = true; return.
+  - si no existe MARKER_KEY:
+      leer localStorage['cola_operaciones_offline'].
+      extraer registros con tipo === 'venta_offline'.
+      si no hay ventas legacy: hydrated = true; return SIN abrir la DB (lazy).
+      si hay:
+        (a) abrir DB y put() de cada venta (dedupe por id).
+        (b) SOLO si (a) tuvo exito, reescribir la cola localStorage sin ventas.
+        (c) setear MARKER_KEY = '1'.
+  - si existe MARKER_KEY: abrir DB y leer todo el store.
+  - cargar itemsSignal con lo leido; hydrated = true.
+
+openDb()
+  - indexedDB.open(DB_NAME, 1).
+  - onupgradeneeded: createObjectStore(STORE, { keyPath: 'id' });
+    store.createIndex('estado', 'estado', { unique: false }).
+  - resolver/rechazar correctamente.
+
+enqueue(record)
+  - itemsSignal.update(v => [...v, record]).
+  - escribir via persistChain:
+      si fallback: guardar items en FALLBACK_KEY.
+      si no: abrir DB (lazy) y put(record).
+  - navigator.storage?.persist?.().catch(() => undefined) best-effort.
+  - errores de cuota: console.warn y conservar el espejo (no romper la venta).
+
+markEnviadas(ids)
+  - actualizar espejo a 'enviada'; persistir esos ids.
+
+applySyncResult(...)
+  - confirmados -> estado 'confirmada' (eliminar ultimo_error).
+  - conflictos  -> estado 'en_conflicto' + ultimo_error con detalle/causa.
+  - persistir.
+
+revertEnviadas()
+  - los 'enviada' vuelven a 'pendiente'; persistir.
+
+hasPending()
+  - return itemsSignal().some(v => v.estado !== 'confirmada')
+  - NO debe tocar IndexedDB (debe ser sincrono y barato).
+
+whenIdle()
+  - return this.persistChain.
+
+IMPORTANTE: este servicio NO debe inyectar OfflineQueueService (evita ciclo).
+Los llamadores hacen offlineQueue.refreshStatus().
+
+
+6. CAMBIOS POR ARCHIVO
+--------------------------------------------------------------------------------
+
+6.1 frontend/package.json
+  devDependencies: agregar "fake-indexeddb": "^6.0.0".
+
+6.2 frontend/src/app/core/offline-queue.service.ts
+  - import { inject } from '@angular/core';
+  - import { VentasOfflineStore } from './ventas-offline-store.service';
+  - private readonly ventasStore = inject(VentasOfflineStore);
+  - hasPending(): al final, antes de return false, agregar:
+        if (this.ventasStore.hasPending()) return true;
+  - No cambiar enqueue()/clear() existentes (siguen siendo para reservas/cambios).
+
+6.3 frontend/src/app/controller/cu28_venta_contado_offline_controller.ts
+  - inject(VentasOfflineStore) y inject(OfflineQueueService).
+  - Reemplazar lineas 56-58 (push a localStorage) por:
+        this.ventasStore.enqueue(operacion);
+        this.offlineQueue.refreshStatus();
+  - Mantener: validacion solo efectivo, generacion de uuid, payload,
+    idempotency_key 'VENTA-OFF-' + uuid, retorno sincrono de payload.
+  - El record 'operacion' ya tiene el shape compatible con VentaOfflineRecord;
+    agregar intentos: 0.
+  - Mensaje de error del catch: mantener pero referir a almacenamiento local.
+
+6.4 frontend/src/app/controller/cu31_sincronizar_operaciones_controller.ts
+  - inject(VentasOfflineStore).
+  - Parseo seguro de la cola localStorage (try/catch; default []).
+  - localPendientes = cola.filter(o =>
+        o && o.tipo !== 'venta_offline' &&
+        (o.estado === 'pendiente' || o.estado === 'enviada'));
+  - ventasPendientes = this.ventasStore.listPendientes();
+  - pendientes = [...localPendientes, ...ventasPendientes];
+  - if (pendientes.length === 0): refreshStatus(), return observable vacio (igual que hoy).
+  - Marcar enviadas:
+        localPendientes.forEach(o => o.estado = 'enviada');
+        localStorage.setItem('cola_operaciones_offline', JSON.stringify(cola));
+        this.ventasStore.markEnviadas(ventasPendientes.map(v => v.id));
+  - payload.operaciones = pendientes.map(...) sin cambios de contrato.
+  - next:
+        confirmadosList / conflictosList desde res.
+        cola.forEach(op => { if op.tipo !== 'venta_offline' -> misma logica actual });
+        this.ventasStore.applySyncResult(confirmadosList, conflictosList);
+        localStorage.setItem(...) de la cola local.
+        refreshStatus(); confirmados.set(...); conflictos.set(...).
+  - catchError:
+        cola.forEach(op => { if (op.tipo !== 'venta_offline' && op.estado==='enviada') op.estado='pendiente'; });
+        this.ventasStore.revertEnviadas();
+        localStorage.setItem(...); refreshStatus(); error.set(...); throwError.
+  - Nota: NO cambiar el contrato del POST /api/v1/sync.
+
+6.5 frontend/src/app/controller/cu30_cola_operaciones_offline_controller.ts
+  - inject(VentasOfflineStore).
+  - Parseo seguro de localStorage.
+  - locales = cola.filter(o => o && o.tipo !== 'venta_offline').
+  - ventas = this.ventasStore.list().
+  - ops = dedupePorId([...locales, ...ventas]) (Map por id, conservar ultimo).
+  - operaciones.set(ops); return ops.
+
+6.6 frontend/src/app/app.config.ts
+  - import { provideAppInitializer, inject } from '@angular/core';
+  - import { VentasOfflineStore } from './core/ventas-offline-store.service';
+  - import { OfflineQueueService } from './core/offline-queue.service';
+  - providers: agregar
+        provideAppInitializer(async () => {
+          if (typeof indexedDB === 'undefined') return;
+          await inject(VentasOfflineStore).hydrate();
+          inject(OfflineQueueService).refreshStatus();
+        }),
+  - hydrate() no lanza, por lo que no bloquea el bootstrap.
+
+6.7 frontend/src/app/core/pos.service.ts (linea 24)
+  - Reemplazar el texto por:
+        `[CU-28] Venta POS derivada a la cola offline local (solo efectivo). UUID: ${uuid}.`
+  - NO cambiar el handler ni conectar CU28.
+
+6.8 README.md
+  - En "Comportamiento offline": indicar que las ventas web (CU-28) se
+    persisten en IndexedDB (FashionStoreVentasOfflineDB / ventas_offline),
+    mientras reservas y cambios siguen en localStorage.
+
+
+7. TESTS
+--------------------------------------------------------------------------------
+Nuevo: frontend/src/app/core/ventas-offline.spec.ts
+  - Primera linea: import 'fake-indexeddb/auto';
+  - beforeEach:
+      localStorage.clear();
+      await deleteDb();   // indexedDB.deleteDatabase('FashionStoreVentasOfflineDB')
+      TestBed.configureTestingModule({
+        providers: [provideHttpClient(), provideHttpClientTesting()]
+      });
+      store = TestBed.inject(VentasOfflineStore);
+      await store.hydrate();
+  - afterEach: httpMock.verify(); localStorage.clear(); await deleteDb();
+
+Casos:
+  [T1] Sin ventas ni marcador, hydrate() no abre la DB
+       (spyOn(indexedDB, 'open') y expect(openSpy).not.toHaveBeenCalled()).
+  [T2] registrarVenta() encola en el espejo, persiste en IDB y
+       hasPending() pasa a true.
+  [T3] Persistencia sobrevive a nueva instancia:
+       tras enqueue + whenIdle(), crear nuevo TestBed/injector,
+       hydrate(), expect(store.list().length).toBe(1).
+  [T4] Migracion legacy:
+       localStorage['cola_operaciones_offline'] con 1 venta_offline y 1
+       reserva_offline; hydrate(); venta queda en IDB; la clave legacy
+       conserva SOLO la reserva; sin duplicados; MARKER_KEY == '1'.
+  [T5] CU-31 arma un solo lote con venta (IDB) + reserva (localStorage),
+       hace POST /api/v1/sync, hace flush con confirmados de ambos ids y
+       deja ambas fuentes en 'confirmada'; hasPending() == false.
+  [T6] Fallback: simular indexedDB undefined; enqueue(); list() devuelve
+       la venta desde FALLBACK_KEY; hasPending() == true.
+
+Regresion:
+  - frontend/src/app/core/offline-reservas.spec.ts debe seguir pasando sin
+    cambios funcionales (el store queda vacio y sin hidratar en ese spec).
+
+
+8. COMANDOS DE VERIFICACION
+--------------------------------------------------------------------------------
+cd frontend
+npm install -D fake-indexeddb
+npm run build
+npx ng test --browsers=ChromeHeadless --watch=false
+
+Prueba manual:
+  1. Abrir /offline/venta, DevTools -> Application -> IndexedDB:
+     la DB NO debe existir antes de la primera venta.
+  2. Confirmar venta offline: aparece FashionStoreVentasOfflineDB /
+     ventas_offline con el registro 'pendiente'.
+  3. Recargar: la venta sigue listada (CU-30) y hasPending sigue true.
+  4. Volver online: POST /api/v1/sync incluye la venta UNA sola vez con
+     idempotency_key 'VENTA-OFF-...'; el registro pasa a 'confirmada'.
+  5. Verificar que una reserva offline sigue usando localStorage y
+     sincroniza en el mismo lote.
+
+
+9. CRITERIOS DE ACEPTACION
+--------------------------------------------------------------------------------
+- Ninguna venta offline se pierde al recargar, cerrar sesion o reabrir.
+- La DB se crea solo cuando se usa CU-28 (creacion perezosa).
+- No hay duplicados tras la migracion legacy.
+- El auto-sync se dispara con solo ventas pendientes.
+- Reservas y cambios no cambian de comportamiento.
+- Build y tests en verde.
+
+
+10. RIESGOS / NOTAS
+--------------------------------------------------------------------------------
+- No subir la version de FashionStoreOfflineDB (inventario depende de ella).
+- IndexedDB puede no estar disponible en modo privado: fallback cubierto.
+- QuotaExceededError: se loguea y se mantiene el espejo en memoria.
+- El orden de persistencia se garantiza con persistChain; no usar await
+  dentro de CU-28 para no romper el flujo sincrono del componente.
+- Si se desea limpiar ventas confirmadas antiguas, hacerlo en una tarea
+  posterior (fuera de este alcance).
+================================================================================
+FIN DEL PLAN
+================================================================================

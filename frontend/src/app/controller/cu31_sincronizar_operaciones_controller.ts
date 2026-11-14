@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap, catchError, throwError } from 'rxjs';
 import { OfflineQueueService } from '../core/offline-queue.service';
+import { VentasOfflineStore } from '../core/ventas-offline-store.service';
 
 /**
  * Controlador Web para CU-31: Sincronizar Operaciones Pendientes (Idempotencia RNF05)
@@ -10,6 +11,7 @@ import { OfflineQueueService } from '../core/offline-queue.service';
 export class CU31SincronizarOperacionesController {
   private readonly http = inject(HttpClient);
   private readonly offlineQueue = inject(OfflineQueueService);
+  private readonly ventasStore = inject(VentasOfflineStore);
 
   cargando = signal(false);
   error = signal<string | null>(null);
@@ -22,9 +24,22 @@ export class CU31SincronizarOperacionesController {
     this.confirmados.set(0);
     this.conflictos.set(0);
 
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('cola_operaciones_offline') : null;
-    const cola: any[] = raw ? JSON.parse(raw) : [];
-    const pendientes = cola.filter((o) => o && (o.estado === 'pendiente' || o.estado === 'enviada'));
+    let cola: any[] = [];
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('cola_operaciones_offline');
+        cola = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(cola)) cola = [];
+      } catch {
+        cola = [];
+      }
+    }
+
+    const localPendientes = cola.filter(
+      (o) => o && o.tipo !== 'venta_offline' && (o.estado === 'pendiente' || o.estado === 'enviada'),
+    );
+    const ventasPendientes = this.ventasStore.listPendientes();
+    const pendientes = [...localPendientes, ...ventasPendientes];
 
     if (pendientes.length === 0) {
       this.cargando.set(false);
@@ -36,8 +51,11 @@ export class CU31SincronizarOperacionesController {
     }
 
     // Marcar como enviadas
-    pendientes.forEach((p) => (p.estado = 'enviada'));
-    localStorage.setItem('cola_operaciones_offline', JSON.stringify(cola));
+    localPendientes.forEach((p) => (p.estado = 'enviada'));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('cola_operaciones_offline', JSON.stringify(cola));
+    }
+    this.ventasStore.markEnviadas(ventasPendientes.map((v) => v.id));
 
     const payload = {
       dispositivo_id: 'WEB-PWA-01',
@@ -59,19 +77,25 @@ export class CU31SincronizarOperacionesController {
           const conflictosList: any[] = res.conflictos || [];
 
           cola.forEach((op) => {
-            if (confirmadosList.includes(op.id)) {
-              op.estado = 'confirmada';
-              delete op.ultimo_error;
-            } else {
-              const conflicto = conflictosList.find((c) => c.id === op.id);
-              if (conflicto) {
-                op.estado = 'en_conflicto';
-                op.ultimo_error = conflicto.detalle || conflicto.causa || 'Conflicto de stock al sincronizar';
+            if (op && op.tipo !== 'venta_offline') {
+              if (confirmadosList.includes(op.id)) {
+                op.estado = 'confirmada';
+                delete op.ultimo_error;
+              } else {
+                const conflicto = conflictosList.find((c: any) => c.id === op.id);
+                if (conflicto) {
+                  op.estado = 'en_conflicto';
+                  op.ultimo_error = conflicto.detalle || conflicto.causa || 'Conflicto de stock al sincronizar';
+                }
               }
             }
           });
 
-          localStorage.setItem('cola_operaciones_offline', JSON.stringify(cola));
+          this.ventasStore.applySyncResult(confirmadosList, conflictosList);
+
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('cola_operaciones_offline', JSON.stringify(cola));
+          }
           this.offlineQueue.refreshStatus();
           this.confirmados.set(confirmadosList.length);
           this.conflictos.set(conflictosList.length);
@@ -80,11 +104,15 @@ export class CU31SincronizarOperacionesController {
       catchError((err) => {
         // RNF: Sección 5.4 - Prohibición absoluta de borrado y revertir a pendiente
         cola.forEach((op) => {
-          if (op.estado === 'enviada') {
+          if (op && op.tipo !== 'venta_offline' && op.estado === 'enviada') {
             op.estado = 'pendiente';
           }
         });
-        localStorage.setItem('cola_operaciones_offline', JSON.stringify(cola));
+        this.ventasStore.revertEnviadas();
+
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('cola_operaciones_offline', JSON.stringify(cola));
+        }
         this.offlineQueue.refreshStatus();
         this.cargando.set(false);
         this.error.set('Corte de red en transmisión. Transacciones preservadas en cola: ' + (err?.message || 'sin red'));
@@ -93,4 +121,3 @@ export class CU31SincronizarOperacionesController {
     );
   }
 }
-

@@ -181,8 +181,11 @@ npm run build
 ## Comportamiento offline
 
 - La PWA conserva tokens, catálogo cacheado, soft-locks y cola en almacenamiento
-  del navegador; la app Flutter usa `flutter_secure_storage` para tokens y SQLite
-  para catálogo, usuario, tenant, última sincronización, soft-locks locales y cola.
+  del navegador; las ventas offline web (CU-28) se persisten en IndexedDB
+  (`FashionStoreVentasOfflineDB` / `ventas_offline`), mientras que reservas (CU-26) y
+  cambios (CU-29) continúan en `localStorage` (`cola_operaciones_offline`).
+- La app Flutter usa `flutter_secure_storage` para tokens y SQLite para catálogo, usuario,
+  tenant, última sincronización, soft-locks locales y cola.
 - Sin conexión se pueden registrar reservas/ventas offline, emitir soft-locks y
   validar tickets QR HMAC; al reconectar se sincronizan de forma idempotente y se
   resuelven conflictos desde la UI dedicada.

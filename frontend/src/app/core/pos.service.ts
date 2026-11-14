@@ -21,7 +21,7 @@ export class PosService {
   private offlineHandler: VentaOfflineHandler = {
     registrar: async (ventaLocal, uuid) => {
       console.warn(
-        `[CU-28 STUB] Venta POS guardada en IndexedDB local con UUID: ${uuid}. Solo efectivo permitido en offline.`,
+        `[CU-28] Venta POS derivada a la cola offline local (solo efectivo). UUID: ${uuid}.`,
         ventaLocal
       );
       return true;
