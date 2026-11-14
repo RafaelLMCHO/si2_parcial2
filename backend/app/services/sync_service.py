@@ -521,6 +521,10 @@ class SyncService:
         op_id = _coerce_uuid_str(_op_get(op, "id"), "venta_offline")
         sucursal_id = _op_get(op, "sucursal_id")
         op_usuario_id = str(_op_get(op, "usuario_id") or usuario_id)
+        try:
+            UUID(op_usuario_id)
+        except (ValueError, TypeError):
+            op_usuario_id = str(usuario_id)
         p = _op_get(op, "payload") or {}
         if isinstance(p, str):
             p = json.loads(p)
@@ -589,6 +593,10 @@ class SyncService:
         op_id = _coerce_uuid_str(_op_get(op, "id"), "reserva_offline")
         sucursal_id = _op_get(op, "sucursal_id")
         op_usuario_id = str(_op_get(op, "usuario_id") or usuario_id)
+        try:
+            UUID(op_usuario_id)
+        except (ValueError, TypeError):
+            op_usuario_id = str(usuario_id)
         p = _op_get(op, "payload") or {}
         if isinstance(p, str):
             p = json.loads(p)
@@ -722,6 +730,10 @@ class SyncService:
                 p = json.loads(op["payload"]) if isinstance(op["payload"], str) else (op["payload"] or {})
                 op_tipo = _op_get(op, "tipo") or "venta_offline"
                 op_usuario_id = str(_op_get(op, "usuario_id") or usuario_id)
+        try:
+            UUID(op_usuario_id)
+        except (ValueError, TypeError):
+            op_usuario_id = str(usuario_id)
 
                 if datos.decision == "ajustar":
                     # Inyectar stock de regularización y reprocesar según tipo
@@ -739,11 +751,15 @@ class SyncService:
                         cant = int(item.get("cantidad", 1))
                         await conn.execute(
                             """
-                            UPDATE inventario
-                            SET stock_fisico = stock_fisico + $1
-                            WHERE empresa_id = $2 AND sucursal_id = $3 AND variante_id = $4
+                            INSERT INTO inventario (
+                                empresa_id, sucursal_id, variante_id,
+                                stock_fisico, stock_minimo, actualizado_en
+                            ) VALUES ($1, $2, $3, $4, 2, NOW())
+                            ON CONFLICT (empresa_id, variante_id, sucursal_id)
+                            DO UPDATE SET stock_fisico = inventario.stock_fisico + $4,
+                                          actualizado_en = NOW()
                             """,
-                            cant, empresa_id, op["sucursal_id"], var_id
+                            empresa_id, op["sucursal_id"], var_id, cant
                         )
                     if op_tipo == "reserva_offline":
                         await self._procesar_reserva_offline_sync(conn, empresa_id, op_usuario_id, op)

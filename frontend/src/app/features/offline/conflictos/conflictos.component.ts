@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CU32ResolverConflictosController } from '../../../controller/cu32_resolver_conflictos_controller';
+import { VentasOfflineStore } from '../../../core/ventas-offline-store.service';
+import { OfflineQueueService } from '../../../core/offline-queue.service';
 
 @Component({
   selector: 'app-conflictos-sync',
@@ -11,12 +13,18 @@ import { CU32ResolverConflictosController } from '../../../controller/cu32_resol
       <div class="flex justify-between items-center mb-6 border-b pb-4">
         <div>
           <h1 class="text-2xl font-bold text-gray-900">CU-32: Bandeja de Conflictos de Sincronización</h1>
-          <p class="text-sm text-gray-500">Resolución con políticas FIFO, transferencia entre tiendas o anulación</p>
+          <p class="text-sm text-gray-500">Resolución con políticas FIFO, regularización de stock o anulación</p>
         </div>
         <button (click)="cargar()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-xs font-semibold rounded-lg">
           Actualizar
         </button>
       </div>
+
+      @if (ctrl.error()) {
+        <div class="p-3 bg-red-50 text-red-700 text-xs rounded-xl mb-4">
+          ⚠️ {{ ctrl.error() }}
+        </div>
+      }
 
       <div class="space-y-4">
         @for (c of ctrl.conflictos(); track c.id) {
@@ -32,16 +40,18 @@ import { CU32ResolverConflictosController } from '../../../controller/cu32_resol
 
             <div class="flex gap-2">
               <button
-                (click)="resolver(c.id, 'rechazar')"
-                class="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold text-xs rounded-lg"
+                [disabled]="resolviendoId() === c.id"
+                (click)="resolver(c, 'rechazar')"
+                class="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold text-xs rounded-lg disabled:opacity-50"
               >
                 Anular Venta
               </button>
               <button
-                (click)="resolver(c.id, 'ajustar')"
-                class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg"
+                [disabled]="resolviendoId() === c.id"
+                (click)="resolver(c, 'ajustar')"
+                class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg disabled:opacity-50"
               >
-                Ajustar Stock (FIFO)
+                {{ resolviendoId() === c.id ? 'Ajustando...' : 'Ajustar Stock (FIFO)' }}
               </button>
             </div>
           </div>
@@ -56,6 +66,10 @@ import { CU32ResolverConflictosController } from '../../../controller/cu32_resol
 })
 export class ConflictosSyncComponent implements OnInit {
   ctrl = inject(CU32ResolverConflictosController);
+  ventasStore = inject(VentasOfflineStore);
+  offlineQueue = inject(OfflineQueueService);
+
+  resolviendoId = signal<string | null>(null);
 
   ngOnInit() {
     this.cargar();
@@ -65,12 +79,27 @@ export class ConflictosSyncComponent implements OnInit {
     this.ctrl.cargarConflictos().subscribe();
   }
 
-  resolver(id: string, decision: 'ajustar' | 'rechazar') {
+  resolver(c: any, decision: 'ajustar' | 'rechazar') {
+    this.resolviendoId.set(c.id);
     this.ctrl.resolverConflicto({
-      operacion_id: id,
+      operacion_id: c.id,
       decision,
       motivo: 'Resolución manual desde panel web'
-    }).subscribe();
+    }).subscribe({
+      next: () => {
+        this.resolviendoId.set(null);
+        const localId = c.payload?.uuid || c.id;
+        if (decision === 'ajustar') {
+          this.ventasStore.applySyncResult([localId], []);
+        } else {
+          this.ventasStore.remove(localId);
+        }
+        this.offlineQueue.refreshStatus();
+      },
+      error: () => {
+        this.resolviendoId.set(null);
+      }
+    });
   }
 }
 
