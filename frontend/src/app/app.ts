@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { SwUpdate } from '@angular/service-worker';
 import { CommonModule } from '@angular/common';
@@ -85,13 +85,16 @@ export class App {
 
       if (isAuth && tieneEmpresa && online) {
         this.cu25Offline.asegurarCatalogoOfflineCargado();
-        if (!this.wasOnline || this.auth.pendingOffline()) {
-          if (!this.cu31Sync.cargando()) {
-            this.cu31Sync
-              .sincronizarLote()
-              .pipe(catchError(() => EMPTY))
-              .subscribe();
-          }
+        // Solo sincronizar automáticamente cuando se pasa de offline a online
+        if (!this.wasOnline) {
+          untracked(() => {
+            if (!this.cu31Sync.cargando() && this.auth.pendingOffline()) {
+              this.cu31Sync
+                .sincronizarLote()
+                .pipe(catchError(() => EMPTY))
+                .subscribe();
+            }
+          });
         }
       } else if (!isAuth) {
         this.cu25Offline.resetPrefetch();

@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap, catchError, throwError } from 'rxjs';
+import { Observable, tap, catchError, throwError, of } from 'rxjs';
 import { OfflineQueueService } from '../core/offline-queue.service';
 import { VentasOfflineStore } from '../core/ventas-offline-store.service';
 
@@ -19,6 +19,9 @@ export class CU31SincronizarOperacionesController {
   conflictos = signal<number>(0);
 
   sincronizarLote(): Observable<any> {
+    if (this.cargando()) {
+      return of({ procesados_total: 0, confirmados: [], conflictos: [] });
+    }
     this.cargando.set(true);
     this.error.set(null);
     this.confirmados.set(0);
