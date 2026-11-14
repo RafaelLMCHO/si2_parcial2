@@ -21,10 +21,20 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideHttpClient(withInterceptors([authInterceptor])),
-    provideAppInitializer(async () => {
-      if (typeof indexedDB === 'undefined') return;
-      await inject(VentasOfflineStore).hydrate();
-      inject(OfflineQueueService).refreshStatus();
+    provideAppInitializer(() => {
+      const ventasStore = inject(VentasOfflineStore);
+      const offlineQueue = inject(OfflineQueueService);
+      return (async () => {
+        try {
+          if (typeof indexedDB !== 'undefined') {
+            await ventasStore.hydrate();
+          }
+        } catch (e) {
+          console.warn('[AppInitializer] hydrate error:', e);
+        } finally {
+          offlineQueue.refreshStatus();
+        }
+      })();
     }),
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
