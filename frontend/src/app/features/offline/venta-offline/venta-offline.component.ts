@@ -3,6 +3,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CU27BloquearStockSoftLockController } from '../../../controller/cu27_bloquear_stock_soft_lock_controller';
 import { CU28VentaContadoOfflineController } from '../../../controller/cu28_venta_contado_offline_controller';
+import { AuthService } from '../../../core/auth.service';
 
 @Component({
   selector: 'app-venta-offline',
@@ -41,8 +42,11 @@ import { CU28VentaContadoOfflineController } from '../../../controller/cu28_vent
 
         <div class="border rounded-xl p-4 bg-gray-50">
           <div class="flex justify-between items-center text-sm">
-            <span>Camisa Oxford M (SKU: OX-M) x 1</span>
-            <span class="font-bold">BOB 120.00</span>
+            <span>Vestido midi (SKU: FS-VES-001-GRI-M) x 1</span>
+            <span class="font-bold">BOB 180.00</span>
+          </div>
+          <div class="text-[11px] text-gray-500 mt-1">
+            Sucursal: Sucursal Centro • Stock disponible en servidor: 159 u.
           </div>
         </div>
 
@@ -72,6 +76,7 @@ import { CU28VentaContadoOfflineController } from '../../../controller/cu28_vent
   `
 })
 export class VentaOfflineComponent {
+  auth = inject(AuthService);
   lockCtrl = inject(CU27BloquearStockSoftLockController);
   ventaCtrl = inject(CU28VentaContadoOfflineController);
 
@@ -80,22 +85,26 @@ export class VentaOfflineComponent {
   formaPago = 'efectivo';
 
   confirmarVenta() {
+    const sucursalId = '11111111-1111-1111-1111-111111111101'; // Sucursal Centro
+    const varianteId = '01027aaa-d97a-a94a-410f-835132fd8e1d'; // Vestido midi
+    const usuarioId = this.auth.user()?.id || '11111111-1111-1111-1111-111111111304';
+
     // 1. Soft-Lock TTL 45 min
-    this.lockCtrl.bloquearStock('22222222-2222-2222-2222-222222222201', 1, 45);
+    this.lockCtrl.bloquearStock(varianteId, 1, 45, sucursalId);
 
     // 2. Venta contado offline
     this.ventaCtrl.registrarVenta({
-      sucursal_id: '11111111-1111-1111-1111-111111111101',
-      usuario_id: 'cajero-01',
+      sucursal_id: sucursalId,
+      usuario_id: usuarioId,
       cliente_nombre: this.clienteNombre,
       cliente_documento: this.clienteDoc,
       lineas: [{
-        variante_id: '22222222-2222-2222-2222-222222222201',
-        sku: 'OX-M',
+        variante_id: varianteId,
+        sku: 'FS-VES-001-GRI-M',
         cantidad: 1,
-        precio_unitario: 120.0
+        precio_unitario: 180.0
       }],
-      total: 120.0,
+      total: 180.0,
       metodo_pago: this.formaPago
     });
   }
