@@ -9,14 +9,14 @@ from generate_class_diagrams import UMLClassDiagram
 def generate_unified_clases_cu13(output_dir):
     d = UMLClassDiagram(
         title="CU-13: CONSULTAR CATÁLOGO DE PRENDAS (DISEÑO ROBUSTEZ - CLASES)",
-        subtitle="Diagrama de Clases de Diseño (ICONIX) - Fronteras Web/Flutter, Controladores de Robustez y Esquema Relacional de BD",
+        subtitle="Diagrama de Clases de Diseño (ICONIX) - 2 Fronteras (Web y Flutter), Controladores de Robustez y Esquema Relacional de BD",
         width=25,
         height=16
     )
 
     # 1. Actor
     d.add_class(
-        'actor', x=0.065, y_top=0.90, w=0.10,
+        'actor', x=0.065, y_top=0.75, w=0.10,
         name='Cliente', stereotype='actor',
         attributes=[
             '+ isOnline: boolean',
@@ -30,14 +30,16 @@ def generate_unified_clases_cu13(output_dir):
         ]
     )
 
-    # 2. Boundaries (Fronteras UI)
+    # 2. ÚNICAS 2 FRONTERAS (Boundary)
     d.add_class(
-        'ui_web', x=0.20, y_top=0.92, w=0.16,
+        'ui_web', x=0.22, y_top=0.92, w=0.17,
         name='CatalogoWebUI', stereotype='boundary',
         attributes=[
             '- productos: Prenda[] = []',
             '- isOffline: boolean = false',
-            '- isDataStale: boolean = false'
+            '- isDataStale: boolean = false',
+            '- bannerVisible: boolean = false',
+            '- warningText: string'
         ],
         methods=[
             '+ ngOnInit(): void',
@@ -45,16 +47,19 @@ def generate_unified_clases_cu13(output_dir):
             '+ fetchCatalogoOnline(): Promise<void>',
             '+ leerCacheLocalSiOffline(): Promise<void>',
             '+ mostrarAlertaDesactualizado(): void',
+            '+ ocultarAlerta(): void',
+            '+ reintentarSincronizacion(): void',
             '+ renderCatalogo(): void'
         ]
     )
 
     d.add_class(
-        'ui_mob', x=0.20, y_top=0.66, w=0.16,
+        'ui_mob', x=0.22, y_top=0.50, w=0.17,
         name='CatalogoFlutterUI', stereotype='boundary',
         attributes=[
             '- items: List<Prenda> = []',
             '- isOffline: bool = false',
+            '- isDataStale: bool = false',
             '- cacheUpdatedAt: DateTime?'
         ],
         methods=[
@@ -62,28 +67,14 @@ def generate_unified_clases_cu13(output_dir):
             '+ cargarInicial(slug: String): Future<void>',
             '+ checkVersionOffline(): Future<void>',
             '+ leerCacheLocalSiOffline(): Future<void>',
+            '+ mostrarAlertaDesactualizado(): void',
             '+ recargar(slug: String): Future<void>'
-        ]
-    )
-
-    d.add_class(
-        'ui_banner', x=0.20, y_top=0.40, w=0.16,
-        name='BannerDesactualizadoView', stereotype='boundary',
-        attributes=[
-            '- visible: boolean = false',
-            '- warningText: string',
-            '- lastDownload: timestamp'
-        ],
-        methods=[
-            '+ mostrarAlerta(): void',
-            '+ ocultarAlerta(): void',
-            '+ reintentarSincronizacion(): void'
         ]
     )
 
     # 3. Controller (Coincidente con el Diagrama de Robustez)
     d.add_class(
-        'ctrl', x=0.41, y_top=0.92, w=0.22,
+        'ctrl', x=0.44, y_top=0.92, w=0.21,
         name='CU13ConsultaCatalogoController', stereotype='control',
         attributes=[
             '- pool: asyncpg.Pool'
@@ -98,8 +89,8 @@ def generate_unified_clases_cu13(output_dir):
 
     # 4. Entidad de Cache Local (Offline / Sincronización)
     d.add_class(
-        'cache', x=0.41, y_top=0.68, w=0.20,
-        name='CatalogoCacheLocal', stereotype='boundary',
+        'cache', x=0.44, y_top=0.64, w=0.20,
+        name='CatalogoCacheLocal', stereotype='entity',
         attributes=[
             '- db: IndexedDB | SQLite',
             '+ cacheKey: varchar(60) = "fs_offline_catalog"',
@@ -116,7 +107,7 @@ def generate_unified_clases_cu13(output_dir):
 
     # 5. Entidad BD: catalogo_version
     d.add_class(
-        'cat_ver', x=0.41, y_top=0.40, w=0.20,
+        'cat_ver', x=0.44, y_top=0.36, w=0.20,
         name='CatalogoVersion', stereotype='entity', table='catalogo_version',
         attributes=[
             '+ empresa_id: uuid [PK, FK]',
@@ -130,7 +121,7 @@ def generate_unified_clases_cu13(output_dir):
 
     # 6. Entidad BD: categoria
     d.add_class(
-        'categoria', x=0.65, y_top=0.92, w=0.19,
+        'categoria', x=0.67, y_top=0.92, w=0.19,
         name='Categoria', stereotype='entity', table='categoria',
         attributes=[
             '+ id: uuid [PK]',
@@ -147,7 +138,7 @@ def generate_unified_clases_cu13(output_dir):
 
     # 7. Entidad BD: empresa
     d.add_class(
-        'empresa', x=0.65, y_top=0.62, w=0.19,
+        'empresa', x=0.67, y_top=0.58, w=0.19,
         name='Empresa', stereotype='entity', table='empresa',
         attributes=[
             '+ id: uuid [PK]',
@@ -166,7 +157,7 @@ def generate_unified_clases_cu13(output_dir):
 
     # 8. Entidad BD: prenda (Atributos 100% coincidentes con db/05_catalogo.sql)
     d.add_class(
-        'prenda', x=0.88, y_top=0.92, w=0.20,
+        'prenda', x=0.89, y_top=0.92, w=0.20,
         name='Prenda', stereotype='entity', table='prenda',
         attributes=[
             '+ id: uuid [PK]',
@@ -193,7 +184,7 @@ def generate_unified_clases_cu13(output_dir):
 
     # 9. Entidad BD: variante (Atributos 100% coincidentes con db/05_catalogo.sql)
     d.add_class(
-        'variante', x=0.88, y_top=0.45, w=0.20,
+        'variante', x=0.89, y_top=0.45, w=0.20,
         name='Variante', stereotype='entity', table='variante',
         attributes=[
             '+ id: uuid [PK]',
@@ -213,20 +204,16 @@ def generate_unified_clases_cu13(output_dir):
     )
 
     # Relaciones y Conectores
-    # Actor -> Fronteras
+    # Actor -> Las únicas 2 Fronteras
     d.add_connector('actor', 'ui_web', side1='right', side2='left', label="«interacts web»")
-    d.add_connector('actor', 'ui_mob', side1='right', side2='left', label="«interacts mobile»", rad=-0.06)
-
-    # Fronteras -> Banner
-    d.add_connector('ui_web', 'ui_banner', side1='bottom', side2='top', mult1="1", mult2="0..1", is_comp=True)
-    d.add_connector('ui_mob', 'ui_banner', side1='bottom', side2='top', mult1="1", mult2="0..1", is_comp=True)
+    d.add_connector('actor', 'ui_mob', side1='right', side2='left', label="«interacts mobile»", rad=-0.04)
 
     # Fronteras -> Controlador (Llamadas robustez: checkVersionOffline, list_prendas)
     d.add_connector('ui_web', 'ctrl', side1='right', side2='left', label="«HTTP online»", is_dep=True)
     d.add_connector('ui_mob', 'ctrl', side1='right', side2='left', label="«HTTP online»", is_dep=True, rad=-0.06)
 
     # Fronteras -> Cache Local (Llamada robustez: leerCacheLocalSiOffline, stale banner)
-    d.add_connector('ui_web', 'cache', side1='right', side2='left', label="«actualizar / leer»", is_dep=True, rad=0.08)
+    d.add_connector('ui_web', 'cache', side1='right', side2='left', label="«actualizar / leer»", is_dep=True, rad=0.06)
     d.add_connector('ui_mob', 'cache', side1='right', side2='left', label="«leerCacheLocalSiOffline»", is_dep=True)
 
     # Controlador -> Entidades (Llamadas robustez: get_catalog_version, list_prendas)
