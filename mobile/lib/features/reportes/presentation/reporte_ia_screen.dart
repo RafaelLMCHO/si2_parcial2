@@ -35,6 +35,7 @@ class _ReporteIaScreenState extends State<ReporteIaScreen> {
   String? _voiceError;
 
   final List<String> _whitelistChips = const [
+    'Mostrar los 10 productos más vendidos durante los últimos 3 meses agrupados por sucursal',
     'Mostrame las ventas de septiembre agrupadas por sucursal',
     '¿Cuáles fueron los diez productos más vendidos?',
     'Generá un gráfico de ventas por semana',
@@ -246,11 +247,17 @@ class _ReporteIaScreenState extends State<ReporteIaScreen> {
       if (raw is! Map) continue;
       final row = Map<String, dynamic>.from(raw);
       if (row.isEmpty) continue;
-      final label = row.values.first?.toString() ?? 'Item';
+      final label = row.containsKey('sucursal') && row.containsKey('prenda')
+          ? '${row['sucursal']} - ${row['prenda']}'
+          : (row.values.first?.toString() ?? 'Item');
       var value = 0.0;
-      for (final v in row.values) {
-        if (v is num) {
-          value = v.toDouble();
+      if (row.containsKey('unidades_vendidas') && row['unidades_vendidas'] is num) {
+        value = (row['unidades_vendidas'] as num).toDouble();
+      } else {
+        for (final v in row.values) {
+          if (v is num) {
+            value = v.toDouble();
+          }
         }
       }
       points.add(_ChartPoint(label: label, value: value));
@@ -847,12 +854,13 @@ class _ReporteIaScreenState extends State<ReporteIaScreen> {
         else
           ...filas.map((map) {
             final entries = map.entries.toList(growable: false);
-            final headerValue =
-                entries.length > 1 &&
-                    entries.first.key == 'codigo' &&
-                    map.containsKey('prenda')
-                ? '${map['prenda']} (${map['codigo']})'
-                : (entries.isNotEmpty ? _formatValue(entries.first.value) : '');
+            final headerValue = map.containsKey('sucursal') && map.containsKey('prenda')
+                ? '${map['sucursal']} • ${map['prenda']}'
+                : (entries.length > 1 &&
+                        entries.first.key == 'codigo' &&
+                        map.containsKey('prenda')
+                    ? '${map['prenda']} (${map['codigo']})'
+                    : (entries.isNotEmpty ? _formatValue(entries.first.value) : ''));
 
             return Card(
               margin: const EdgeInsets.only(bottom: 10),

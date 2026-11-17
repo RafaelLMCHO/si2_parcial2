@@ -2173,7 +2173,7 @@ export class CatalogoClienteComponent implements OnInit {
 
   filtros: CatalogFilterParams = {};
   ordenSeleccionado = 'relevancia';
-  prendas = signal<Prenda[]>([]);
+  prendas = signal<Prenda[]>([]); //atributo
   auxiliares = signal<AuxiliaresCatalogoResponse>({
     categorias: [],
     colores: [],
@@ -2183,7 +2183,7 @@ export class CatalogoClienteComponent implements OnInit {
   });
 
   cargando = signal(true);
-  isOffline = signal(false);
+  isOffline = signal(false);//atributo
   sinDatosLocales = signal(false);
 
   // Estado del Carrito
@@ -2213,6 +2213,7 @@ export class CatalogoClienteComponent implements OnInit {
   private toastTimeout: any;
 
   // Lista Ordenada y Filtrada
+  //rendercatalogo
   prendasFiltradas = computed(() => {
     let list = [...this.prendas()];
 
@@ -2231,7 +2232,7 @@ export class CatalogoClienteComponent implements OnInit {
     }
     return list;
   });
-
+  //metodo ngOnInit
   ngOnInit(): void {
     this.route.queryParams.subscribe((params) => {
       this.filtros.empresa_slug = params['empresa_slug'] || this.store.readTenant() || 'demo';
@@ -2247,7 +2248,7 @@ export class CatalogoClienteComponent implements OnInit {
       this.auxiliares.set(aux);
     });
   }
-
+  //metodo fetchCatalogoOnline()
   cargar(): void {
     this.cargando.set(true);
     this.catalogoService.consultarCatalogo(this.filtros).subscribe({
@@ -2657,7 +2658,7 @@ export class CatalogoClienteComponent implements OnInit {
               this.abrirCarritoDrawer();
             }
           },
-          error: () => {},
+          error: () => { },
         });
       }
     });

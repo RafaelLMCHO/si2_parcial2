@@ -16,16 +16,16 @@ class CatalogoController extends ChangeNotifier {
   final LocalDatabase _database;
   final NetworkStatus _networkStatus;
 
-  List<Prenda> _items = const [];
+  List<Prenda> _items = const []; //atributo
   AuxiliaresCatalogo _auxiliares = const AuxiliaresCatalogo();
   CatalogoFiltros _filtros = const CatalogoFiltros();
   bool _loading = false;
-  bool _isOffline = false;
-  bool _sinDatosLocales = false;
+  bool _isOffline = false;  //atributo
+  bool _sinDatosLocales = false; //atributo
   String? _error;
   int _total = 0;
   int _versionCatalogo = 0;
-  DateTime? _cacheUpdatedAt;
+  DateTime? _cacheUpdatedAt; //atributo
   String? _empresaSlug;
 
   List<Prenda> get items => _items;
@@ -41,7 +41,7 @@ class CatalogoController extends ChangeNotifier {
   DateTime? get cacheUpdatedAt => _cacheUpdatedAt;
   String? get empresaSlug => _empresaSlug;
   bool get hasItems => _items.isNotEmpty;
-
+//metodo cargarInicial(String)
   Future<void> cargarInicial(String empresaSlug) async {
     _empresaSlug = empresaSlug;
     _filtros = const CatalogoFiltros();
@@ -105,7 +105,7 @@ class CatalogoController extends ChangeNotifier {
     _error = null;
     notifyListeners();
   }
-
+//metodo checkVersionOffline()
   Future<void> _cargarOnline(
     String empresaSlug, {
     required bool refreshAuxiliares,
@@ -142,7 +142,7 @@ class CatalogoController extends ChangeNotifier {
       );
     }
   }
-
+//metodo para leer cache local
   Future<void> _cargarAuxiliares(String empresaSlug) async {
     try {
       final remote = await _repository.obtenerAuxiliares(empresaSlug);

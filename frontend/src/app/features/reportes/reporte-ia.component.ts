@@ -182,8 +182,8 @@ import {
               </thead>
               <tbody>
                 <tr *ngFor="let fila of reporte.filas">
-                  <td *ngFor="let val of fila | keyvalue">
-                    {{ val.value }}
+                  <td *ngFor="let val of obtenerValoresFila(fila)">
+                    {{ val }}
                   </td>
                 </tr>
               </tbody>
@@ -602,6 +602,7 @@ export class ReporteIaComponent {
   reporte: ReporteIaResponse | null = null;
 
   sugerenciasWhitelist = [
+    'Mostrar los 10 productos más vendidos durante los últimos 3 meses agrupados por sucursal',
     'Mostrame las ventas de septiembre agrupadas por sucursal',
     '¿Cuáles fueron los diez productos más vendidos?',
     'Generá un gráfico de ventas por semana',
@@ -703,16 +704,26 @@ export class ReporteIaComponent {
   }
 
   obtenerEtiquetaFila(fila: Record<string, any>): string {
+    if (fila['sucursal'] && fila['prenda']) {
+      return `${fila['sucursal']} - ${fila['prenda']}`;
+    }
     const vals = Object.values(fila);
     return String(vals[0] || 'Item');
   }
 
   obtenerValorFila(fila: Record<string, any>): number {
+    if (typeof fila['unidades_vendidas'] === 'number') {
+      return fila['unidades_vendidas'];
+    }
     const vals = Object.values(fila);
     for (const v of vals) {
       if (typeof v === 'number') return v;
     }
     return 1;
+  }
+
+  obtenerValoresFila(fila: Record<string, any>): any[] {
+    return Object.values(fila);
   }
 
   calcularPorcentajeBarra(fila: Record<string, any>): number {

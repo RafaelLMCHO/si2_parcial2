@@ -53,7 +53,7 @@ async def resolve_empresa_id(
 # --------------------------------------------------------------------------
 # CONSULTAS Y FILTRADO (CU-13 y CU-14) - Clientes, Movil, Offline & Web
 # --------------------------------------------------------------------------
-
+##metodo list_premdas
 @router.get("/prendas", response_model=PrendaListResponse)
 async def list_prendas(
     request: Request,

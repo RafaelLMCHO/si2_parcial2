@@ -25,7 +25,7 @@ class CatalogoScreen extends StatefulWidget {
 
 class _CatalogoScreenState extends State<CatalogoScreen> {
   final _searchController = TextEditingController();
-
+//metodo initState
   @override
   void initState() {
     super.initState();

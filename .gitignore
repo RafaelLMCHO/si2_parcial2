@@ -12,7 +12,9 @@ frontend/node_modules/
 frontend/dist/
 frontend/.angular/
 
-# Logs / temporales
+# Documentos personales / notas locales
+EXPLICACION_DOCENTE_*.txt
+
 *.log
 *.tmp
 supabase_dump*.sql

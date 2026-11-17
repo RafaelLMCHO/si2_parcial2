@@ -39,6 +39,14 @@ def _get_llm_config() -> Tuple[str, str, str]:
 # Whitelist de Reportes Permitidos (Regla BR-08)
 # ---------------------------------------------------------------------------
 WHITELIST_INTENTS = {
+    "top_productos_por_sucursal": [
+        r"(top|10|diez|m[aá]s vendidos|productos|prendas).*(por|agrupad[ao]s? por)\s*sucursal",
+        r"sucursal.*(top|10|diez|m[aá]s vendidos|productos|prendas)",
+        r"(top|10|diez|mejores).*productos.*sucursal",
+        r"productos.*m[aá]s vendidos.*sucursal",
+        r"prendas.*m[aá]s vendidas.*sucursal",
+        r"productos.*por sucursal",
+    ],
     "ventas_por_sucursal": [
         r"ventas.*sucursal",
         r"sucursales.*ventas",
@@ -141,12 +149,32 @@ def _extract_common_params(prompt: str) -> Dict[str, Any]:
             parametros["fecha_fin"] = date(next_year, next_month, 1) - timedelta(days=1)
             break
 
+    # Detección de periodos relativos ("últimos 3 meses", "ultimos 6 meses", "ultimo mes")
+    if "fecha_inicio" not in parametros:
+        m_meses = re.search(r'(?:[uú]ltimos?|pasados?)\s*(\d+)?\s*mes(?:es)?', p_lower)
+        if m_meses:
+            cant_meses = int(m_meses.group(1)) if m_meses.group(1) else 3
+            parametros["meses_atras"] = cant_meses
+            parametros["fecha_fin"] = date.today()
+            parametros["fecha_inicio"] = date.today() - timedelta(days=cant_meses * 30)
+
     if "diez" in p_lower or "10" in p_lower:
         parametros["limite"] = 10
     elif "cinco" in p_lower or "5" in p_lower:
         parametros["limite"] = 5
     elif "veinte" in p_lower or "20" in p_lower:
         parametros["limite"] = 20
+    elif "quince" in p_lower or "15" in p_lower:
+        parametros["limite"] = 15
+    else:
+        m_lim = re.search(r'(?:top|\b)\s*(\d+)\b', p_lower)
+        if m_lim:
+            try:
+                val = int(m_lim.group(1))
+                if 1 <= val <= 50:
+                    parametros["limite"] = val
+            except ValueError:
+                pass
     return parametros
 
 
@@ -266,37 +294,7 @@ def clasificar_intencion_whitelist(prompt: str) -> Tuple[str, Dict[str, Any]]:
         _reject_disallowed_prompt()
 
     p_lower = prompt.lower().strip()
-
-    # Extracción de parámetros comunes
-    parametros: Dict[str, Any] = {}
-
-    # Detección de meses
-    meses_map = {
-        "enero": 1, "febrero": 2, "marzo": 3, "abril": 4,
-        "mayo": 5, "junio": 6, "julio": 7, "agosto": 8,
-        "septiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12,
-    }
-    for mes_nombre, mes_num in meses_map.items():
-        if mes_nombre in p_lower:
-            year = datetime.now().year
-            parametros["mes"] = mes_num
-            parametros["mes_nombre"] = mes_nombre.capitalize()
-            parametros["fecha_inicio"] = date(year, mes_num, 1)
-            # Fin de mes
-            next_month = mes_num + 1 if mes_num < 12 else 1
-            next_year = year if mes_num < 12 else year + 1
-            parametros["fecha_fin"] = date(next_year, next_month, 1) - timedelta(days=1)
-            break
-
-    # Detección de límites
-    if "diez" in p_lower or "10" in p_lower:
-        parametros["limite"] = 10
-    elif "cinco" in p_lower or "5" in p_lower:
-        parametros["limite"] = 5
-    elif "veinte" in p_lower or "20" in p_lower:
-        parametros["limite"] = 20
-    else:
-        parametros["limite"] = 10
+    parametros = _extract_common_params(prompt)
 
     # Matching contra intents
     for intent, patterns in WHITELIST_INTENTS.items():
@@ -306,7 +304,9 @@ def clasificar_intencion_whitelist(prompt: str) -> Tuple[str, Dict[str, Any]]:
 
     # Fallback por defecto si menciona ventas o inventario
     if "venta" in p_lower or "vendido" in p_lower:
-        return "ventas_por_sucursal", parametros
+        if "sucursal" in p_lower:
+            return "top_productos_por_sucursal", parametros
+        return "top_productos_vendidos", parametros
     if "stock" in p_lower or "inventario" in p_lower:
         return "rotacion_stock_critico", parametros
 
@@ -354,7 +354,100 @@ async def procesar_reporte_ia(
     limite = params.get("limite", 10)
 
     # 1. Ejecución del reporte seguro según Whitelist
-    if tipo_reporte == "ventas_por_sucursal":
+    if tipo_reporte == "top_productos_por_sucursal":
+        cant_m = params.get("meses_atras", 3)
+        titulo = f"Top {limite} Prendas Más Vendidas por Sucursal (Últimos {cant_m} meses)"
+        rows = await conn.fetch(
+            """
+            SELECT
+                COALESCE(s.nombre, 'Venta Web / Digital') AS sucursal,
+                p.codigo,
+                p.nombre AS prenda,
+                COALESCE(cat.nombre, 'Sin categoría') AS categoria,
+                COALESCE(SUM(vd.cantidad), 0)::int AS unidades_vendidas,
+                COALESCE(SUM(vd.subtotal), 0)::float AS total_recaudado
+            FROM venta_detalle vd
+            JOIN venta v ON v.id = vd.venta_id AND v.empresa_id = vd.empresa_id
+            LEFT JOIN sucursal s ON s.id = v.sucursal_id AND s.empresa_id = v.empresa_id
+            JOIN variante var ON var.id = vd.variante_id AND var.empresa_id = vd.empresa_id
+            JOIN prenda p ON p.id = var.prenda_id AND p.empresa_id = vd.empresa_id
+            LEFT JOIN categoria cat ON cat.id = p.categoria_id AND cat.empresa_id = p.empresa_id
+            WHERE vd.empresa_id = $1
+              AND v.fecha_hora::date >= $2
+              AND v.fecha_hora::date <= $3
+              AND v.estado IN ('pagada', 'completada', 'emitida', 'entregada', 'enviada')
+            GROUP BY COALESCE(s.nombre, 'Venta Web / Digital'), p.codigo, p.nombre, cat.nombre
+            ORDER BY sucursal ASC, unidades_vendidas DESC, total_recaudado DESC
+            LIMIT $4
+            """,
+            empresa_id,
+            fecha_inicio,
+            fecha_fin,
+            limite,
+        )
+        if len(rows) == 0:
+            # Reintento con ventana histórica si en los últimos N meses no hubo registros
+            rows = await conn.fetch(
+                """
+                SELECT
+                    COALESCE(s.nombre, 'Venta Web / Digital') AS sucursal,
+                    p.codigo,
+                    p.nombre AS prenda,
+                    COALESCE(cat.nombre, 'Sin categoría') AS categoria,
+                    COALESCE(SUM(vd.cantidad), 0)::int AS unidades_vendidas,
+                    COALESCE(SUM(vd.subtotal), 0)::float AS total_recaudado
+                FROM venta_detalle vd
+                JOIN venta v ON v.id = vd.venta_id AND v.empresa_id = vd.empresa_id
+                LEFT JOIN sucursal s ON s.id = v.sucursal_id AND s.empresa_id = v.empresa_id
+                JOIN variante var ON var.id = vd.variante_id AND var.empresa_id = vd.empresa_id
+                JOIN prenda p ON p.id = var.prenda_id AND p.empresa_id = vd.empresa_id
+                LEFT JOIN categoria cat ON cat.id = p.categoria_id AND cat.empresa_id = p.empresa_id
+                WHERE vd.empresa_id = $1
+                  AND v.estado IN ('pagada', 'completada', 'emitida', 'entregada', 'enviada')
+                GROUP BY COALESCE(s.nombre, 'Venta Web / Digital'), p.codigo, p.nombre, cat.nombre
+                ORDER BY sucursal ASC, unidades_vendidas DESC, total_recaudado DESC
+                LIMIT $2
+                """,
+                empresa_id,
+                limite,
+            )
+
+        columnas = ["Sucursal", "Código", "Prenda", "Categoría", "Unidades Vendidas", "Ingresos (Bs.)"]
+        filas = [
+            {
+                "sucursal": r["sucursal"],
+                "codigo": r["codigo"],
+                "prenda": r["prenda"],
+                "categoria": r["categoria"],
+                "unidades_vendidas": r["unidades_vendidas"],
+                "ingresos": round(float(r["total_recaudado"]), 2),
+            }
+            for r in rows
+        ]
+        tipo_grafico = "barras"
+        datos_grafico = {
+            "labels": [f"{f['sucursal']} - {f['prenda'][:14]}" for f in filas],
+            "datasets": [
+                {"label": "Unidades Vendidas", "data": [f["unidades_vendidas"] for f in filas]}
+            ],
+        }
+        total_unidades = sum(f["unidades_vendidas"] for f in filas)
+        total_ingresos = sum(f["ingresos"] for f in filas)
+        sucursales_unicas = sorted(list(set(f["sucursal"] for f in filas)))
+        resumen_ejecutivo = (
+            f"En el período analizado de los últimos {cant_m} meses ({fecha_inicio.strftime('%d/%m/%Y')} al {fecha_fin.strftime('%d/%m/%Y')}), "
+            f"se consolidaron {total_unidades} unidades comercializadas de las prendas más demandadas en {len(sucursales_unicas)} "
+            f"sucursal(es) ({', '.join(sucursales_unicas) if sucursales_unicas else 'Sin ventas'}), "
+            f"alcanzando una recaudación de Bs. {total_ingresos:,.2f}."
+        )
+        kpis = {
+            "sucursales_con_ventas": len(sucursales_unicas),
+            "unidades_top_productos": total_unidades,
+            "recaudacion_top_bs": round(total_ingresos, 2),
+            "prenda_estrella": filas[0]["prenda"] if filas else "N/A",
+        }
+
+    elif tipo_reporte == "ventas_por_sucursal":
         titulo = f"Ventas Consolidadas por Sucursal ({params.get('mes_nombre', 'Últimos 90 días')})"
         rows = await conn.fetch(
             """
@@ -636,6 +729,7 @@ async def procesar_reporte_ia(
         logger.warning(f"No se pudo registrar log particionado consulta_ia_log: {e}")
 
     sugerencias = [
+        "Mostrar los 10 productos más vendidos durante los últimos 3 meses agrupados por sucursal",
         "¿Cuáles fueron los diez productos más vendidos este mes?",
         "Mostrame las ventas de septiembre agrupadas por sucursal",
         "Generá un gráfico de ventas por semana",

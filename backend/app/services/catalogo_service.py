@@ -33,7 +33,7 @@ async def _increment_catalog_version(conn, empresa_id: UUID) -> int:
     )
     return int(version)
 
-
+##metodo catalogo_version
 async def get_catalog_version(conn, empresa_id: UUID) -> int:
     v = await conn.fetchval("SELECT version FROM catalogo_version WHERE empresa_id = $1", empresa_id)
     return int(v) if v is not None else 1
@@ -55,6 +55,7 @@ async def list_prendas(
     limit: int = 50,
     offset: int = 0,
 ) -> PrendaListResponse:
+ ##atributo pool
     async with tenant_connection(empresa_id, user_id) as conn:
         version = await get_catalog_version(conn, UUID(empresa_id))
 

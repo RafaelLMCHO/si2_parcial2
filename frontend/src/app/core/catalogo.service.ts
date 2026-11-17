@@ -48,6 +48,8 @@ export class CatalogoService {
   /**
    * CU-13 & CU-14: Consulta de catalogo con filtros y resiliencia offline.
    */
+
+  //metodo reintentarSincronizacion
   consultarCatalogo(filters: CatalogFilterParams = {}): Observable<CatalogQueryResult> {
     if (this.network.online()) {
       let params = new HttpParams();
@@ -65,7 +67,7 @@ export class CatalogoService {
       }
       if (filters.genero) params = params.set('genero', filters.genero);
       if (filters.search) params = params.set('search', filters.search);
-
+      //metodo checkVersionOffline
       return this.http.get<PrendaListResponse>('/api/v1/catalogo/prendas', { params }).pipe(
         map((resp) => {
           // Guardar snapshot local para navegacion offline (RNF03)
@@ -260,7 +262,7 @@ export class CatalogoService {
       // Ignorar quota exceeded
     }
   }
-
+  //metodo leerCacheLocalSiOffline()
   private consultarOfflineLocal(filters: CatalogFilterParams): CatalogQueryResult {
     const items = this.leerPrendasOfflineCombinadas();
     if (items.length === 0) {
