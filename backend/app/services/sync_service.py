@@ -730,10 +730,10 @@ class SyncService:
                 p = json.loads(op["payload"]) if isinstance(op["payload"], str) else (op["payload"] or {})
                 op_tipo = _op_get(op, "tipo") or "venta_offline"
                 op_usuario_id = str(_op_get(op, "usuario_id") or usuario_id)
-        try:
-            UUID(op_usuario_id)
-        except (ValueError, TypeError):
-            op_usuario_id = str(usuario_id)
+                try:
+                    UUID(op_usuario_id)
+                except (ValueError, TypeError):
+                    op_usuario_id = str(usuario_id)
 
                 if datos.decision == "ajustar":
                     # Inyectar stock de regularización y reprocesar según tipo
